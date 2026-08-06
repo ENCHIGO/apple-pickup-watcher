@@ -1,0 +1,112 @@
+================================================================================
+NOTICE — 来源、版权与修改声明
+================================================================================
+
+本项目 apple-pickup-watcher 是下述项目的修改版本（硬分叉重写）：
+
+    原项目名称  Apple Store 预约助手 (apple-store-helper)
+    原项目地址  https://github.com/hteen/apple-store-helper
+    原项目作者  Hteen  <https://github.com/hteen>
+    原项目许可  GNU General Public License, version 3 (GPL-3.0)
+
+原项目贡献者（依原项目 README 所列）：
+
+    @Hteen      https://github.com/hteen
+    @Timssse    https://github.com/Timssse
+    @Black-Hole https://github.com/BlackHole1
+    @RayJason   https://github.com/RayJason
+    @Warkeeper  https://github.com/Warkeeper
+
+版权声明：
+
+    Copyright (C) 2020-2025 Hteen and the apple-store-helper contributors
+    Copyright (C) 2026 the apple-pickup-watcher contributors
+
+原项目的许可条款以 GPL-3.0 全文形式完整保留在本仓库根目录的 LICENSE 文件中，
+未作任何删改。
+
+
+--------------------------------------------------------------------------------
+修改声明（依据 GPL-3.0 第 5 条 a 款）
+--------------------------------------------------------------------------------
+
+本项目包含对原项目的显著修改。
+
+    修改日期    2026-08-06
+    修改者      apple-pickup-watcher 项目维护者
+    修改说明    本作品的全部文件均已被修改；本项目是在原项目基础上进行的
+                重新实现，而非原项目的逐字副本。
+
+修改摘要：
+
+  1. 库存查询接口整体更换。
+     原项目使用 /shop/fulfillment-messages 接口。该接口现已对任意请求恒定返回
+     HTTP 541 与一个 HTML 拦截页，原项目因此完全失效。本项目改用
+     /shop/retail/pickup-message 接口，并相应重写了全部请求构造与响应解析逻辑。
+
+  2. 引入「有货 / 无货 / 未知」三态库存模型。
+     原项目在请求失败时把结果退化为「无货」。本项目把「查询失败」提升为独立
+     状态，并新增被拦截、被限流、响应结构不符、业务报错四类可判定的错误分类。
+
+  3. 重写轮询调度。
+     原项目采用固定 500 毫秒一轮的无退出条件循环。本项目改为默认 30 秒、带
+     随机抖动与失败指数退避、可经 context 取消的调度引擎，并按门店聚合请求。
+
+  4. 重写 HTTP 客户端。
+     原项目每次查询都新建客户端实例，连接池无法复用。本项目在进程内复用单个
+     客户端与连接池，并加入全局最小请求间隔。
+
+  5. 消除后台 goroutine 内的 panic。
+     原项目在提示音播放与推送通知路径上直接 panic，会终止整个进程。本项目将
+     全部错误改为返回值，并在调度循环与各工作 goroutine 上设置兜底恢复。
+
+  6. 共享状态全面加锁。
+     原项目在界面线程与轮询 goroutine 之间无锁共享 map，会触发 Go 运行时的
+     fatal error 并直接终止进程。本项目所有跨线程状态均由读写锁保护。
+
+  7. 设置存储位置变更。
+     原项目将设置写入进程工作目录。本项目改为写入操作系统约定的用户配置目录，
+     并采用「写临时文件后原子改名」的方式落盘。
+
+  8. 商品目录改为可在线获取。
+     原项目的机型清单需要人工从浏览器开发者工具中复制并硬编码。本项目可直接
+     从 Apple 官网购买页解析获取，同时保留内置数据作为离线兜底。
+
+  9. 工程结构与依赖重整。
+     代码重新组织为 model / apple / catalog / config / watcher / notify / ui
+     分层结构；除 GUI 框架与音频播放库外的第三方依赖全部移除，改用标准库实现。
+
+
+--------------------------------------------------------------------------------
+本项目的许可
+--------------------------------------------------------------------------------
+
+依据 GPL-3.0 第 5 条 b、c 两款，本项目整体同样以
+GNU General Public License version 3 授权发布。
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+许可全文见本仓库根目录的 LICENSE 文件。
+
+
+--------------------------------------------------------------------------------
+第三方组件
+--------------------------------------------------------------------------------
+
+本项目在运行时链接以下第三方组件，它们各自的许可条款独立于本项目：
+
+    fyne.io/fyne/v2            BSD 3-Clause License
+    github.com/gopxl/beep/v2   MIT License
+
+assets/ 目录下的字体与提示音文件承自原项目，随原项目一同以 GPL-3.0 分发。

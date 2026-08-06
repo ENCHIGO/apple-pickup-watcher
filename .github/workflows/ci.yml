@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# 同一分支上的旧任务在有新提交时直接取消，避免排队浪费额度。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.26.2"
+
+jobs:
+  check:
+    name: 格式、静态检查与测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fyne 走 CGO 调用 OpenGL 与 X11，beep 在 Linux 上通过 ALSA 播放音频，
+      # 这些头文件 runner 默认没有，缺任何一个都会在编译期报 C 头文件找不到，
+      # 而不是在测试里失败，排查起来很费时间。
+      - name: 安装 Fyne 与音频依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc \
+            pkg-config \
+            libgl1-mesa-dev \
+            xorg-dev \
+            libxkbcommon-dev \
+            libasound2-dev
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      # 这里刻意用 gofmt -l 而不是 go fmt：后者会就地改写文件，CI 上改了也没人
+      # 看得见，结果是格式问题被静默吞掉。列出文件并让任务失败才有意义。
+      - name: gofmt 检查
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "以下文件未通过 gofmt，请在本地执行 make fmt 后重新提交："
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: 编译
+        run: go build ./...
+
+      # -race 是这个项目的重点：上游那些「用着用着就闪退」的问题，根子在界面
+      # 线程与轮询 goroutine 无锁共享状态。没有竞态检测的测试挡不住这类回归。
+      - name: 测试（竞态检测）
+        run: go test -race -count=1 ./...
