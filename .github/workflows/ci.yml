@@ -18,7 +18,7 @@ jobs:
     name: 格式、静态检查与测试
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Fyne 走 CGO 调用 OpenGL 与窗口系统，beep 在 Linux 上通过 ALSA 播放音频，
       # 这些头文件 runner 默认没有，缺任何一个都会在编译期报 C 头文件找不到，
@@ -42,7 +42,7 @@ jobs:
             libdecor-0-dev \
             libasound2-dev
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
