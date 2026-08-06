@@ -1,0 +1,186 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.26.2"
+  BINARY: apple-pickup-watcher
+  APP_NAME: Apple Pickup Watcher
+  APP_ID: io.github.enchigo.apple-pickup-watcher
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    # Fyne 依赖 CGO（OpenGL、系统窗口 API 都要链接本地库），beep 在各平台也要
+    # 链接系统音频库，所以每个目标平台必须在对应的 runner 上原生构建。
+    # 在 ubuntu 上设 GOOS=darwin 直接交叉编译是编不过的：没有 macOS SDK，
+    # 也没有对应的 C 交叉工具链。macos-latest 出 arm64，macos-15-intel 出 amd64。
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS (Apple Silicon)
+            runner: macos-latest
+            goos: darwin
+            goarch: arm64
+          # macos-15-intel 是 GitHub 当前提供的 Intel runner（有效期至 2027-08）。
+          # 上一代标签 macos-13 已于 2025-12-04 退役，指定它会让作业在初始化阶段
+          # 直接失败，进而跳过整个 publish，Releases 页面一个产物都不会有。
+          # 不要试图在 arm64 上交叉出 amd64：CGO 项目没有可用的交叉工具链。
+          - label: macOS (Intel)
+            runner: macos-15-intel
+            goos: darwin
+            goarch: amd64
+          - label: Windows (x64)
+            runner: windows-latest
+            goos: windows
+            goarch: amd64
+            # -H=windowsgui 让程序以 GUI 子系统启动，否则双击 exe 会额外弹出
+            # 一个黑色控制台窗口，看起来像是运行出错了。
+            extra_ldflags: -H=windowsgui
+          - label: Linux (x64)
+            runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+
+    defaults:
+      run:
+        # Windows runner 默认是 pwsh。统一成 bash，四个平台就能共用同一套脚本。
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Fyne 与音频依赖
+        if: matrix.goos == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc \
+            pkg-config \
+            libgl1-mesa-dev \
+            xorg-dev \
+            libxkbcommon-dev \
+            libasound2-dev
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: 编译
+        env:
+          CGO_ENABLED: "1"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          EXTRA_LDFLAGS: ${{ matrix.extra_ldflags }}
+        run: |
+          set -eu
+          mkdir -p dist
+          name="$BINARY"
+          if [ "$GOOS" = "windows" ]; then
+            name="$BINARY.exe"
+          fi
+          # migrated_fynedo 与 Makefile 的 build 目标保持一致：向 Fyne 声明界面
+          # 更新已全部走 fyne.Do，避免发布出去的程序每次启动都打印一句
+          # 「本应用尚未迁移」的不实警告。CI 的测试作业不加这个标签，
+          # 以便继续开着 Fyne 的跨线程访问检查。
+          go build -trimpath -tags migrated_fynedo -ldflags "-s -w $EXTRA_LDFLAGS" \
+            -o "dist/$name" ./cmd/"$BINARY"
+
+      # 图标不在仓库里时跳过 .app 打包，只发布可执行文件。宁可少一个产物，
+      # 也不要让整条发布流水线因为缺一张图片而失败。
+      - name: 打包 macOS .app
+        if: matrix.goos == 'darwin'
+        run: |
+          set -eu
+          if [ ! -f assets/icon.png ]; then
+            echo "仓库内没有 assets/icon.png，跳过 .app 打包"
+            exit 0
+          fi
+          go install fyne.io/tools/cmd/fyne@latest
+          (cd ./cmd/"$BINARY" && "$(go env GOPATH)/bin/fyne" package \
+            -name "$APP_NAME" -appID "$APP_ID" -icon "$GITHUB_WORKSPACE/assets/icon.png")
+          mv "./cmd/$BINARY/$APP_NAME.app" dist/
+          # ad-hoc 签名让用户在自己机器上清掉隔离属性后即可运行。
+          # 这不是 Apple 公证，下载后仍需执行 xattr -cr，README 里有说明。
+          xattr -cr "dist/$APP_NAME.app"
+          codesign --force --deep --sign - "dist/$APP_NAME.app"
+
+      - name: 归档
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          base="${BINARY}_${TAG}_${GOOS}_${GOARCH}"
+          mkdir -p out
+          cp LICENSE NOTICE README.md dist/
+          if [ "$GOOS" = "windows" ]; then
+            (cd dist && 7z a -tzip "../out/${base}.zip" ./*)
+          else
+            tar -czf "out/${base}.tar.gz" -C dist .
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.goos }}-${{ matrix.goarch }}
+          path: out/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: 发布 Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: 生成校验和
+        run: |
+          set -eu
+          cd out
+          # 先写到上一级再挪回来，免得校验和文件把自己也算进去。
+          sha256sum ./* > ../SHA256SUMS.txt
+          mv ../SHA256SUMS.txt .
+          cat SHA256SUMS.txt
+
+      # 标签名经环境变量传入而不是直接内插进脚本，避免命令注入。
+      - name: 创建 Release 并上传产物
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          notes=$(cat <<'EOF'
+          ### 安装说明
+
+          - **macOS**：应用未经 Apple 公证，首次打开会被 Gatekeeper 拦下并提示「已损坏」。
+            解压后执行 `xattr -cr "/Applications/Apple Pickup Watcher.app"` 即可正常启动。
+          - **Linux**：需要系统已安装 OpenGL 与 ALSA 运行库。
+          - 校验产物完整性请对照 `SHA256SUMS.txt`。
+
+          本项目基于 [hteen/apple-store-helper](https://github.com/hteen/apple-store-helper) 修改，
+          以 GPL-3.0 发布，详见仓库内的 `LICENSE` 与 `NOTICE`。
+          EOF
+          )
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" --repo "$REPO" --clobber out/*
+          else
+            gh release create "$TAG" --repo "$REPO" --title "$TAG" \
+              --notes "$notes" --generate-notes out/*
+          fi
