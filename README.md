@@ -87,7 +87,10 @@ xattr -cr "/Applications/Apple Pickup Watcher.app"
 xcode-select --install
 
 # Debian / Ubuntu
-sudo apt-get install -y gcc pkg-config libgl1-mesa-dev xorg-dev libxkbcommon-dev libasound2-dev
+# Wayland 那几个包不能省：Fyne v2.8 带的 GLFW 3.4 会同时编译 X11 和 Wayland
+# 两个后端，只装 xorg-dev 会报 wayland-client-core.h: No such file or directory。
+sudo apt-get install -y gcc pkg-config libgl1-mesa-dev xorg-dev libxkbcommon-dev \
+  libwayland-dev wayland-protocols libwayland-bin libdecor-0-dev libasound2-dev
 
 # Windows：安装 MinGW-w64，确保 gcc 在 PATH 中
 ```
