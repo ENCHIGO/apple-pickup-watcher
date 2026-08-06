@@ -58,6 +58,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Wayland 那几个包不能省：Fyne v2.8 带的 GLFW 3.4 会同时编译 X11 与
+      # Wayland 两个后端，只装 xorg-dev 会卡在 wayland-client-core.h 找不到。
       - name: 安装 Fyne 与音频依赖
         if: matrix.goos == 'linux'
         run: |
@@ -68,6 +70,10 @@ jobs:
             libgl1-mesa-dev \
             xorg-dev \
             libxkbcommon-dev \
+            libwayland-dev \
+            wayland-protocols \
+            libwayland-bin \
+            libdecor-0-dev \
             libasound2-dev
 
       - uses: actions/setup-go@v5
