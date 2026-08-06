@@ -122,7 +122,7 @@ make package-mac
 ```
 
 产物是 `dist/Apple Pickup Watcher.app`，已经做过 ad-hoc 签名，本机可直接运行。
-需要自备一张图标放在 `assets/icon.png`，或用 `make package-mac ICON=<路径>` 指定。
+图标默认取仓库里的 `assets/icon.png`，想换一张用 `make package-mac ICON=<路径>` 指定。
 
 > 由于 Fyne 依赖 CGO，**各平台必须在对应系统上原生构建**，
 > 在 Linux 上设 `GOOS=darwin` 直接交叉编译是编不过的。
