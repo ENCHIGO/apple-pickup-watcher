@@ -112,8 +112,13 @@ jobs:
             exit 0
           fi
           go install fyne.io/tools/cmd/fyne@latest
+          # fyne package 会自己重新编译一遍，不会复用上一步 dist/ 里的产物，
+          # 所以 migrated_fynedo 必须在这里再传一次。漏掉的话，macOS 用户真正
+          # 双击运行的这个 .app 就会打印那三行「尚未迁移到 fyne.Do」的不实警告，
+          # 而上一步为可执行文件做的规避完全帮不上忙。与 Makefile 的 package-mac 一致。
           (cd ./cmd/"$BINARY" && "$(go env GOPATH)/bin/fyne" package \
-            -name "$APP_NAME" -appID "$APP_ID" -icon "$GITHUB_WORKSPACE/assets/icon.png")
+            -name "$APP_NAME" -appID "$APP_ID" -icon "$GITHUB_WORKSPACE/assets/icon.png" \
+            -tags migrated_fynedo)
           mv "./cmd/$BINARY/$APP_NAME.app" dist/
           # ad-hoc 签名让用户在自己机器上清掉隔离属性后即可运行。
           # 这不是 Apple 公证，下载后仍需执行 xattr -cr，README 里有说明。
