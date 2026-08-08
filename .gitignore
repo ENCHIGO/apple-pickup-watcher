@@ -30,3 +30,6 @@ user_settings.json
 .idea/
 .vscode/
 *.swp
+
+# Rust
+/rust/target/
