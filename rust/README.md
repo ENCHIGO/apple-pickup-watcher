@@ -46,11 +46,13 @@ pub enum Availability {
 - [x] `apw-core::apple` —— HTTP 客户端、限速、退避重试、错误四分类、响应解析
 - [x] 单元测试与针对 Apple 真实接口的契约测试
 - [ ] `apw-core::catalog` —— 商品与门店目录（内嵌兜底 + 在线刷新）
-- [ ] `apw-core::watcher` —— 调度引擎
+- [x] `apw-core::watcher` —— 调度引擎（actor 模型）
 - [ ] `apw-core::notify` —— Bark / 提示音 / 系统通知
 - [ ] `apw-core::config` —— 设置持久化（含读取 Go 版 settings.json 做迁移）
 - [ ] Tauri 应用外壳与前端
 - [ ] 系统托盘、自动更新
+
+前端确定用 React 19 + TypeScript + Vite + shadcn/ui + Tailwind 4。
 
 ## 开发
 
