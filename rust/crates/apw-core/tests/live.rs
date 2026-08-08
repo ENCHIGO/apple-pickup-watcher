@@ -1,0 +1,138 @@
+//! 针对 Apple 真实接口的契约测试。默认不参与 `cargo test`，需要显式启用：
+//!
+//! ```shell
+//! cargo test -p apw-core --features live -- --nocapture
+//! ```
+//!
+//! 它存在的理由很直接：上游项目就是因为 Apple 悄悄换掉了接口而彻底失效，却因为
+//! 没有任何测试，半年时间里没人发现程序返回的「无货」其实是被拦截。单元测试用
+//! 假响应验证解析逻辑，但拦不住这种事；只有真的打一次 Apple 才行。
+//!
+//! 建议在 CI 里按天定时跑，而不是每次提交都跑，以免给 Apple 添麻烦。
+
+#![cfg(feature = "live")]
+
+use std::time::Duration;
+
+use apw_core::apple::{ApiError, AppleClient, ClientConfig};
+use apw_core::model::{Availability, UnknownReason, region_by_locale};
+
+/// 每个地区挑一家真实门店和一个真实零件号。
+///
+/// 零件号会随机型更新而失效，届时应当更新此表，而不是删掉测试。
+const CASES: &[(&str, &str, &str)] = &[
+    ("zh_CN", "R683", "MG724CH/A"),
+    ("zh_HK", "R428", "MG6L4ZA/A"),
+    ("zh_TW", "R694", "MG6L4ZP/A"),
+    ("ja_JP", "R119", "MG6A4J/A"),
+    ("en_SG", "R669", "MG6L4X/A"),
+    ("en_AU", "R440", "MG6L4X/A"),
+    ("en_MY", "R742", "MG6L4X/A"),
+];
+
+fn client() -> AppleClient {
+    AppleClient::new(ClientConfig {
+        // 别把真实接口当压测目标：两次请求之间隔开一点。
+        min_interval: Duration::from_secs(2),
+        ..ClientConfig::default()
+    })
+    .expect("构造客户端失败")
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn 七个地区的接口都还能用() {
+    let client = client();
+
+    for (locale, store, part) in CASES {
+        let region = region_by_locale(locale).expect("地区表里没有这个 locale");
+        let parts = vec![part.to_string()];
+
+        let result = client
+            .pickup_message(region, store, &parts)
+            .await
+            .unwrap_or_else(|e| match e {
+                ApiError::Blocked(d) => {
+                    panic!("{locale} 的请求被 Apple 拦截，接口或请求特征需要调整：{d}")
+                }
+                ApiError::SchemaDrift { field, raw } => {
+                    panic!("{locale} 的响应结构已改变，解析逻辑需要更新：{field} = {raw}")
+                }
+                other => panic!("{locale} 查询失败：{other}"),
+            });
+
+        assert_eq!(result.store_number, *store, "{locale} 返回了别的门店");
+        let status = result.parts.get(*part).unwrap_or_else(|| {
+            panic!("{locale} 的响应里没有零件号 {part}（可能已下架，需更新用例）")
+        });
+
+        assert!(
+            !status.pickup_display.is_empty(),
+            "{locale} 的 pickupDisplay 为空，字段名可能已变更"
+        );
+
+        // 是有货还是无货取决于当下库存，不做断言；但解析结果不能是「无法识别」——
+        // 那说明 Apple 换了词表，得去补 availability_from 的分支。
+        if let Availability::Unknown(UnknownReason::SchemaDrift { raw, .. }) = &status.availability
+        {
+            panic!("{locale} 返回了无法识别的 pickupDisplay {raw:?}，需要补充分支");
+        }
+
+        println!(
+            "{locale:6} {:12} {part:12} -> {:4} (pickupDisplay={}, 商品名={})",
+            result.store_name,
+            status.availability.label(),
+            status.pickup_display,
+            status.product_title.as_deref().unwrap_or("(无)"),
+        );
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn 无效零件号不会被判成无货() {
+    // 本项目最关键的不变量在真实接口上也必须成立。
+    let client = client();
+    let region = region_by_locale("zh_CN").unwrap();
+
+    match client
+        .pickup_message(region, "R683", &["NOSUCHPART/A".to_string()])
+        .await
+    {
+        // Apple 对无效零件号会直接报业务错误，这是可接受且正确的结果。
+        Err(e) => println!("无效零件号返回错误（可接受）：{e}"),
+        Ok(result) => {
+            if let Some(status) = result.parts.get("NOSUCHPART/A") {
+                assert_ne!(
+                    status.availability,
+                    Availability::OutOfStock,
+                    "无效零件号被判定成了「无货」，这正是上游那个致命缺陷：{status:?}"
+                );
+            }
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn 一次请求可以带多个零件号() {
+    // 这决定了正确的请求策略：每门店每轮只发一个请求，覆盖该店所有关注型号。
+    let client = client();
+    let region = region_by_locale("zh_CN").unwrap();
+    let parts: Vec<String> = ["MG724CH/A", "MG0A4CH/A", "MG364CH/A"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    let result = client
+        .pickup_message(region, "R683", &parts)
+        .await
+        .expect("批量查询应当成功");
+
+    assert_eq!(
+        result.parts.len(),
+        parts.len(),
+        "批量请求的型号数与返回的不一致：{:?}",
+        result.parts.keys().collect::<Vec<_>>()
+    );
+    for p in &parts {
+        assert!(result.parts.contains_key(p), "响应里缺少 {p}");
+    }
+}
