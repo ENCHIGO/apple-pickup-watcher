@@ -38,6 +38,8 @@ const maxPageBytes = 8 << 20
 // 注意 productSelectionData 这个键没有引号，它是 JS 对象字面量而非 JSON，
 // 因此整段不能直接 json.Unmarshal，只能定位到冒号后的第一个 { 再做花括号
 // 配对，把其中那个「本身是合法 JSON」的子对象截出来。
+//
+// 不过「没有引号」只是当前打包器的选择，不是契约，所以解析时带引号的写法也要认。
 const (
 	bootstrapMarker     = "PRODUCT_SELECTION_BOOTSTRAP"
 	productSelectionKey = "productSelectionData"
@@ -168,13 +170,59 @@ func extractProductSelectionData(page []byte) ([]byte, error) {
 		offset = i
 	}
 
-	k := bytes.Index(search, []byte(productSelectionKey))
-	if k < 0 {
-		return nil, fmt.Errorf("%w: 页面中找不到 %s", ErrUnexpectedSchema, productSelectionKey)
+	// 必须把所有同名位置都试一遍，而不是只认第一个。
+	// 原来只做一次 bytes.Index：页面里只要先出现一段含有 productSelectionData 文本的
+	// 字符串字面量（埋点参数、提示文案里出现这种字面量再正常不过），定位就停在那里，
+	// 发现后面不是冒号便直接判整页失败，真正的属性再也没机会被看到。表现是购买页
+	// 明明带着完整数据，程序却一口咬定「结构不符」，用户对着空目录无从下手。
+	var lastErr error
+	for from := 0; from < len(search); {
+		rel := bytes.Index(search[from:], []byte(productSelectionKey))
+		if rel < 0 {
+			break
+		}
+		k := from + rel
+		from = k + len(productSelectionKey)
+
+		raw, err := selectionValueAt(search, k, offset)
+		if err != nil {
+			// 单个候选不成立只说明这里不是那个属性，接着找下一个。
+			lastErr = err
+			continue
+		}
+		return raw, nil
 	}
 
+	// 全部候选都不成立时，报最后一个候选的具体原因；一个候选都没有才是「找不到」。
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, fmt.Errorf("%w: 页面中找不到 %s", ErrUnexpectedSchema, productSelectionKey)
+}
+
+// selectionValueAt 判断 search[k:] 处的 productSelectionKey 是不是一个真的属性名，
+// 是则把它的值原样截出来。offset 只用于把出错位置换算回整页偏移，方便排查。
+func selectionValueAt(search []byte, k, offset int) ([]byte, error) {
+	// 前后都得是标识符边界。否则 legacy_productSelectionData、productSelectionDataV2
+	// 这类把目标名包在里面的更长标识符也会算命中，进而把一份旧数据当成商品目录 ——
+	// 那比报错还糟：界面上会摆出一批早已下架的型号，用户守着永远不会有货的零件号。
+	if k > 0 && isIdentByte(search[k-1]) {
+		return nil, fmt.Errorf("%w: 偏移 %d 处的 %s 只是更长标识符的一部分",
+			ErrUnexpectedSchema, offset+k, productSelectionKey)
+	}
 	pos := k + len(productSelectionKey)
+	if pos < len(search) && isIdentByte(search[pos]) {
+		return nil, fmt.Errorf("%w: 偏移 %d 处的 %s 只是更长标识符的一部分",
+			ErrUnexpectedSchema, offset+k, productSelectionKey)
+	}
+
 	pos = skipSpace(search, pos)
+	// 键带不带引号都要认：JS 对象字面量里 productSelectionData: 和
+	// "productSelectionData": 一样合法。原来只认不带引号那种，Apple 哪天顺手加上引号
+	// （比如换个打包器），整页数据就会栽在「之后不是冒号」上。
+	if pos < len(search) && (search[pos] == '"' || search[pos] == '\'') {
+		pos = skipSpace(search, pos+1)
+	}
 	if pos >= len(search) || search[pos] != ':' {
 		return nil, fmt.Errorf("%w: %s 之后不是冒号", ErrUnexpectedSchema, productSelectionKey)
 	}
@@ -188,7 +236,22 @@ func extractProductSelectionData(page []byte) ([]byte, error) {
 		return nil, fmt.Errorf("%w: 截取 %s 失败（起始偏移 %d）: %v",
 			ErrUnexpectedSchema, productSelectionKey, offset+pos, err)
 	}
-	return search[pos:end], nil
+
+	raw := search[pos:end]
+	// 花括号配平不等于内容合法。补这一道校验，才能把「命中的其实是某段文案里的同名
+	// 文本」这类假阳性挡在门外 —— 挡掉之后循环还能继续去找真正的属性，而不是抱着
+	// 一段垃圾往下走，最后以「一个商品都解析不出来」收场。
+	if err := json.Unmarshal(raw, new(json.RawMessage)); err != nil {
+		return nil, fmt.Errorf("%w: %s 的值不是合法 JSON: %v",
+			ErrUnexpectedSchema, productSelectionKey, err)
+	}
+	return raw, nil
+}
+
+// isIdentByte 判断一个字节能否出现在 JS 标识符中间。
+func isIdentByte(b byte) bool {
+	return b == '_' || b == '$' || isASCIIDigit(b) ||
+		(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 
 func skipSpace(b []byte, i int) int {

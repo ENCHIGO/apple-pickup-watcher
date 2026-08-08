@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -141,6 +142,39 @@ func waitCalls(t *testing.T, f *fakeFetcher, n int, timeout time.Duration) {
 		time.Sleep(time.Millisecond)
 	}
 	t.Fatalf("等待 %d 次查询超时，实际只有 %d 次", n, f.callCount())
+}
+
+// waitTrouble 阻塞读事件，直到收到一条 EventTrouble。
+func waitTrouble(t *testing.T, e *watcher.Engine, timeout time.Duration) watcher.Event {
+	t.Helper()
+	deadline := time.After(timeout)
+	for {
+		select {
+		case ev := <-e.Events():
+			if ev.Kind == watcher.EventTrouble {
+				return ev
+			}
+		case <-deadline:
+			t.Fatal("等待 EventTrouble 超时")
+			return watcher.Event{}
+		}
+	}
+}
+
+// waitStopped 轮询等待引擎报告自己已经停下。
+//
+// 生命周期复位发生在监控 goroutine 退出的路上，收到事件的那一刻它可能还没走完，
+// 所以只能轮询，不能收到事件就立刻断言。
+func waitStopped(t *testing.T, e *watcher.Engine, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if !e.Running() {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("监控循环已经退出，Running() 却一直是 true —— 引擎成了叫不醒的僵尸")
 }
 
 // drainEvents 非阻塞地取走通道里已有的事件。
@@ -561,6 +595,12 @@ func TestFetcherPanicDoesNotKillEngine(t *testing.T) {
 
 	e.Start()
 	events := waitCycles(t, e, 1, 5*time.Second)
+
+	// 门店级 panic 是被单店 recover 兜住的局部故障，监控循环本身必须还活着；
+	// 复位生命周期只能是循环整个塌掉时的行为，不能被这种局部故障误触发。
+	if !e.Running() {
+		t.Error("单个门店的 panic 之后 Running() 变成了 false，监控循环被误停了")
+	}
 	e.Stop()
 
 	var trouble *watcher.Event
@@ -718,31 +758,14 @@ func TestClearingTargetsStopsQueries(t *testing.T) {
 	e.Stop()
 }
 
-// TestStartThenImmediateStop 记录一个尚未修复的核心缺陷，因此被跳过。
+// TestStartThenImmediateStop 覆盖「没有目标就点开始再点停止」这条最普通的路径。
 //
-// 缺陷位置：watcher.go:226 的 defer close(e.done) 与 watcher.go:253 的
-// e.cancel, e.done = nil, nil。前者在监控 goroutine 内读 e.done 却不持有 runMu，
-// 后者在 Stop 里持锁写 e.done，两者之间没有任何 happens-before 关系。
-//
-// 后果不只是数据竞争。defer 的实参在 defer 语句执行时求值：Start 返回后若
-// Stop 抢先把 e.done 置为 nil，goroutine 求到的就是 nil，循环退出时执行
-// close(nil) 直接 panic「close of nil channel」；而 watcher.go:231 那个
-// recover 兜底是后注册的，按 LIFO 会先于 close 执行，根本拦不住这个 panic，
-// 于是整个进程被带走——正是本项目要消灭的那类崩溃。同时 Stop 卡在 <-done 上永不返回。
-//
-// 复现：新建引擎后 e.Start(); e.Stop()，两者之间不做任何会与监控 goroutine
-// 通信的操作（有目标时 waitCycles 从 Events() 收事件会意外建立 happens-before
-// 边而掩盖掉它，所以恰恰是「没有目标就点开始再点停止」这条最普通的路径最危险）。
-// 去掉下面的 Skip 后：
-//   - go test -race 报 WARNING: DATA RACE；
-//   - GOMAXPROCS=1 go test 稳定复现 panic: close of nil channel（栈顶 watcher.go:241），
-//     整个测试进程当场退出。
-//
-// 修复方向：把 e.done 在 Start 里存进局部变量，goroutine 里 defer close(该局部变量)，
-// 不再通过 e 字段访问。修好后请删掉这里的 Skip。
+// 它专门不与监控 goroutine 做任何通信：有目标时 waitCycles 从 Events() 收事件会
+// 建立 happens-before 边，把 Start/Stop 之间的竞争掩盖掉。历史上这里的 done 通道
+// 是在 goroutine 里通过 e 字段访问的，与 Stop 清空该字段构成数据竞争，
+// 还会 close(nil) 把进程带走；现在 done 在 Start 里就捕获成局部变量，
+// 配合 go test -race 跑这个用例可以守住。
 func TestStartThenImmediateStop(t *testing.T) {
-	t.Skip("已知缺陷：watcher.go:226 与 watcher.go:253 对 e.done 存在数据竞争，可导致 close of nil channel")
-
 	f := &fakeFetcher{}
 	e := watcher.New(f, watcher.WithInterval(time.Millisecond), watcher.WithJitter(0))
 
@@ -754,5 +777,301 @@ func TestStartThenImmediateStop(t *testing.T) {
 	}
 	if n := f.callCount(); n != 0 {
 		t.Errorf("没有目标却发起了 %d 次查询", n)
+	}
+}
+
+// missingAllParts 返回一个结构完全合法、却一个请求的型号都没命中的响应，
+// 用来模拟 Apple 改了 partsAvailability 的键格式。
+func missingAllParts(store string, _ []string) (*apple.StoreAvailability, error) {
+	return storeResult(store, []string{"MG000CH/A"}, model.InStock), nil
+}
+
+// TestAllPartsMissingIsStoreLevelFailure 验证「请求的型号一个都没在响应里出现」
+// 必须按门店级失败处理。
+//
+// 之前只有「取值无法识别」的型号才计数，型号整个缺失时虽然记成了 Unknown，
+// 门店却仍算查询成功：不发 EventTrouble、本轮也不算失败。于是 Apple 一改键格式，
+// 所有型号统统对不上，程序反而认为一切正常，继续按原频率去请求一个已经失效的结构，
+// 用户只能对着一屏「未知」干等，什么提示都没有。
+func TestAllPartsMissingIsStoreLevelFailure(t *testing.T) {
+	f := &fakeFetcher{
+		respond: func(n int, store string, parts []string) (*apple.StoreAvailability, error) {
+			return missingAllParts(store, parts)
+		},
+	}
+	e := newEngine(f)
+	e.SetTargets([]model.Target{target(storeA, partA), target(storeA, partB)})
+
+	e.Start()
+	events := waitCycles(t, e, 1, 5*time.Second)
+	e.Stop()
+	events = append(events, drainEvents(e)...)
+
+	var trouble *watcher.Event
+	for i := range events {
+		if events[i].Kind == watcher.EventTrouble {
+			trouble = &events[i]
+			break
+		}
+	}
+	if trouble == nil {
+		t.Fatal("整店型号全部缺失却没有发出 EventTrouble，用户看不到接口已经对不上了")
+	}
+	if !strings.Contains(trouble.Reason, storeA) {
+		t.Errorf("EventTrouble.Reason = %q, 期望带上出问题的门店号 %s", trouble.Reason, storeA)
+	}
+
+	for _, ev := range events {
+		if ev.Kind == watcher.EventCycleComplete && ev.Healthy {
+			t.Error("一个型号都没拿到结果，EventCycleComplete 却报告本轮健康")
+		}
+	}
+
+	for _, part := range []string{partA, partB} {
+		st := findState(t, e, target(storeA, part).Key())
+		if st.Availability != model.Unknown {
+			t.Errorf("%s 的状态 = %v, 期望 Unknown", part, st.Availability)
+		}
+		if !errors.Is(st.LastError, apple.ErrUnexpectedSchema) {
+			t.Errorf("%s 的 LastError = %v, 期望满足 errors.Is(err, ErrUnexpectedSchema)", part, st.LastError)
+		}
+	}
+}
+
+// TestAllPartsMissingTriggersGlobalBackoff 验证整店型号全缺失会计入全局失败计数。
+//
+// cycleFailures 不导出，只能从它唯一的外部表现去验：整轮全败会把下一轮的间隔翻倍。
+// 之前这种失败被当成成功，计数每轮都被清零，接口失效时退避形同虚设 —— 程序会以
+// 完全没变的频率继续猛冲，只会让风控来得更快。
+func TestAllPartsMissingTriggersGlobalBackoff(t *testing.T) {
+	const interval = 100 * time.Millisecond
+
+	f := &fakeFetcher{
+		respond: func(n int, store string, parts []string) (*apple.StoreAvailability, error) {
+			return missingAllParts(store, parts)
+		},
+	}
+	e := watcher.New(f, watcher.WithInterval(interval), watcher.WithJitter(0))
+	e.SetTargets([]model.Target{target(storeA, partA)})
+
+	e.Start()
+	waitCycles(t, e, 1, 5*time.Second)
+	begin := time.Now()
+	waitCycles(t, e, 1, 5*time.Second)
+	elapsed := time.Since(begin)
+	e.Stop()
+
+	// 退避生效时第二轮要等两倍间隔。定时器只会晚到不会早到，机器再慢也只会
+	// 让 elapsed 更大，所以这个下界不会误报。
+	if elapsed < interval+interval/2 {
+		t.Fatalf("第一轮全军覆没后第二轮只等了 %v（基础间隔 %v），说明这一轮被算成了成功、没有进入全局退避",
+			elapsed, interval)
+	}
+}
+
+// TestPartialMissingPartDoesNotAlarmStore 守住上面那条修复的边界。
+//
+// 只有个别型号缺失时仍按较宽松的策略处理：那多半是某一个零件号自己下架或写错，
+// 让它拖着整个门店告警并退避是过度反应，久了用户就会开始无视告警。
+func TestPartialMissingPartDoesNotAlarmStore(t *testing.T) {
+	f := &fakeFetcher{
+		respond: func(n int, store string, parts []string) (*apple.StoreAvailability, error) {
+			// 只回 partA，漏掉 partB。
+			return storeResult(store, []string{partA}, model.InStock), nil
+		},
+	}
+	e := newEngine(f)
+	e.SetTargets([]model.Target{target(storeA, partA), target(storeA, partB)})
+
+	e.Start()
+	events := waitCycles(t, e, 1, 5*time.Second)
+	e.Stop()
+	events = append(events, drainEvents(e)...)
+
+	if n := countKind(events, watcher.EventTrouble); n != 0 {
+		t.Fatalf("只有一个型号缺失就发了 %d 条 EventTrouble，对单个零件号的问题反应过度", n)
+	}
+}
+
+// concurrentFetcher 记录同一时刻在飞的查询数峰值。
+//
+// 只盯一个门店时，一条监控循环任何时刻最多只有一次查询在飞（runCycle 会等本轮
+// 所有门店 goroutine 结束才返回）。峰值一旦超过 1，就只能是同时存在两条循环。
+type concurrentFetcher struct {
+	delay time.Duration
+
+	mu       sync.Mutex
+	inFlight int
+	peak     int
+	calls    int
+}
+
+func (f *concurrentFetcher) PickupMessage(ctx context.Context, region model.Region, storeNumber string, parts []string) (*apple.StoreAvailability, error) {
+	f.mu.Lock()
+	f.calls++
+	f.inFlight++
+	if f.inFlight > f.peak {
+		f.peak = f.inFlight
+	}
+	f.mu.Unlock()
+
+	// 拖住一会儿，让「旧循环还在飞、新循环已经起来」的重叠窗口能被观测到。
+	time.Sleep(f.delay)
+
+	f.mu.Lock()
+	f.inFlight--
+	f.mu.Unlock()
+
+	return storeResult(storeNumber, parts, model.InStock), nil
+}
+
+func (f *concurrentFetcher) stats() (calls, peak int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls, f.peak
+}
+
+// TestConcurrentStopAndStartRunsSingleLoop 验证并发的 Stop 与 Start 不会跑出两套循环。
+//
+// Stop 必须先释放 runMu 才能去等旧循环退出。之前它在释放锁之前就把 running 置成了
+// false，于是这段等待期间闯进来的 Start 会看到「没在运行」而再拉起一条循环：
+// 两条循环同时查询，请求量翻倍（风控只会更严），还会交替往同一份状态里写，
+// 界面上的状态和提醒都会开始跳。
+func TestConcurrentStopAndStartRunsSingleLoop(t *testing.T) {
+	f := &concurrentFetcher{delay: 5 * time.Millisecond}
+	e := watcher.New(f, watcher.WithInterval(time.Millisecond), watcher.WithJitter(0))
+	e.SetTargets([]model.Target{target(storeA, partA)})
+
+	for i := 0; i < 20; i++ {
+		e.Start()
+
+		// 等循环真的开始查询，否则 Stop 撞上的是一条还没干活的循环，窗口根本没打开。
+		before, _ := f.stats()
+		waitConcurrentCalls(t, f, before+1, 5*time.Second)
+
+		// 让两个调用尽量同时进入，才有机会命中 Stop 释放锁之后的那一小段窗口。
+		fire := make(chan struct{})
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-fire
+			e.Stop()
+		}()
+		go func() {
+			defer wg.Done()
+			<-fire
+			e.Start()
+		}()
+		close(fire)
+		wg.Wait()
+
+		e.Stop()
+		drainEvents(e)
+
+		if _, peak := f.stats(); peak > 1 {
+			t.Fatalf("第 %d 次并发 Stop/Start 后出现了 %d 个同时在飞的查询，"+
+				"单门店单循环最多只该有 1 个，说明同时跑起了两套循环", i, peak)
+		}
+	}
+
+	if calls, _ := f.stats(); calls == 0 {
+		t.Fatal("整个用例一次查询都没发生，没有真正跑起来")
+	}
+}
+
+// waitConcurrentCalls 轮询等待 concurrentFetcher 被调用够 n 次。
+func waitConcurrentCalls(t *testing.T, f *concurrentFetcher, n int, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if calls, _ := f.stats(); calls >= n {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	calls, _ := f.stats()
+	t.Fatalf("等待 %d 次查询超时，实际只有 %d 次", n, calls)
+}
+
+// TestLoopPanicResetsLifecycle 验证监控循环因 panic 退出后引擎不会变成僵尸。
+//
+// 之前主 goroutine 的 recover 只发一条 EventTrouble 就算完，生命周期状态原样挂着：
+// Running() 一直报告「在运行」，Start() 又因此变成空操作，监控其实早就死了，
+// 界面却显示得好好的，用户点停止再点开始也救不回来，只能重启程序。
+//
+// panic 从时间源注入而不是从 fetcher 注入：fetcher 的 panic 由每个门店自己的
+// recover 兜住（见 TestFetcherPanicDoesNotKillEngine），循环本来就该继续跑。
+// 要模拟「循环整个塌掉」，panic 必须发生在门店 goroutine 之外 —— 第 2 次时间源
+// 调用恰好落在 runCycle 收尾发 EventCycleComplete 那一处，那里不持有任何锁，
+// panic 能干净地一路抛到 loop 外面。
+func TestLoopPanicResetsLifecycle(t *testing.T) {
+	var clockCalls int64
+	clock := func() time.Time {
+		// 只炸一次：引擎必须能从这次 panic 里彻底恢复，第二次 Start 要真的又跑起来。
+		if atomic.AddInt64(&clockCalls, 1) == 2 {
+			panic("时间源炸了")
+		}
+		return time.Now()
+	}
+
+	f := &fakeFetcher{}
+	e := newEngine(f, watcher.WithClock(clock))
+	e.SetTargets([]model.Target{target(storeA, partA)})
+
+	e.Start()
+	trouble := waitTrouble(t, e, 5*time.Second)
+	if !strings.Contains(trouble.Reason, "时间源炸了") {
+		t.Errorf("EventTrouble.Reason = %q, 期望带上原始 panic 的内容", trouble.Reason)
+	}
+
+	waitStopped(t, e, 5*time.Second)
+
+	// 复位到位与否的真正验收标准：还能不能重新启动。
+	before := f.callCount()
+	e.Start()
+	waitCalls(t, f, before+1, 5*time.Second)
+	if !e.Running() {
+		t.Error("重新 Start 之后 Running() 仍是 false")
+	}
+
+	e.Stop()
+	if e.Running() {
+		t.Error("Stop 之后 Running() 仍是 true")
+	}
+}
+
+// TestNilOptionsFallBackToDefaults 验证 nil 的时间源 / 随机源不会把引擎炸掉。
+//
+// 这两个 Option 之前照单全收 nil：WithClock(nil) 会让第一次写状态时 e.now() 就崩，
+// 而崩在 recover 处理路径上还会二次 panic 直接终止进程；WithRand(nil) 更隐蔽，
+// 要到第一轮跑完、算下一轮抖动时才炸，此前一切看起来都正常。
+func TestNilOptionsFallBackToDefaults(t *testing.T) {
+	f := &fakeFetcher{}
+	// 抖动必须大于 0，否则 nextDelay 根本不会碰随机源，WithRand(nil) 也就炸不出来。
+	e := watcher.New(f,
+		watcher.WithInterval(5*time.Millisecond),
+		watcher.WithJitter(0.5),
+		watcher.WithClock(nil),
+		watcher.WithRand(nil),
+	)
+	e.SetTargets([]model.Target{target(storeA, partA)})
+
+	e.Start()
+	// 必须等到第二轮：随机源是在第一轮结束之后算下一轮间隔时才用到的。
+	// 抖动大于 0 时下一轮至少要等 1 秒（nextDelay 的下限），这里的超时留足余量。
+	events := waitCycles(t, e, 2, 10*time.Second)
+	e.Stop()
+
+	if n := countKind(events, watcher.EventTrouble); n != 0 {
+		t.Fatalf("收到 %d 条 EventTrouble：nil 选项应当被忽略并退回默认值，而不是把循环炸掉", n)
+	}
+
+	st := findState(t, e, target(storeA, partA).Key())
+	if st.LastChecked.IsZero() {
+		t.Error("LastChecked 仍是零值，说明 nil 时间源没有退回 time.Now")
+	}
+	if st.Availability != model.InStock {
+		t.Errorf("Availability = %v, 期望 InStock", st.Availability)
 	}
 }

@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -488,23 +489,13 @@ func TestConcurrentSaveAndLoad(t *testing.T) {
 	}
 }
 
-// TestSaveDoesNotMutateCallerTargets 记录一个尚未修复的核心缺陷，因此被跳过。
+// TestSaveDoesNotMutateCallerTargets 钉住：Save 不得改写调用方持有的切片。
 //
-// 缺陷位置：config.go:70 的 kept := s.Targets[:0] 就地压缩切片，
-// 配合 config.go:149 的 func (s *Store) Save(settings Settings) —— Settings 是按值传的，
-// 但 Targets 与调用方共用同一块底层数组，于是 Save 会把调用方的切片内容一起改掉。
-//
-// 复现：调用方持有 targets := []Target{A, A, B}（含重复），调用 Save(Settings{Targets: targets})。
-// Normalize 把去重结果 [A, B] 就地写回底层数组，数组变成 [A, B, B]；调用方的 targets
-// 长度仍是 3，于是它看到的内容从 [A, A, B] 悄悄变成了 [A, B, B]。
-// 界面层典型的「改完设置 → Save → engine.SetTargets(s.Targets)」这条路径上，
-// 监控列表会莫名多出一条重复行。
-//
-// 修复方向：Normalize 里改成 kept := make([]model.Target, 0, len(s.Targets))，
-// 别复用调用方的底层数组。修好后请删掉这里的 Skip。
+// Settings 是按值传给 Save 的，但 Targets 与调用方共用同一块底层数组，
+// Normalize 一旦就地压缩就会把去重结果写回去：调用方持有 [A, A, B] 时数组被压成
+// [A, B, B]，而它的切片长度仍是 3，看到的内容就此变了样。界面上
+// 「改完设置 → Save → engine.SetTargets(s.Targets)」这条路径会因此多出一条重复行。
 func TestSaveDoesNotMutateCallerTargets(t *testing.T) {
-	t.Skip("已知缺陷：config.go:70 就地压缩切片，会改写调用方持有的 Targets 底层数组")
-
 	store, _ := newStore(t)
 	a := sampleTarget("R683", "MG724CH/A")
 	b := sampleTarget("R409", "MG834CH/A")
@@ -522,5 +513,176 @@ func TestSaveDoesNotMutateCallerTargets(t *testing.T) {
 
 	if !reflect.DeepEqual(callerTargets, before) {
 		t.Fatalf("Save 改写了调用方的切片:\n after = %+v\nbefore = %+v", callerTargets, before)
+	}
+}
+
+// TestNormalizeDoesNotMutateSharedTargets 从 Normalize 这一层钉住同一件事。
+//
+// Save 只是最常见的触发路径；任何人拿到一份 Settings 的副本再 Normalize，
+// 都不该影响原主。去重必须发生在新切片上，而不是就地压缩共用的底层数组。
+func TestNormalizeDoesNotMutateSharedTargets(t *testing.T) {
+	a := sampleTarget("R683", "MG724CH/A")
+	b := sampleTarget("R409", "MG834CH/A")
+
+	original := config.Settings{
+		Locale:          "zh_CN",
+		IntervalSeconds: config.DefaultIntervalSeconds,
+		Targets:         []model.Target{a, a, b},
+	}
+	before := append([]model.Target(nil), original.Targets...)
+
+	copied := original
+	copied.Normalize()
+
+	if !reflect.DeepEqual(original.Targets, before) {
+		t.Fatalf("Normalize 改写了共用底层数组:\n after = %+v\nbefore = %+v", original.Targets, before)
+	}
+	if want := []model.Target{a, b}; !reflect.DeepEqual(copied.Targets, want) {
+		t.Fatalf("去重结果 = %+v, 期望 %+v", copied.Targets, want)
+	}
+}
+
+// paddedSettings 返回一份长度恰好为 size 字节的合法设置 JSON。
+//
+// 用尾部空白凑长度：这里只关心 Load 对字节数的判定，JSON 的内容多复杂无关紧要。
+func paddedSettings(t *testing.T, size int) []byte {
+	t.Helper()
+	body := `{"locale":"ja_JP","interval_seconds":45}`
+	if size < len(body) {
+		t.Fatalf("size = %d 小于最短合法 JSON 的 %d 字节", size, len(body))
+	}
+	return []byte(body + strings.Repeat("\n", size-len(body)))
+}
+
+// TestLoadRejectsOversizedFile 验证超大的设置文件被拒绝，而不是整个读进内存。
+//
+// 磁盘损坏、别的程序写错文件、或有人刻意构造一个几 GB 的 settings.json 时，
+// 原先的 os.ReadFile 会在任何错误处理之前就把内存吃光，进程直接被杀，
+// 用户连提示都看不到。现在必须返回错误并退回默认设置。
+func TestLoadRejectsOversizedFile(t *testing.T) {
+	cases := []struct {
+		name string
+		size int
+	}{
+		{"刚好超过上限一个字节", config.MaxSettingsBytes + 1},
+		{"远超上限", config.MaxSettingsBytes * 4},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store, _ := newStore(t)
+			if err := os.WriteFile(store.Path(), paddedSettings(t, tc.size), 0o600); err != nil {
+				t.Fatalf("写入超大配置失败: %v", err)
+			}
+
+			got, err := store.Load()
+			if err == nil {
+				t.Fatal("文件超过上限时 Load 没有返回错误")
+			}
+			if !errors.Is(err, config.ErrTooLarge) {
+				t.Errorf("err = %v, 期望能被 errors.Is 识别为 config.ErrTooLarge", err)
+			}
+			if !reflect.DeepEqual(got, config.Default()) {
+				t.Errorf("Load = %+v, 期望回退到 Default()", got)
+			}
+		})
+	}
+}
+
+// TestLoadHugeSparseFileDoesNotReadItAll 用一个远大于内存预算的稀疏文件确认上限真的生效。
+//
+// os.Truncate 造出的稀疏文件几乎不占磁盘，但 os.ReadFile 会老老实实分配这么多内存。
+// 只要 Load 仍然按上限截断，这个用例就能瞬间返回 ErrTooLarge。
+func TestLoadHugeSparseFileDoesNotReadItAll(t *testing.T) {
+	store, _ := newStore(t)
+	f, err := os.Create(store.Path())
+	if err != nil {
+		t.Fatalf("创建配置文件失败: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("关闭配置文件失败: %v", err)
+	}
+	const size = 2 << 30 // 2 GiB
+	if err := os.Truncate(store.Path(), size); err != nil {
+		t.Skipf("当前文件系统不支持稀疏文件，跳过: %v", err)
+	}
+
+	got, err := store.Load()
+	if !errors.Is(err, config.ErrTooLarge) {
+		t.Fatalf("err = %v, 期望 config.ErrTooLarge", err)
+	}
+	if !reflect.DeepEqual(got, config.Default()) {
+		t.Errorf("Load = %+v, 期望回退到 Default()", got)
+	}
+}
+
+// TestLoadAcceptsFileAtSizeLimit 验证上限附近的正常文件仍然读得出来。
+//
+// 上限是防御异常文件的，不能顺手把边界上的正常配置也判死。
+func TestLoadAcceptsFileAtSizeLimit(t *testing.T) {
+	cases := []struct {
+		name string
+		size int
+	}{
+		{"正好等于上限", config.MaxSettingsBytes},
+		{"比上限少一个字节", config.MaxSettingsBytes - 1},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store, _ := newStore(t)
+			if err := os.WriteFile(store.Path(), paddedSettings(t, tc.size), 0o600); err != nil {
+				t.Fatalf("写入配置失败: %v", err)
+			}
+
+			got, err := store.Load()
+			if err != nil {
+				t.Fatalf("上限之内的文件 Load 失败: %v", err)
+			}
+			if got.Locale != "ja_JP" {
+				t.Errorf("Locale = %q, 期望 ja_JP", got.Locale)
+			}
+			if got.IntervalSeconds != 45 {
+				t.Errorf("IntervalSeconds = %d, 期望 45", got.IntervalSeconds)
+			}
+		})
+	}
+}
+
+// TestPreserveCorruptedAfterOversizedLoad 验证超大文件走的是与损坏文件相同的善后流程。
+//
+// main.go 在 Load 失败时会放弃写盘并把原文件改名留存。「文件超大」同样属于
+// 「读不到旧配置」，绝不能被当成「用户没有配置」而被一份默认配置覆盖掉 ——
+// 那会让用户的整个监控列表消失且无从找回。
+func TestPreserveCorruptedAfterOversizedLoad(t *testing.T) {
+	store, dir := newStore(t)
+	if err := os.WriteFile(store.Path(), paddedSettings(t, config.MaxSettingsBytes+1), 0o600); err != nil {
+		t.Fatalf("写入超大配置失败: %v", err)
+	}
+
+	if _, err := store.Load(); !errors.Is(err, config.ErrTooLarge) {
+		t.Fatalf("err = %v, 期望 config.ErrTooLarge", err)
+	}
+
+	backup, err := store.PreserveCorrupted()
+	if err != nil {
+		t.Fatalf("PreserveCorrupted 失败: %v", err)
+	}
+	if backup == "" {
+		t.Fatal("PreserveCorrupted 没有留下备份")
+	}
+	if _, err := os.Stat(backup); err != nil {
+		t.Fatalf("备份文件不存在: %v", err)
+	}
+	if _, err := os.Stat(store.Path()); !os.IsNotExist(err) {
+		t.Errorf("原设置文件仍在原处: %v", err)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("读取目录失败: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("目录里有 %d 个文件, 期望只剩备份", len(entries))
 	}
 }

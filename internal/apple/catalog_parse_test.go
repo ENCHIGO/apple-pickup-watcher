@@ -255,6 +255,152 @@ func TestExtractPrefersBootstrapMarker(t *testing.T) {
 	}
 }
 
+// buildBuyPageWithDecoys 在真正的 productSelectionData 之前插入若干段干扰文本。
+//
+// 干扰段一律放在 PRODUCT_SELECTION_BOOTSTRAP 里面，才能真正考验候选扫描：
+// 放在外面会被开头那次「先定位全局变量」的裁剪直接切掉，等于什么都没测。
+func buildBuyPageWithDecoys(selection string, decoys ...string) []byte {
+	var b strings.Builder
+	b.WriteString("<!DOCTYPE html>\n<html><head><title>购买 iPhone</title></head><body>\n")
+	b.WriteString("<script type=\"text/javascript\">\n")
+	b.WriteString("window.PRODUCT_SELECTION_BOOTSTRAP = {\n")
+	for _, d := range decoys {
+		b.WriteString("        ")
+		b.WriteString(d)
+		b.WriteString("\n")
+	}
+	b.WriteString("        productSelectionData: ")
+	b.WriteString(selection)
+	b.WriteString(",\n        analyticsData: { \"page\": \"buy-iphone\" }\n};\n")
+	b.WriteString("</script>\n</body></html>\n")
+	return []byte(b.String())
+}
+
+// TestExtractSkipsDecoyOccurrences 覆盖「同名文本先出现在别处」。
+//
+// 原来只做一次 bytes.Index 取首个匹配：命中干扰文本后发现它后面不是冒号，就直接判
+// 整页失败，真正的属性再也没机会被看到。表现是购买页明明带着完整数据，程序却一口
+// 咬定「结构不符」—— 抓不到目录，用户连型号都选不出来。
+func TestExtractSkipsDecoyOccurrences(t *testing.T) {
+	cases := []struct {
+		name  string
+		decoy string
+	}{
+		// 最朴素的一种：字符串值恰好就是这个词。
+		{"字符串值里的同名文本", `note: "productSelectionData",`},
+		// 文案里连冒号带花括号一起出现，能骗过「找冒号 + 花括号配对」，
+		// 只有最后那道 JSON 校验能把它挡下来。
+		{"文案里带冒号和花括号", `hint: "productSelectionData: {不是 JSON 只是一句提示}",`},
+		// 更长的标识符把目标名整个包在里面，且后面真的跟着一个合法 JSON 对象。
+		// 没有边界检查的话，这份旧数据会被原封不动当成商品目录返回 —— 比报错更糟，
+		// 因为界面上会显示一批早就下架的型号，用户守着一个永远不会有货的零件号。
+		{"更长标识符里的同名文本", `legacy_productSelectionData: {"products":[` +
+			`{"partNumber":"DECOY/A","familyType":"iphone17","dimensionCapacity":"128gb","dimensionColor":"black"}]},`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			page := buildBuyPageWithDecoys(normalSelection, tc.decoy)
+
+			raw, err := extractProductSelectionData(page)
+			if err != nil {
+				t.Fatalf("extractProductSelectionData 返回错误: %v", err)
+			}
+			if string(raw) != normalSelection {
+				t.Fatalf("截取的不是真正的 productSelectionData:\n截取: %q", string(raw))
+			}
+
+			products, err := ParseProductSelection(raw)
+			if err != nil {
+				t.Fatalf("ParseProductSelection 返回错误: %v", err)
+			}
+			for _, p := range products {
+				if p.PartNumber == "DECOY/A" {
+					t.Fatalf("命中了干扰数据: %+v", products)
+				}
+			}
+			if len(products) != 3 {
+				t.Fatalf("解析出 %d 个商品，期望 3 个: %+v", len(products), products)
+			}
+		})
+	}
+
+	// 三段干扰同时出现也要能穿过去。
+	t.Run("多段干扰叠加", func(t *testing.T) {
+		decoys := make([]string, 0, len(cases))
+		for _, tc := range cases {
+			decoys = append(decoys, tc.decoy)
+		}
+		raw, err := extractProductSelectionData(buildBuyPageWithDecoys(normalSelection, decoys...))
+		if err != nil {
+			t.Fatalf("extractProductSelectionData 返回错误: %v", err)
+		}
+		if string(raw) != normalSelection {
+			t.Fatalf("截取的不是真正的 productSelectionData:\n截取: %q", string(raw))
+		}
+	})
+}
+
+// TestExtractAcceptsQuotedKey 覆盖「键被写成带引号的形式」。
+//
+// 页面里现在是 JS 对象字面量（键不带引号），但这只是打包器的选择，不是契约。
+// 原来的写法在键后紧跟引号时就判「之后不是冒号」，Apple 换个打包器就会让整个
+// 目录抓取失效 —— 又一次把「我们没适配」表现成「这个机型没有商品」。
+func TestExtractAcceptsQuotedKey(t *testing.T) {
+	cases := []struct{ name, key string }{
+		{"不带引号", `productSelectionData:`},
+		{"双引号", `"productSelectionData":`},
+		{"双引号且冒号前有空格", `"productSelectionData" :`},
+		{"单引号", `'productSelectionData':`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			page := []byte(`<script>window.PRODUCT_SELECTION_BOOTSTRAP = {` + "\n" +
+				tc.key + " " + normalSelection + ",\n\"analyticsData\": {}};</script>")
+
+			raw, err := extractProductSelectionData(page)
+			if err != nil {
+				t.Fatalf("extractProductSelectionData 返回错误: %v", err)
+			}
+			if string(raw) != normalSelection {
+				t.Fatalf("截取结果与原对象不一致:\n截取: %q", string(raw))
+			}
+			products, err := ParseProductSelection(raw)
+			if err != nil {
+				t.Fatalf("ParseProductSelection 返回错误: %v", err)
+			}
+			if len(products) != 3 {
+				t.Fatalf("解析出 %d 个商品，期望 3 个: %+v", len(products), products)
+			}
+		})
+	}
+}
+
+// TestExtractAllCandidatesInvalid 覆盖「所有候选都不成立」。
+//
+// 扫描全部候选是为了不漏掉真正的属性，但绝不能反过来变成「凑合挑一个」：
+// 一个都不成立时必须报 ErrUnexpectedSchema，让上层知道是结构变了。
+func TestExtractAllCandidatesInvalid(t *testing.T) {
+	page := []byte(`<script>window.PRODUCT_SELECTION_BOOTSTRAP = {
+		note: "productSelectionData",
+		hint: "productSelectionData = 别的东西",
+		tip: "productSelectionData: {不是 JSON}",
+		legacy_productSelectionData: {"products":[{"partNumber":"DECOY/A"}]}
+	};</script>`)
+
+	raw, err := extractProductSelectionData(page)
+	if err == nil {
+		t.Fatalf("应当返回错误，实际截出 %q", string(raw))
+	}
+	if !errors.Is(err, ErrUnexpectedSchema) {
+		t.Errorf("错误没有携带 ErrUnexpectedSchema: %v", err)
+	}
+	if raw != nil {
+		t.Errorf("出错时不应返回内容，实际 %q", string(raw))
+	}
+}
+
 // ---------------------------------------------------------------------------
 // 异常输入：必须返回带 ErrUnexpectedSchema 的错误，而不是 panic，也不是空目录
 // ---------------------------------------------------------------------------
@@ -276,6 +422,7 @@ func TestExtractProductSelectionDataErrors(t *testing.T) {
 		{"值是 null", prefix + ` productSelectionData: null};</script>`, "不是对象"},
 		{"值是数组", prefix + ` productSelectionData: []};</script>`, "不是对象"},
 		{"冒号后直接结束", prefix + ` productSelectionData:`, "不是对象"},
+		{"花括号配平但内容不是 JSON", prefix + ` productSelectionData: {不是 JSON}};</script>`, "不是合法 JSON"},
 		{"响应被截断，花括号不闭合", prefix + ` productSelectionData: {"products": [{"partNumber": "MG724CH/A"`, "花括号未闭合"},
 		{"字符串未闭合吞掉了收尾花括号", prefix + ` productSelectionData: {"a": "没有收尾引号}};</script>`, "花括号未闭合"},
 	}
