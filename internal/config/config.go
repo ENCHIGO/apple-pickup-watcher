@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -16,6 +17,24 @@ import (
 
 // appDir 是配置目录名。
 const appDir = "apple-pickup-watcher"
+
+// MaxSettingsBytes 是读取设置文件时接受的字节上限。
+//
+// 依据：一份正常配置只有几百字节；单条 Target 序列化后不到 200 字节，就算用户
+// 登记上千个目标也才几百 KB，1 MiB 是数量级上的余量，正常使用永远碰不到。
+// 之所以必须有上限，是因为 Load 原先用 os.ReadFile 整读：磁盘损坏、别的程序
+// 写错了文件、或有人刻意构造出一个几 GB 的 settings.json 时，内存会在任何
+// 错误处理之前就被吃光，进程直接被杀 —— 用户连「配置读不出来」这句提示都
+// 看不到，更谈不上备份原文件。
+const MaxSettingsBytes = 1 << 20
+
+// ErrTooLarge 表示设置文件超过了 MaxSettingsBytes。
+//
+// 单独留一个哨兵值，是为了让调用方能用 errors.Is 把「文件大得离谱」与
+// 「JSON 坏了」「读不动」区分开，给出的提示不一样；至于处置方式，三者是一致的：
+// 都属于「读不到旧配置」，都必须放弃写盘并把原文件备份留存，绝不能当成
+// 「用户没有配置」而用一份默认配置把它覆盖掉。
+var ErrTooLarge = errors.New("设置文件超过大小上限")
 
 // Settings 是持久化的用户设置。
 type Settings struct {
@@ -66,8 +85,15 @@ func (s *Settings) Normalize() {
 		s.IntervalSeconds = DefaultIntervalSeconds
 	}
 	// 去掉重复目标，避免同一门店同一型号被重复查询。
+	//
+	// 这里必须新建切片，不能用 s.Targets[:0] 就地压缩：Save 虽然按值收 Settings，
+	// 但 Targets 与调用方共用同一块底层数组，就地写回等于改掉了调用方的数据。
+	// 调用方持有 [A, A, B] 时，去重结果 [A, B] 会把底层数组压成 [A, B, B]，
+	// 而它的切片长度仍是 3 —— 内容悄悄从 [A, A, B] 变成了 [A, B, B]。
+	// 界面上「改设置 → Save → engine.SetTargets(s.Targets)」这条路径因此会
+	// 莫名多出一条重复的监控行。
 	seen := make(map[string]struct{}, len(s.Targets))
-	kept := s.Targets[:0]
+	kept := make([]model.Target, 0, len(s.Targets))
 	for _, t := range s.Targets {
 		if t.StoreNumber == "" || t.PartNumber == "" {
 			continue
@@ -77,6 +103,11 @@ func (s *Settings) Normalize() {
 		}
 		seen[t.Key()] = struct{}{}
 		kept = append(kept, t)
+	}
+	if len(kept) == 0 {
+		// 没有目标时收敛回 nil，与 Default() 保持一致：空切片和 nil 在
+		// reflect.DeepEqual 下不相等，留着空切片会让 Default() 不再是规范化的。
+		kept = nil
 	}
 	s.Targets = kept
 }
@@ -124,12 +155,22 @@ func (s *Store) Load() (Settings, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	data, err := os.ReadFile(s.path)
+	f, err := os.Open(s.path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return Default(), nil
 	}
 	if err != nil {
+		return Default(), fmt.Errorf("打开设置文件失败: %w", err)
+	}
+	defer f.Close()
+
+	// 比上限多读一个字节：读满了就说明文件确实更大，从而在不整读的前提下判定超限。
+	data, err := io.ReadAll(io.LimitReader(f, MaxSettingsBytes+1))
+	if err != nil {
 		return Default(), fmt.Errorf("读取设置失败: %w", err)
+	}
+	if len(data) > MaxSettingsBytes {
+		return Default(), fmt.Errorf("设置文件超过 %d 字节上限: %w", MaxSettingsBytes, ErrTooLarge)
 	}
 
 	settings := Default()

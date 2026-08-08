@@ -86,14 +86,31 @@ func WithConcurrency(n int) Option {
 	}
 }
 
-// WithClock 替换时间源，供测试使用。
+// WithClock 替换时间源，供测试使用。传 nil 时保留默认的 time.Now。
+//
+// 之所以是忽略而不是报错：Option 是 func(*Engine)，签名里没有出错的位置，
+// 要报错就得改成返回 error 并波及 New 的每一个调用点。而照单全收 nil 的
+// 代价是引擎在第一次 e.now() 时就 panic —— 更糟的是这个 panic 会在
+// recover 处理路径上再次发生（见 Start 里的说明），直接终止进程。
+// 相比之下，退回一个必定可用的默认时间源是唯一还能继续工作的选择。
 func WithClock(now func() time.Time) Option {
-	return func(e *Engine) { e.now = now }
+	return func(e *Engine) {
+		if now != nil {
+			e.now = now
+		}
+	}
 }
 
-// WithRand 替换随机源，供测试使用。
+// WithRand 替换随机源，供测试使用。传 nil 时保留默认随机源，理由同 WithClock。
+//
+// nil 随机源尤其隐蔽：它要到第一轮查询跑完、nextDelay 去算抖动时才炸，
+// 此前一切正常，用户会以为程序好好的。
 func WithRand(r *rand.Rand) Option {
-	return func(e *Engine) { e.rng = r }
+	return func(e *Engine) {
+		if r != nil {
+			e.rng = r
+		}
+	}
 }
 
 // Engine 是监控调度引擎，所有导出方法均并发安全。
@@ -132,6 +149,23 @@ type Engine struct {
 	rng   *rand.Rand
 
 	events chan Event
+
+	// lifeMu 把 Start 与 Stop 的整个过程串行化，包括 Stop 等待旧循环退出的那一段。
+	//
+	// 两把锁分工不同：runMu 只保护字段，持有时间必须极短，绝不能跨越一次等待；
+	// 而「启动」和「停止」各自是一个不可分割的过程，必须整体互斥。
+	//
+	// 只靠 runMu 堵不住：Stop 必须先释放 runMu 才能去等旧循环退出（否则等待期间
+	// 谁也拿不到锁），这中间就留下一个窗口 —— 旧循环的收尾代码已经把状态复位、
+	// 但还没关掉 done，此时闯进来的 Start 会看到「没在运行」而再拉起一条循环。
+	// 于是 Stop 返回时其实又有一条新循环在跑，两条循环同时查询：请求量翻倍
+	// （风控只会更严），还会交替往同一份状态里写，界面上的状态和提醒开始乱跳。
+	// 用一把独立的生命周期锁让两个过程整体互斥，这类窗口就从设计上不存在了，
+	// 不必再依赖对时序的推理。
+	//
+	// 不必担心 Stop 持锁等待会拖住界面：界面是在后台 goroutine 里调 Stop 的
+	// （internal/ui/view.go 的 onStop），期间按钮已置灰并显示「正在停止…」。
+	lifeMu sync.Mutex
 
 	runMu   sync.Mutex
 	cancel  context.CancelFunc
@@ -218,7 +252,13 @@ func (e *Engine) Running() bool {
 }
 
 // Start 启动监控循环。重复调用无副作用。
+//
+// 若此刻正有一次 Stop 在收尾，本次调用会等它结束再判断 —— 由 lifeMu 保证，
+// 绝不会在旧循环还活着的时候把新循环拉起来。
 func (e *Engine) Start() {
+	e.lifeMu.Lock()
+	defer e.lifeMu.Unlock()
+
 	e.runMu.Lock()
 	defer e.runMu.Unlock()
 	if e.running {
@@ -234,12 +274,19 @@ func (e *Engine) Start() {
 	// 必须把 done 捕获成局部变量再交给 goroutine。
 	//
 	// 写成 defer close(e.done) 是错的：defer 语句在执行时就会读一次 e.done 字段，
-	// 而这次读没有持有 runMu，与 Stop 里把 e.done 置 nil（本文件 Stop 方法内）
-	// 构成数据竞争。更要命的是，一旦 Stop 抢先把字段清空，goroutine 读到的就是
-	// nil，close(nil) 会 panic —— 而这个 defer 注册得最早、执行得最晚，
+	// 而这次读没有持有 runMu，与历史上 Stop 里把 e.done 置 nil 的写法构成数据竞争。
+	// 更要命的是，一旦 Stop 抢先把字段清空，goroutine 读到的就是 nil，
+	// close(nil) 会 panic —— 而这个 defer 注册得最早、执行得最晚，
 	// 下面那个 recover 兜底早已运行结束，根本拦不住它，进程直接崩。
 	go func() {
+		// 这几个 defer 按 LIFO 执行：先 recover 拦住 panic，再复位生命周期、
+		// 释放 context，最后才 close(done) 放行等在 Stop 里的调用方 ——
+		// 顺序不能颠倒，否则 Stop 返回时状态还没复位，紧接着的 Start 会被
+		// 当成重复启动而失效。
 		defer close(done)
+		defer cancel()
+		defer e.finishRun(done)
+
 		// 兜底：引擎内部任何未预料的 panic 都不应该带走整个应用。
 		// 上游在后台 goroutine 里直接 panic（services/listen.go:282 的
 		// AlertMp3、:302 的 Bark 推送），而 Go 中任意 goroutine 的
@@ -247,8 +294,12 @@ func (e *Engine) Start() {
 		defer func() {
 			if r := recover(); r != nil {
 				e.emit(Event{
-					Kind:   EventTrouble,
-					At:     e.now(),
+					Kind: EventTrouble,
+					// 这里刻意用 time.Now 而不是 e.now：时间源是外部注入的回调，
+					// 原 panic 完全可能就出自它，在 recover 里再调一次就是二次 panic。
+					// 而二次 panic 发生在 defer 里，没有任何 recover 拦得住，
+					// 整个进程当场退出 —— 兜底代码反倒成了新的崩溃源。
+					At:     time.Now(),
 					Reason: fmt.Sprintf("监控循环内部错误已被拦截: %v", r),
 				})
 			}
@@ -257,24 +308,43 @@ func (e *Engine) Start() {
 	}()
 }
 
+// finishRun 在监控 goroutine 退出时复位生命周期状态。
+//
+// 复位必须由 goroutine 自己做，不能只交给 Stop：循环也可能因为内部 panic
+// 被上面的 recover 兜下来而提前结束，那时根本没有 Stop 在等着收尾。之前
+// 这条路径只发一条 EventTrouble 就完事，running 一直挂着真，于是 Running()
+// 骗界面说还在监控、Start() 又因为 running 为真而变成空操作 —— 监控实际已死，
+// 用户却只能对着一个永远不再更新的界面等下去，谁也叫不醒它。
+//
+// 传入自己那一代的 done 是为了确认没有被新的一代接管：拿别人的通道来比对，
+// 就不会把新循环的状态一并抹掉。
+func (e *Engine) finishRun(done chan struct{}) {
+	e.runMu.Lock()
+	defer e.runMu.Unlock()
+	if e.done != done {
+		return
+	}
+	e.running = false
+	e.cancel = nil
+}
+
 // Stop 停止监控循环并等待其退出。重复调用与并发调用都是安全的，
 // 且每一个调用方返回时，监控循环都确实已经结束。
 func (e *Engine) Stop() {
-	e.runMu.Lock()
-	done, cancel := e.done, e.cancel
-	if e.running {
-		e.running = false
-		// 这里不把 e.done 置 nil：它要留给后来的调用方等待。
-		// 之前的写法一并清空了 done，于是并发的第二个 Stop 看到
-		// running 已是 false 就直接返回，此时监控循环可能还在跑
-		// —— 方法名承诺了「等待其退出」，却没有真的等。
-		e.cancel = nil
-		e.runMu.Unlock()
-		cancel()
-	} else {
-		e.runMu.Unlock()
-	}
+	e.lifeMu.Lock()
+	defer e.lifeMu.Unlock()
 
+	e.runMu.Lock()
+	// 不把 e.done 置 nil：它要留给后来的调用方等待。之前的写法一并清空了 done，
+	// 于是后一个 Stop 看到 running 已是 false 就直接返回，此时监控循环可能还在跑
+	// —— 方法名承诺了「等待其退出」，却没有真的等。
+	done, cancel := e.done, e.cancel
+	e.cancel = nil
+	e.runMu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
 	if done != nil {
 		// 循环退出时会 close 这个通道；已经关闭的通道立即返回。
 		<-done
@@ -393,7 +463,8 @@ func (e *Engine) groupTargets() ([]storeGroup, []model.Target) {
 // cycleTally 汇总一轮查询的结果。
 type cycleTally struct {
 	sync.Mutex
-	// ok 是查询成功且全部型号都拿到可识别答复的门店数。
+	// ok 是没有发生门店级失败的门店数：请求本身成功，且至少有一个型号拿到了
+	// 明确答复。个别型号缺失或取值无法识别不影响 ok，那类异常只体现在 problems 上。
 	ok int
 	// failed 是整店级失败的门店数，用于判断是否需要全局退避。
 	failed int
@@ -522,7 +593,14 @@ func (e *Engine) queryStore(ctx context.Context, g storeGroup) (ok bool, problem
 		return false, len(g.parts)
 	}
 
-	unrecognized := 0
+	// resolved 统计真正拿到明确答复的型号数。
+	//
+	// 之前这里数的是「取值无法识别」的型号，型号在响应里整个缺失时只置 Unknown、
+	// 不计数，于是「一个型号都没对上」这种最典型的接口漂移反而被判成查询成功：
+	// Apple 改一下 partsAvailability 的键格式，所有型号统统 !found，
+	// cycleFailures 被清零、全局退避不生效、EventTrouble 也不发，程序照原频率
+	// 猛冲一个已经失效的结构，界面上却没有任何异常提示。
+	resolved := 0
 	for _, part := range g.parts {
 		key := g.region.Locale + "|" + g.storeNumber + "|" + part
 		status, found := result.Parts[part]
@@ -541,22 +619,22 @@ func (e *Engine) queryStore(ctx context.Context, g storeGroup) (ok bool, problem
 				fmt.Errorf("%w: 型号 %s 返回了无法识别的 pickupDisplay %q",
 					apple.ErrUnexpectedSchema, part, status.PickupDisplay), true)
 			problems++
-			unrecognized++
 
 		default:
 			e.updateState(key, status.Availability, nil, false)
+			resolved++
 		}
 	}
 
-	// 整店的型号全都无法识别，才判定为门店级故障并触发告警与退避。
-	// 只有个别型号对不上时不能这么判 —— 那多半是某一个零件号本身的问题，
-	// 让它拖着整个门店退避是过度反应。
-	if unrecognized == len(g.parts) && len(g.parts) > 0 {
+	// 整店一个型号都没拿到明确结果（无论是缺失还是取值无法识别），才判定为
+	// 门店级故障并触发告警与退避。只有个别型号对不上时维持原来较宽松的策略
+	// —— 那多半是某一个零件号本身的问题，让它拖着整个门店退避是过度反应。
+	if resolved == 0 && len(g.parts) > 0 {
 		e.emit(Event{
 			Kind: EventTrouble,
 			At:   e.now(),
-			Reason: fmt.Sprintf("门店 %s 的全部型号都返回了无法识别的取值，Apple 可能已调整接口",
-				g.storeNumber),
+			Reason: fmt.Sprintf("门店 %s 的全部 %d 个型号都没有拿到明确结果，Apple 可能已调整接口",
+				g.storeNumber, len(g.parts)),
 		})
 		return false, problems
 	}

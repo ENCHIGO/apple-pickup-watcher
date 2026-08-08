@@ -79,6 +79,18 @@ type Deps struct {
 	Warnings []string
 }
 
+// settingsStore 是界面对设置持久化的全部要求。
+//
+// 收窄成接口而不是直接用 *config.Store，是为了让测试能换上一个可以控制写盘
+// 耗时的实现：「关窗口时最后一次设置会不会丢」取决于 Close 有没有等这次写完，
+// 而这个时序拿真实的几百字节写入去撞是撞不稳的。
+type settingsStore interface {
+	// Save 原子地写入设置。
+	Save(config.Settings) error
+	// Path 返回设置文件路径，用于在界面上告诉用户配置存在哪。
+	Path() string
+}
+
 // UI 持有窗口与全部控件。
 //
 // 除非注释另有说明，所有字段都只能在 Fyne 主线程上访问。
@@ -87,7 +99,7 @@ type UI struct {
 	win     fyne.Window
 	catalog *catalog.Catalog
 	engine  *watcher.Engine
-	store   *config.Store
+	store   settingsStore
 	fetcher catalog.ProductFetcher
 	sound   notify.Notifier
 	http    *http.Client
@@ -101,11 +113,27 @@ type UI struct {
 	saveMu  sync.Mutex
 	pending *config.Settings
 	saveSig chan struct{}
+	// saverWG 让 Close 能等到写盘 goroutine 真正退出，见 Close 里的说明。
+	saverWG sync.WaitGroup
 
 	// rows 是状态列表的数据源，logs 是日志区的数据源，都只在主线程读写。
 	rows     []watcher.State
 	logs     []string
 	selected widget.ListItemID
+
+	// notified 记住已经发过到货提醒的目标 key，只在主线程读写。
+	//
+	// 提醒不能只挂在 EventInStock 这条边沿事件上：引擎的事件通道写满时会直接
+	// 丢事件（watcher.Engine.emit），而状态永远可以用 Snapshot 重新取回来。
+	// 每轮结束时拿这个集合和快照对账，被丢掉的提醒就能补上。
+	notified map[string]struct{}
+
+	// dispatchNotify 真正把一条到货提醒发出去。
+	//
+	// 默认实现另起 goroutine：提醒里既有网络请求也有音频播放，一次可能要等
+	// 好几秒，占住事件循环只会让更多事件被丢掉。做成字段是为了让测试换成同步
+	// 实现，从而守住 ui_test.go 顶部那条「单线程驱动」的约定。
+	dispatchNotify func(state watcher.State)
 
 	// 控件。
 	regionRadio   *widget.RadioGroup
@@ -157,7 +185,6 @@ func New(d Deps) (*UI, error) {
 		win:      d.App.NewWindow(windowTitle),
 		catalog:  d.Catalog,
 		engine:   d.Engine,
-		store:    d.Store,
 		fetcher:  d.Fetcher,
 		sound:    d.Sound,
 		http:     d.HTTPClient,
@@ -165,6 +192,16 @@ func New(d Deps) (*UI, error) {
 		saveSig:  make(chan struct{}, 1),
 		selected: -1,
 		quit:     make(chan struct{}),
+		notified: map[string]struct{}{},
+	}
+	// 不能直接写进结构体字面量：d.Store 为 nil 时，一个类型化的 nil 指针装进
+	// 接口变量之后接口本身并不为 nil，后面所有 u.store == nil 的判断都会失效，
+	// 于是「配置目录不可用」这条降级路径反而会去调一个 nil 接收者的方法。
+	if d.Store != nil {
+		u.store = d.Store
+	}
+	u.dispatchNotify = func(state watcher.State) {
+		u.safeGo("发送到货通知", func() { u.dispatchNotifications(state) })
 	}
 
 	u.build()
@@ -210,18 +247,25 @@ func (u *UI) Close() {
 
 		u.engine.Stop()
 
-		// 写盘 goroutine 已经退出了，最后一次改动可能还压在 pending 里。
-		// 这里同步补写一次，代价是几毫秒，换的是「刚改完设置就关窗口」不丢配置。
-		if u.store != nil {
-			u.saveMu.Lock()
-			last := u.pending
-			u.pending = nil
-			u.saveMu.Unlock()
-			if last != nil {
-				if err := u.store.Save(*last); err != nil {
-					log.Printf("退出前保存设置失败: %v", err)
-				}
-			}
+		// 等写盘 goroutine 真正退出，再补最后一次。
+		//
+		// 这里原先只有一句「写盘 goroutine 已经退出了」的断言，但 close(quit)
+		// 只是发了个信号，没有任何同步保证。真实时序是：写盘 goroutine 刚把
+		// pending 取空、正卡在 Store.Save 里，Close 看到 pending == nil 就什么
+		// 都不做直接返回，main 随之结束，运行时把这个 goroutine 连同写了一半的
+		// 临时文件一起带走 —— 最新的设置没落盘，配置目录里还留下一个
+		// .settings-*.json。等待之后再 flush，两次写入天然串行，不会有两条路径
+		// 同时改同一个文件。
+		//
+		// 等待不会死锁：写盘 goroutine 只阻塞在 select 和文件 IO 上，唯一可能
+		// 回主线程的 logfAsync 走的是 fyne.Do（投递后立刻返回，不等主线程），
+		// 何况此时 closed 已经置位，onMain 会直接返回。所以即便 Close 是在
+		// Fyne 主线程上被调用的，也不存在互相等待。
+		u.saverWG.Wait()
+
+		if err := u.flushPending(); err != nil {
+			// 走到这里界面已经在销毁了，日志区显示不出来，只能退回标准错误输出。
+			log.Printf("退出前保存设置失败: %v", err)
 		}
 	})
 }
@@ -292,25 +336,43 @@ func (u *UI) startSaver() {
 	if u.store == nil {
 		return
 	}
+	// Add 必须在起 goroutine 之前完成，否则 Close 可能在计数加上去之前就 Wait，
+	// 等了个空。
+	u.saverWG.Add(1)
 	u.safeGo("保存设置", func() {
+		// 放在 fn 内部：safeGo 的 recover 兜底在 fn 返回之后才跑，
+		// 而 fn 自己的 defer 在展开时就会执行，所以 goroutine 即便 panic 了
+		// 计数也一定会归零，Close 不会永远等下去。
+		defer u.saverWG.Done()
 		for {
 			select {
 			case <-u.quit:
 				return
 			case <-u.saveSig:
-				u.saveMu.Lock()
-				next := u.pending
-				u.pending = nil
-				u.saveMu.Unlock()
-				if next == nil {
-					continue
-				}
-				if err := u.store.Save(*next); err != nil {
+				if err := u.flushPending(); err != nil {
 					u.logfAsync("保存设置失败：%v", err)
 				}
 			}
 		}
 	})
+}
+
+// flushPending 取走当前待写的设置并落盘，没有待写内容时什么都不做。
+//
+// 写盘 goroutine 和 Close 共用这一个函数：两边都先把 pending 摘下来再写，
+// 加上 Close 会等 goroutine 退出，同一份配置文件永远只有一条路径在写。
+func (u *UI) flushPending() error {
+	if u.store == nil {
+		return nil
+	}
+	u.saveMu.Lock()
+	next := u.pending
+	u.pending = nil
+	u.saveMu.Unlock()
+	if next == nil {
+		return nil
+	}
+	return u.store.Save(*next)
 }
 
 // scheduleSave 请求把当前设置写盘，立刻返回。只应从主线程调用。

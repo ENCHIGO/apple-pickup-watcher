@@ -555,6 +555,193 @@ func TestPickupMessageAppleErrorMessage(t *testing.T) {
 	}
 }
 
+// envelopeJSON 把一段门店 JSON 包进指定的 head / body 附加字段里。
+//
+// 这里刻意不复用 storesJSON：那个夹具写死了 head.status 为 "200" 且没有 errorMessage，
+// 而这一组用例要考察的恰恰是信封本身。
+func envelopeJSON(t *testing.T, head, extraBody, store string) string {
+	t.Helper()
+	body := fmt.Sprintf(`{"head":%s,"body":{%s"stores":[%s]}}`, head, extraBody, store)
+	if !json.Valid([]byte(body)) {
+		t.Fatalf("测试夹具不是合法 JSON:\n%s", body)
+	}
+	return body
+}
+
+// TestPickupMessageEnvelopeErrorBeatsStoreData 守住「信封先于数据」。
+//
+// 原来的写法只在 stores 为空时才回头看 body.errorMessage，head.status 更是从没看过。
+// 于是 Apple 明确报错、却仍在 stores 里带着一份陈旧或占位数据的响应会被当成正常作答，
+// 其中的 pickupDisplay=unavailable 一路走到界面上就是「无货」—— 用户看到的是一条
+// 确定的坏消息，实际上程序压根没拿到有效答案。这是本项目核心不变量最直接的破口。
+func TestPickupMessageEnvelopeErrorBeatsStoreData(t *testing.T) {
+	// 每个用例的门店数据都是完整且「看起来正常」的，问题一律只在信封里。
+	store := storeJSON(t, testStore, "环球港", map[string]string{partA: "unavailable"})
+
+	cases := []struct {
+		name    string
+		body    string
+		wantErr error
+		substr  string
+	}{
+		{
+			// 需求里给出的原始样本：状态码和 errorMessage 都在喊错，数据却照样带着。
+			name:    "errorMessage 非空但 stores 也非空",
+			body:    envelopeJSON(t, `{"status":"500"}`, `"errorMessage":"request failed",`, store),
+			wantErr: apple.ErrAppleError,
+			substr:  "request failed",
+		},
+		{
+			name:    "只有 errorMessage 出错",
+			body:    envelopeJSON(t, `{"status":"200"}`, `"errorMessage":"零件号无效",`, store),
+			wantErr: apple.ErrAppleError,
+			substr:  "零件号无效",
+		},
+		{
+			name:    "head.status 是 500",
+			body:    envelopeJSON(t, `{"status":"500"}`, "", store),
+			wantErr: apple.ErrUnexpectedSchema,
+			substr:  "500",
+		},
+		{
+			name:    "head.status 是非数字的失败标识",
+			body:    envelopeJSON(t, `{"status":"failure"}`, "", store),
+			wantErr: apple.ErrUnexpectedSchema,
+			substr:  "failure",
+		},
+		{
+			// 字段给了却是空串，说明服务端在用带状态的信封但没给出成功值，同样不可采信。
+			name:    "head.status 是空字符串",
+			body:    envelopeJSON(t, `{"status":""}`, "", store),
+			wantErr: apple.ErrUnexpectedSchema,
+			substr:  "head.status",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := startJSONServer(t, tc.body)
+			c := newTestClient()
+
+			got, err := c.PickupMessage(context.Background(), testRegion(srv), testStore, []string{partA})
+			if err == nil {
+				t.Fatalf("信封已报错却返回了结果 %+v —— 这会在界面上显示成「无货」", got)
+			}
+			if got != nil {
+				t.Errorf("出错时不应返回结果，实际 %+v", got)
+			}
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("err = %v, 期望满足 errors.Is(err, %v)", err, tc.wantErr)
+			}
+			if !strings.Contains(err.Error(), tc.substr) {
+				t.Errorf("错误信息 %q 里应当带上 %q，否则用户无从判断到底出了什么事", err, tc.substr)
+			}
+		})
+	}
+}
+
+// TestPickupMessageAcceptsMissingHeadStatus 验证 head.status 缺失不会被一刀切判成失败。
+//
+// 旧版 fulfillment-messages 的响应里没有这一层状态，而客户端仍保留着
+// body.content.pickupMessage 的兜底解析路径。把「没给」当失败会让兜底路径直接报废，
+// 也会在 Apple 精简字段时凭空制造一批查询失败。
+func TestPickupMessageAcceptsMissingHeadStatus(t *testing.T) {
+	store := storeJSON(t, testStore, "环球港", map[string]string{partA: "available"})
+
+	cases := []struct{ name, body string }{
+		{"整个 head 都没有", fmt.Sprintf(`{"body":{"stores":[%s]}}`, store)},
+		{"head 是空对象", fmt.Sprintf(`{"head":{},"body":{"stores":[%s]}}`, store)},
+		{"status 为 null", fmt.Sprintf(`{"head":{"status":null},"body":{"stores":[%s]}}`, store)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := startJSONServer(t, tc.body)
+			c := newTestClient()
+
+			got, err := c.PickupMessage(context.Background(), testRegion(srv), testStore, []string{partA})
+			if err != nil {
+				t.Fatalf("head.status 缺失不该判成失败: %v", err)
+			}
+			if got.Parts[partA].Availability != model.InStock {
+				t.Errorf("Availability = %v, 期望 InStock", got.Parts[partA].Availability)
+			}
+		})
+	}
+}
+
+// partsAvailabilityJSON 生成一份 partsAvailability，允许 map 键与条目里的 partNumber 不同。
+//
+// payloadPart 为空表示条目里干脆不写 partNumber 字段。
+func partsAvailabilityJSON(t *testing.T, key, payloadPart, display string) string {
+	t.Helper()
+	entry := fmt.Sprintf(`"pickupDisplay":%q`, display)
+	if payloadPart != "" {
+		entry = fmt.Sprintf(`"partNumber":%q,%s`, payloadPart, entry)
+	}
+	body := fmt.Sprintf(`{
+		"head":{"status":"200"},
+		"body":{"stores":[{
+			"storeNumber":%q,
+			"storeName":"环球港",
+			"partsAvailability":{%q:{%s}}
+		}]}
+	}`, testStore, key, entry)
+	if !json.Valid([]byte(body)) {
+		t.Fatalf("测试夹具不是合法 JSON:\n%s", body)
+	}
+	return body
+}
+
+// TestPickupMessagePartNumberMismatch 验证零件号自相矛盾时会停下来报错。
+//
+// map 键和条目里的 partNumber 说的应当是同一个型号。两者都给了却不一致时无从判断谁
+// 可信，原来的写法直接拿 map 键写结果，等于在两个型号里随手挑一个 —— 完全可能把 B
+// 的库存状态记在 A 名下，用户会为一台其实没货的机器专程跑一趟门店。
+func TestPickupMessagePartNumberMismatch(t *testing.T) {
+	srv := startJSONServer(t, partsAvailabilityJSON(t, partA, partB, "available"))
+	c := newTestClient()
+
+	got, err := c.PickupMessage(context.Background(), testRegion(srv), testStore, []string{partA})
+	if err == nil {
+		t.Fatalf("零件号自相矛盾却返回了结果: %+v", got)
+	}
+	if got != nil {
+		t.Errorf("出错时不应返回结果，实际 %+v", got)
+	}
+	if !errors.Is(err, apple.ErrUnexpectedSchema) {
+		t.Fatalf("err = %v, 期望满足 errors.Is(err, ErrUnexpectedSchema)", err)
+	}
+	// 两个零件号都要写进错误信息，否则排查时根本不知道是哪两个型号对不上。
+	if !strings.Contains(err.Error(), partA) || !strings.Contains(err.Error(), partB) {
+		t.Errorf("错误信息 %q 里应当同时带上 %s 和 %s", err, partA, partB)
+	}
+}
+
+// TestPickupMessageAcceptsOmittedPartNumber 验证条目里省略 partNumber 是可以接受的。
+//
+// 这个字段与 map 键完全重复，服务端省掉它是合理的；把「省略」也当成矛盾，会让本来
+// 好好的响应变成一片查询失败。
+func TestPickupMessageAcceptsOmittedPartNumber(t *testing.T) {
+	srv := startJSONServer(t, partsAvailabilityJSON(t, partA, "", "available"))
+	c := newTestClient()
+
+	got, err := c.PickupMessage(context.Background(), testRegion(srv), testStore, []string{partA})
+	if err != nil {
+		t.Fatalf("条目里省略 partNumber 不该判成失败: %v", err)
+	}
+	status, ok := got.Parts[partA]
+	if !ok {
+		t.Fatalf("结果中没有零件号 %s，实际为 %+v", partA, got.Parts)
+	}
+	if status.PartNumber != partA {
+		t.Errorf("PartNumber = %q, 期望回落到 map 键 %q", status.PartNumber, partA)
+	}
+	if status.Availability != model.InStock {
+		t.Errorf("Availability = %v, 期望 InStock", status.Availability)
+	}
+}
+
 // TestPickupMessageLegacyContentShape 覆盖旧版嵌套结构的兜底解析路径。
 func TestPickupMessageLegacyContentShape(t *testing.T) {
 	body := fmt.Sprintf(`{

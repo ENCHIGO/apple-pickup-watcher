@@ -47,16 +47,20 @@ func (u *UI) handleEvent(ev watcher.Event) {
 		state := ev.State
 		u.onMain(func() {
 			u.refreshRows()
+			// 记账要和补发对账在同一条线程上，否则两边可能同时认为该由自己发。
+			u.notified[state.Target.Key()] = struct{}{}
 			u.logf("有货！%s %s，快去下单。", state.Target.StoreTitle, state.Target.ProductName)
 		})
-		// 通知里既有网络请求也有音频播放，都可能要等好几秒，不能占住事件循环。
-		u.safeGo("发送到货通知", func() { u.dispatchNotifications(state) })
+		// 事件到达时立刻发，不等主线程排到那个闭包：主线程忙正是事件被丢的诱因，
+		// 提醒晚几百毫秒对抢购来说是实打实的损失。
+		u.dispatchNotify(state)
 
 	case watcher.EventCycleComplete:
 		healthy := ev.Healthy
 		u.onMain(func() {
 			u.refreshRows()
 			u.maybeClearTrouble(healthy)
+			u.reconcileNotifications()
 		})
 
 	case watcher.EventTrouble:
@@ -87,9 +91,58 @@ func (u *UI) logStateChange(state watcher.State) {
 	}
 }
 
+// reconcileNotifications 用引擎快照对账「已提醒」集合，补发漏掉的到货提醒。
+// 只能在主线程调用。
+//
+// 提醒原本完全挂在 EventInStock 上，而引擎的事件通道写满时会直接丢事件
+// （watcher.Engine.emit，这是有意的取舍：监控的节奏比事件完整性重要）。
+// 首轮大量目标同时有货、或界面卡一下让事件堆积，都足以把这条边沿事件冲掉，
+// 于是用户在列表里看着「有货」，提示音、Bark、系统通知却一个都没来 ——
+// 而「及时提醒」正是这个程序存在的全部理由。
+//
+// 所以提醒不再依赖「事件不丢」，改成从状态推导：状态用 Snapshot 随时取得回来，
+// 永远不会丢。事件仍然照常处理，它只是让提醒来得更早一点。
+func (u *UI) reconcileNotifications() {
+	for _, state := range u.rows {
+		key := state.Target.Key()
+		if state.Availability != model.InStock {
+			// 离开有货就撤销标记，下次补货才能再响一次。保留边沿触发语义：
+			// 持续有货不重复响，否则盯一晚上会被提示音吵死。
+			delete(u.notified, key)
+			continue
+		}
+		if _, done := u.notified[key]; done {
+			continue
+		}
+		u.notified[key] = struct{}{}
+		u.logf("有货！%s %s，快去下单。", state.Target.StoreTitle, state.Target.ProductName)
+		u.dispatchNotify(state)
+	}
+}
+
+// pruneNotified 丢掉已经不在监控列表里的提醒标记，只能在主线程调用。
+//
+// 集合按 target key 累积，不随目标删除一起清理的话，反复增删监控项会让它只涨
+// 不落；更要命的是删掉再加回同一个目标时旧标记还在，那次到货就不会提醒了。
+func (u *UI) pruneNotified() {
+	if len(u.notified) == 0 {
+		return
+	}
+	live := make(map[string]struct{}, len(u.rows))
+	for _, state := range u.rows {
+		live[state.Target.Key()] = struct{}{}
+	}
+	for key := range u.notified {
+		if _, ok := live[key]; !ok {
+			delete(u.notified, key)
+		}
+	}
+}
+
 // refreshRows 从引擎重新取一份状态快照并刷新列表，只能在主线程调用。
 func (u *UI) refreshRows() {
 	u.rows = u.engine.Snapshot()
+	u.pruneNotified()
 	if u.statusList != nil {
 		if u.selected >= len(u.rows) {
 			// 目标被删掉之后旧的选中下标会越界，必须连同列表上的高亮一起撤销，

@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -88,9 +89,53 @@ func newTestUI(t *testing.T, fetcher *fakeFetcher, targets []model.Target) (*UI,
 	return u, engine
 }
 
+// notifyRecorder 顶替默认的「另起 goroutine 发提醒」，把提醒就地记下来。
+//
+// 换掉它是为了守住本文件顶部那条单线程约定：真实实现会起一个后台 goroutine，
+// 那个 goroutine 经 onMain 去碰 fyne.App，而测试驱动把 fyne.Do 内联执行，
+// 于是 -race 会报出生产环境根本不存在的假竞态。记录本身不加锁，因为整个测试
+// 只有一条线程在跑。
+type notifyRecorder struct {
+	states []watcher.State
+}
+
+// recordNotifications 接管界面的提醒发送，返回记录器。
+func recordNotifications(u *UI) *notifyRecorder {
+	rec := &notifyRecorder{}
+	u.dispatchNotify = func(state watcher.State) {
+		rec.states = append(rec.states, state)
+	}
+	return rec
+}
+
+// products 返回收到提醒的型号名，按发生顺序排列。
+func (r *notifyRecorder) products() []string {
+	out := make([]string, 0, len(r.states))
+	for _, s := range r.states {
+		out = append(out, s.Target.ProductName)
+	}
+	return out
+}
+
 // runOneCycle 让引擎跑到至少完成一轮查询后停下，然后把积压的事件喂给界面，
 // 返回最后一个 EventCycleComplete 报告的健康状态。
 func runOneCycle(t *testing.T, u *UI, engine *watcher.Engine, fetcher *fakeFetcher) bool {
+	t.Helper()
+	return runCycleDropping(t, u, engine, fetcher, nil)
+}
+
+// dropAllButCycleComplete 模拟引擎事件通道被写满的极端情形：除了「一轮结束」
+// 之外的事件全部丢掉，界面能拿到的只有「该刷新了」这一个信号。
+//
+// 这不是杜撰的场景。watcher.Engine.emit 在通道满时直接丢弃事件，而首轮大量
+// 目标同时有货、或界面卡顿导致事件堆积，都会真的把 EventInStock 冲掉。
+func dropAllButCycleComplete(ev watcher.Event) bool {
+	return ev.Kind != watcher.EventCycleComplete
+}
+
+// runCycleDropping 与 runOneCycle 相同，但 drop 返回 true 的事件不会喂给界面。
+func runCycleDropping(t *testing.T, u *UI, engine *watcher.Engine, fetcher *fakeFetcher,
+	drop func(watcher.Event) bool) bool {
 	t.Helper()
 
 	before := fetcher.callCount()
@@ -110,6 +155,9 @@ func runOneCycle(t *testing.T, u *UI, engine *watcher.Engine, fetcher *fakeFetch
 		case ev := <-events:
 			if ev.Kind == watcher.EventCycleComplete {
 				healthy = ev.Healthy
+			}
+			if drop != nil && drop(ev) {
+				continue
 			}
 			u.handleEvent(ev)
 		default:
@@ -419,5 +467,274 @@ func TestPanicDuringQueryDoesNotLeaveStaleOutOfStock(t *testing.T) {
 		if strings.Contains(line, "查询已恢复正常") {
 			t.Errorf("panic 之后不该宣布查询已恢复正常，日志: %q", line)
 		}
+	}
+}
+
+// inStockFetcher 返回一个按开关作答的假查询源：开着报有货，关着报无货。
+func inStockFetcher(available *bool, mu *sync.Mutex) *fakeFetcher {
+	return &fakeFetcher{fn: func(store string, parts []string) (*apple.StoreAvailability, error) {
+		mu.Lock()
+		hit := *available
+		mu.Unlock()
+
+		out := &apple.StoreAvailability{StoreNumber: store, StoreName: "环球港", Parts: map[string]apple.PartStatus{}}
+		for _, p := range parts {
+			status := apple.PartStatus{PartNumber: p, PickupDisplay: "unavailable", Recognized: true, Availability: model.OutOfStock}
+			if hit {
+				status.PickupDisplay = "available"
+				status.Availability = model.InStock
+			}
+			out.Parts[p] = status
+		}
+		return out, nil
+	}}
+}
+
+// TestInStockStillNotifiesWhenEventWasDropped 守卫「到货提醒不能因为丢事件而丢失」。
+//
+// 提醒原本只挂在 EventInStock 上，而引擎的事件通道写满时会直接丢事件
+// （watcher.Engine.emit）。一旦这条边沿事件被丢掉，用户会在列表里看到「有货」
+// 却收不到任何提醒 —— 提示音、Bark、系统通知全都没有。对一个盯抢购的工具来说，
+// 这跟上游那屏永远不变的「无货」是同一类失效：界面还在动，但它已经没用了。
+func TestInStockStillNotifiesWhenEventWasDropped(t *testing.T) {
+	available := true
+	var mu sync.Mutex
+	fetcher := inStockFetcher(&available, &mu)
+	targets := []model.Target{target("R683", "上海-环球港", "MG724CH/A", "iPhone 17 512GB 黑色")}
+
+	u, engine := newTestUI(t, fetcher, targets)
+	rec := recordNotifications(u)
+
+	runCycleDropping(t, u, engine, fetcher, dropAllButCycleComplete)
+
+	if row := findRow(t, u, "iPhone 17 512GB 黑色"); row.Availability != model.InStock {
+		t.Fatalf("前置条件不成立，这一行应当是有货，实际为 %v", row.Availability)
+	}
+	if got := rec.products(); len(got) != 1 {
+		t.Fatalf("EventInStock 被丢掉之后提醒也跟着没了，实际发出的提醒: %v", got)
+	}
+	if got := rec.states[0].Target.ProductName; got != "iPhone 17 512GB 黑色" {
+		t.Errorf("提醒发给了错误的型号: %q", got)
+	}
+
+	var announced bool
+	for _, line := range u.logs {
+		if strings.Contains(line, "有货！") {
+			announced = true
+		}
+	}
+	if !announced {
+		t.Error("补发提醒时日志里没有留下记录，用户无从知道刚才响过")
+	}
+}
+
+// TestContinuedInStockDoesNotNotifyTwice 确认对账不会把持续有货变成反复提醒。
+//
+// 每轮结束都要对一次账，如果不记住「这个目标已经提醒过」，一直有货就会每轮都响，
+// 半夜盯货的人会被吵到直接关掉程序 —— 那等于把监控也一起关了。
+func TestContinuedInStockDoesNotNotifyTwice(t *testing.T) {
+	available := true
+	var mu sync.Mutex
+	fetcher := inStockFetcher(&available, &mu)
+	targets := []model.Target{target("R683", "上海-环球港", "MG724CH/A", "iPhone 17 512GB 黑色")}
+
+	u, engine := newTestUI(t, fetcher, targets)
+	rec := recordNotifications(u)
+
+	// 第一轮事件完整送达，走的是 EventInStock 那条路。
+	runOneCycle(t, u, engine, fetcher)
+	if len(rec.states) != 1 {
+		t.Fatalf("第一轮应当提醒一次，实际 %d 次", len(rec.states))
+	}
+
+	// 后面几轮仍然有货，事件送不送达都不该再响。
+	runOneCycle(t, u, engine, fetcher)
+	runCycleDropping(t, u, engine, fetcher, dropAllButCycleComplete)
+	if got := rec.products(); len(got) != 1 {
+		t.Errorf("持续有货被重复提醒了，实际发出的提醒: %v", got)
+	}
+}
+
+// TestInStockNotifiesAgainAfterLeavingStock 确认补货能再次提醒。
+//
+// 边沿触发的另一半：目标离开有货状态后必须把「已提醒」的记号撤掉，
+// 否则第一次抢完之后再补货就永远不会响了。
+func TestInStockNotifiesAgainAfterLeavingStock(t *testing.T) {
+	available := true
+	var mu sync.Mutex
+	fetcher := inStockFetcher(&available, &mu)
+	targets := []model.Target{target("R683", "上海-环球港", "MG724CH/A", "iPhone 17 512GB 黑色")}
+
+	u, engine := newTestUI(t, fetcher, targets)
+	rec := recordNotifications(u)
+
+	// 全程只放行 EventCycleComplete，逼着界面完全靠对账做判断。
+	runCycleDropping(t, u, engine, fetcher, dropAllButCycleComplete)
+	if len(rec.states) != 1 {
+		t.Fatalf("第一次有货应当提醒一次，实际 %d 次", len(rec.states))
+	}
+
+	mu.Lock()
+	available = false
+	mu.Unlock()
+	runCycleDropping(t, u, engine, fetcher, dropAllButCycleComplete)
+	if len(rec.states) != 1 {
+		t.Fatalf("变成无货时不该发提醒，实际累计 %d 次", len(rec.states))
+	}
+
+	mu.Lock()
+	available = true
+	mu.Unlock()
+	runCycleDropping(t, u, engine, fetcher, dropAllButCycleComplete)
+	if got := rec.products(); len(got) != 2 {
+		t.Errorf("补货之后应当再提醒一次，实际发出的提醒: %v", got)
+	}
+}
+
+// TestNotifiedSetForgetsRemovedTargets 确认「已提醒」集合会随目标删除一起收缩。
+//
+// 两个后果：集合按 target key 累积，不清理就只涨不落；而且删掉再加回同一个目标
+// 时旧记号还在，那次到货会被当成「已经提醒过」而静默跳过。
+func TestNotifiedSetForgetsRemovedTargets(t *testing.T) {
+	available := true
+	var mu sync.Mutex
+	fetcher := inStockFetcher(&available, &mu)
+	tgt := target("R683", "上海-环球港", "MG724CH/A", "iPhone 17 512GB 黑色")
+
+	u, engine := newTestUI(t, fetcher, []model.Target{tgt})
+	rec := recordNotifications(u)
+
+	runCycleDropping(t, u, engine, fetcher, dropAllButCycleComplete)
+	if len(rec.states) != 1 {
+		t.Fatalf("前置条件不成立，第一次有货应当提醒一次，实际 %d 次", len(rec.states))
+	}
+
+	u.applyTargets(nil)
+	if len(u.notified) != 0 {
+		t.Errorf("目标已被删除，提醒记号却还留着 %d 条", len(u.notified))
+	}
+
+	// 重新加回来的同一个目标必须能再次提醒。
+	u.applyTargets([]model.Target{tgt})
+	runCycleDropping(t, u, engine, fetcher, dropAllButCycleComplete)
+	if got := rec.products(); len(got) != 2 {
+		t.Errorf("删除后重新添加的目标有货时应当提醒，实际发出的提醒: %v", got)
+	}
+}
+
+// slowStore 包着一个真实的 config.Store，只是把每次写盘拖慢一段固定时间。
+//
+// 拖慢是为了稳定地构造出「写盘 goroutine 已经把 pending 取空、正卡在
+// Store.Save 里」这个时序 —— 真实的一次写入只有几百字节，快到根本撞不上，
+// 而「关窗口时最后一次设置会不会丢」恰恰只在这个窗口里见分晓。
+type slowStore struct {
+	*config.Store
+	// entered 在每次 Save 开始时投递一次，测试据此知道写盘已经真的开始了。
+	entered chan struct{}
+	delay   time.Duration
+}
+
+func (s *slowStore) Save(settings config.Settings) error {
+	select {
+	case s.entered <- struct{}{}:
+	default:
+	}
+	time.Sleep(s.delay)
+	return s.Store.Save(settings)
+}
+
+// TestCloseWaitsForInFlightSave 守卫「关窗口不丢最后一次设置」。
+//
+// Close 曾经只在 pending 非空时补写一次，理由是「写盘 goroutine 已经退出了」，
+// 可 close(quit) 只是发了个信号，没有任何同步保证。真实时序是：写盘 goroutine
+// 刚取走 pending（于是 pending 变成 nil）、正卡在 Store.Save 里，Close 看到
+// pending == nil 就直接返回，main 随之结束，运行时把这个 goroutine 连同写了
+// 一半的临时文件一起终止 —— 改了半天的 Bark 地址没落盘，配置目录里还多出一个
+// .settings-*.json。
+func TestCloseWaitsForInFlightSave(t *testing.T) {
+	dir := t.TempDir()
+	disk := config.NewStoreAt(filepath.Join(dir, "settings.json"))
+	slow := &slowStore{
+		Store:   disk,
+		entered: make(chan struct{}, 1),
+		delay:   200 * time.Millisecond,
+	}
+
+	fetcher := &fakeFetcher{fn: func(string, []string) (*apple.StoreAvailability, error) {
+		return nil, fmt.Errorf("不应当被调用")
+	}}
+	u, _ := newTestUI(t, fetcher, nil)
+	// 顶替掉 newTestUI 装的那个真实 store，好把写盘拖慢。
+	u.store = slow
+
+	// New 期间控件的初始化回调（选中地区、勾上提示音）已经排了一次写盘。
+	// 先把它清掉，否则下面等到的是那一次，构造不出想要的时序。
+	u.saveMu.Lock()
+	u.pending = nil
+	u.saveMu.Unlock()
+	select {
+	case <-u.saveSig:
+	default:
+	}
+
+	u.startSaver()
+
+	const bark = "https://api.day.app/关窗口之前最后改的"
+	u.mutateSettings(func(s *config.Settings) { s.BarkURL = bark })
+	u.scheduleSave()
+
+	select {
+	case <-slow.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("写盘 goroutine 迟迟没有开始写")
+	}
+
+	// 此刻 pending 已经被取空，正是原先那句「已经退出了」漏掉的瞬间。
+	u.Close()
+
+	loaded, err := disk.Load()
+	if err != nil {
+		t.Fatalf("读取设置失败: %v", err)
+	}
+	if loaded.BarkURL != bark {
+		t.Errorf("Close 返回时最后一次设置还没落盘，磁盘上的 Bark 地址是 %q", loaded.BarkURL)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("读取配置目录失败: %v", err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".settings-") {
+			t.Errorf("配置目录里残留了写到一半的临时文件 %s", e.Name())
+		}
+	}
+}
+
+// TestClosePersistsPendingSettings 确认压在 pending 里的改动一定会被写完。
+//
+// 与上一个测试互补：那个盯的是「正在写的那次」，这个盯的是「还没轮到写的那次」，
+// 两者合起来才是「改完设置立刻关窗口不会丢配置」。
+func TestClosePersistsPendingSettings(t *testing.T) {
+	dir := t.TempDir()
+	disk := config.NewStoreAt(filepath.Join(dir, "settings.json"))
+
+	fetcher := &fakeFetcher{fn: func(string, []string) (*apple.StoreAvailability, error) {
+		return nil, fmt.Errorf("不应当被调用")
+	}}
+	u, _ := newTestUI(t, fetcher, nil)
+	u.store = disk
+
+	// 不启动写盘 goroutine：模拟「改完设置立刻关窗口，后台还没来得及动手」。
+	u.mutateSettings(func(s *config.Settings) { s.IntervalSeconds = 45 })
+	u.scheduleSave()
+	u.Close()
+
+	loaded, err := disk.Load()
+	if err != nil {
+		t.Fatalf("读取设置失败: %v", err)
+	}
+	if loaded.IntervalSeconds != 45 {
+		t.Errorf("待写的设置没有落盘，磁盘上的查询间隔是 %d 秒", loaded.IntervalSeconds)
 	}
 }

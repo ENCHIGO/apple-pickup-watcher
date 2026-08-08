@@ -308,9 +308,7 @@ func looksLikeJSON(contentType string, body []byte) bool {
 // 只声明用得到的字段。Apple 的响应有几十个字段，全部映射既无必要也更易随
 // 接口调整而失配。
 type pickupResponse struct {
-	Head struct {
-		Status string `json:"status"`
-	} `json:"head"`
+	Head pickupHead `json:"head"`
 	Body struct {
 		Stores       []pickupStore `json:"stores"`
 		ErrorMessage *string       `json:"errorMessage"`
@@ -322,6 +320,57 @@ type pickupResponse struct {
 			} `json:"pickupMessage"`
 		} `json:"content"`
 	} `json:"body"`
+}
+
+// headStatusOK 是 head.status 表示「这次作答有效」时的取值。
+// 实测 /shop/retail/pickup-message 成功响应里它是字符串 "200"。
+const headStatusOK = "200"
+
+type pickupHead struct {
+	// 用 json.RawMessage 承接，是为了把「字段根本没给」和「字段给了但不是成功值」
+	// 区分开。声明成 string 的话两者都是 ""，无从分辨，而这两种情况的处置恰好相反
+	// （见 checkEnvelope）。
+	Status json.RawMessage `json:"status"`
+}
+
+// status 返回 head.status 的字面取值，第二个返回值表示服务端是否真的给了这个字段。
+func (h pickupHead) status() (string, bool) {
+	raw := strings.TrimSpace(string(h.Status))
+	// JSON null 与字段缺失表达的是同一件事：服务端没有就此作答。
+	if raw == "" || raw == "null" {
+		return "", false
+	}
+	var s string
+	if err := json.Unmarshal([]byte(raw), &s); err != nil {
+		// 不是字符串就拿原始字面量去比。Apple 哪天把 "200" 改成数字 200，
+		// 那只是取值形态变了，不该连带门店数据一起作废。
+		return raw, true
+	}
+	return s, true
+}
+
+// checkEnvelope 在解析门店数据之前校验响应信封。
+//
+// 顺序不能反过来：原来的写法只在 stores 为空时才回头看 body.errorMessage，
+// head.status 更是从头到尾没有看过。于是「Apple 已经明说自己出错了，却仍在 stores
+// 里带着一份陈旧或占位数据」的响应会被当成一次正常作答，里面的
+// pickupDisplay=unavailable 一路走到界面上就是「无货」。那正是上游把查询失败当成
+// 没货的失效方式：用户对着一屏永远不变的「无货」空等，看不出程序其实已经坏了。
+func (r *pickupResponse) checkEnvelope() error {
+	if msg := r.Body.ErrorMessage; msg != nil && strings.TrimSpace(*msg) != "" {
+		return fmt.Errorf("%w: %s", ErrAppleError, *msg)
+	}
+
+	status, present := r.Head.status()
+	// 缺失不能一刀切判成失败。旧版 fulfillment-messages 的响应里没有这一层状态，
+	// 而本文件仍保留着 body.content.pickupMessage 的兜底解析路径；Apple 若把数据挪
+	// 回那个位置，配套的信封多半也是旧的，把「没给」当失败会让兜底路径直接报废。
+	// 反过来，字段既然给了，就说明服务端在用带状态的信封，此时的非成功值是明确的
+	// 故障信号，必须让用户看见，而不是接着去解析后面那份来路不明的数据。
+	if present && status != headStatusOK {
+		return fmt.Errorf("%w: head.status = %q", ErrUnexpectedSchema, status)
+	}
+	return nil
 }
 
 type pickupStore struct {
@@ -347,14 +396,16 @@ func parsePickupMessage(raw []byte, wantStore string) (*StoreAvailability, error
 		return nil, fmt.Errorf("%w: %v", ErrUnexpectedSchema, err)
 	}
 
+	// 信封说这次作答无效时，后面的门店数据不管长得多正常都不能采信。
+	if err := resp.checkEnvelope(); err != nil {
+		return nil, err
+	}
+
 	stores := resp.Body.Stores
 	if len(stores) == 0 {
 		stores = resp.Body.Content.PickupMessage.Stores
 	}
 	if len(stores) == 0 {
-		if msg := resp.Body.ErrorMessage; msg != nil && *msg != "" {
-			return nil, fmt.Errorf("%w: %s", ErrAppleError, *msg)
-		}
 		return nil, fmt.Errorf("%w: 响应中没有门店数据", ErrUnexpectedSchema)
 	}
 
@@ -380,6 +431,17 @@ func parsePickupMessage(raw []byte, wantStore string) (*StoreAvailability, error
 		Parts:       make(map[string]PartStatus, len(matched.PartsAvailability)),
 	}
 	for part, info := range matched.PartsAvailability {
+		// partsAvailability 的 map 键和条目里的 partNumber 说的应当是同一个零件号。
+		// 两边都给了却互相矛盾时，没有任何依据判断谁可信；原来的写法直接拿 map 键写
+		// 结果，等于在两个型号里随手挑一个，完全可能把 B 型号的库存状态记在 A 型号
+		// 名下。这种错比漏报更糟：用户会为一台其实没货的机器专程跑一趟门店。
+		// 条目里没有 partNumber 是可以接受的（服务端省略与键重复的字段），
+		// 只有互相矛盾才必须停下来报错。
+		if payload := strings.TrimSpace(info.PartNumber); payload != "" && payload != part {
+			return nil, fmt.Errorf("%w: 门店 %s 的零件号自相矛盾，键为 %s 而条目里是 %s",
+				ErrUnexpectedSchema, wantStore, part, payload)
+		}
+
 		availability, recognized := availabilityFrom(info.PickupDisplay)
 		result.Parts[part] = PartStatus{
 			PartNumber:    part,
