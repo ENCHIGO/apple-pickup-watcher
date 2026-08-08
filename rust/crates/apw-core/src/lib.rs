@@ -19,5 +19,9 @@
 //! 「把失败悄悄当成无货」在类型层面就写不出来。
 
 pub mod apple;
+pub mod apple_catalog;
+pub mod catalog;
+pub mod config;
 pub mod model;
+pub mod notify;
 pub mod watcher;

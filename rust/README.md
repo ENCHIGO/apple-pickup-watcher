@@ -45,12 +45,15 @@ pub enum Availability {
 - [x] `apw-core::model` —— 三态类型、地区表、目标与键
 - [x] `apw-core::apple` —— HTTP 客户端、限速、退避重试、错误四分类、响应解析
 - [x] 单元测试与针对 Apple 真实接口的契约测试
-- [ ] `apw-core::catalog` —— 商品与门店目录（内嵌兜底 + 在线刷新）
+- [x] `apw-core::catalog` —— 商品与门店目录（内嵌兜底 + 在线刷新）
 - [x] `apw-core::watcher` —— 调度引擎（actor 模型）
-- [ ] `apw-core::notify` —— Bark / 提示音 / 系统通知
-- [ ] `apw-core::config` —— 设置持久化（含读取 Go 版 settings.json 做迁移）
-- [x] Tauri 应用外壳与前端骨架（React 19 + shadcn/ui + Tailwind 4）
-- [ ] 系统托盘、自动更新
+- [x] `apw-core::notify` —— Bark / 提示音（系统通知在应用层，需要 Tauri）
+- [x] `apw-core::config` —— 设置持久化（含读取 Go 版 settings.json 做迁移）
+- [x] Tauri 应用外壳与前端（React 19 + shadcn/ui + Tailwind 4）
+- [x] 系统托盘（关窗口收进托盘，不退出）
+- [ ] 自动更新（需要签名密钥与更新清单托管，等确定发布方式再做）
+- [ ] 打包与发布流水线
+- [ ] 把 rust/ 提到仓库根目录并删掉 Go 版
 
 前端确定用 React 19 + TypeScript + Vite + shadcn/ui + Tailwind 4。
 
