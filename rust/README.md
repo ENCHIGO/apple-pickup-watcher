@@ -49,7 +49,7 @@ pub enum Availability {
 - [x] `apw-core::watcher` —— 调度引擎（actor 模型）
 - [ ] `apw-core::notify` —— Bark / 提示音 / 系统通知
 - [ ] `apw-core::config` —— 设置持久化（含读取 Go 版 settings.json 做迁移）
-- [ ] Tauri 应用外壳与前端
+- [x] Tauri 应用外壳与前端骨架（React 19 + shadcn/ui + Tailwind 4）
 - [ ] 系统托盘、自动更新
 
 前端确定用 React 19 + TypeScript + Vite + shadcn/ui + Tailwind 4。
@@ -58,6 +58,8 @@ pub enum Availability {
 
 ```shell
 cd rust
+pnpm install                  # 首次
+pnpm tauri dev                # 起应用
 cargo test                    # 单元测试，不碰网络
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all

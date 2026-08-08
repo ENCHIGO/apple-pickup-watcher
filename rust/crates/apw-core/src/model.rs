@@ -226,6 +226,7 @@ pub fn region_by_locale(locale: &str) -> Option<&'static Region> {
 
 /// 一个具体可购买的 iPhone 配置（机型 + 容量 + 颜色）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Product {
     /// Apple 零件号，如 `MG724CH/A`，查询库存时的唯一标识。
     pub part_number: String,
@@ -241,6 +242,7 @@ pub struct Product {
 
 /// 一家 Apple 直营店。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Store {
     /// 门店编号，如 `R683`，查询库存时的唯一标识。
     pub number: String,
@@ -252,6 +254,7 @@ pub struct Store {
 
 /// 一条监控目标：在某地区的某门店盯某个型号。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Target {
     pub locale: String,
     pub store_number: String,
