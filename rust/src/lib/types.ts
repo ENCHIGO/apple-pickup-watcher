@@ -43,6 +43,34 @@ export interface Region {
   locale: string;
 }
 
+export interface Product {
+  partNumber: string;
+  family: string;
+  capacity: string;
+  color: string;
+  title: string;
+}
+
+export interface Store {
+  number: string;
+  name: string;
+  title: string;
+}
+
+export interface Settings {
+  locale: string;
+  targets: Target[];
+  intervalSeconds: number;
+  barkUrl: string;
+  soundEnabled: boolean;
+  openBagOnHit: boolean;
+}
+
+/** 监控目标的唯一键，与 Rust 侧 Target::key 的构成保持一致。 */
+export function targetKey(t: Target): string {
+  return `${t.locale}|${t.storeNumber}|${t.partNumber}`;
+}
+
 export type WatcherEvent =
   | { type: "stateChanged"; state: TargetState }
   | { type: "inStock"; state: TargetState }
