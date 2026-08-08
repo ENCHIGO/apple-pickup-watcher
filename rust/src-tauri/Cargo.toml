@@ -1,0 +1,25 @@
+[package]
+name = "apw-app"
+description = "Apple 直营店到店取货库存监控"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+# _lib 后缀不是多余的：Windows 上库名与二进制同名会冲突。
+# 见 https://github.com/rust-lang/cargo/issues/8519
+name = "apw_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+apw-core = { path = "../crates/apw-core" }
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true

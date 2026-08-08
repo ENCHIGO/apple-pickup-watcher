@@ -21,6 +21,7 @@
 //! 一层层往下传，也就不会漏传。
 
 use std::collections::BTreeMap;
+use std::future::Future;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -132,14 +133,36 @@ pub struct Watcher {
 }
 
 impl Watcher {
-    /// 起一个引擎任务，返回句柄与事件流。
-    pub fn spawn<F: Fetcher>(client: F, config: WatcherConfig) -> (Self, mpsc::Receiver<Event>) {
+    /// 构造引擎，但**不**替调用方起任务。
+    ///
+    /// 返回的第三项是引擎的主循环，调用方自己决定用什么执行器去驱动它。
+    /// 之所以把这个选择交出去：`tokio::spawn` 要求当前线程正处在 tokio 运行时
+    /// 上下文中，而宿主未必满足 —— Tauri 有自己的 `async_runtime`，它的 `setup`
+    /// 回调跑在主线程上、并不在 tokio 上下文里，在那里直接 spawn 会 panic，
+    /// 而且因为发生在不可展开的回调里，进程直接 abort。库不该对宿主的执行器
+    /// 做假设。
+    pub fn new<F: Fetcher>(
+        client: F,
+        config: WatcherConfig,
+    ) -> (
+        Self,
+        mpsc::Receiver<Event>,
+        impl Future<Output = ()> + Send + 'static,
+    ) {
         let (cmd_tx, cmd_rx) = mpsc::channel(64);
         let (evt_tx, evt_rx) = mpsc::channel(config.event_buffer);
+        let task = Engine::new(client, config, evt_tx).run(cmd_rx);
+        (Self { cmd: cmd_tx }, evt_rx, task)
+    }
 
-        tokio::spawn(Engine::new(client, config, evt_tx).run(cmd_rx));
-
-        (Self { cmd: cmd_tx }, evt_rx)
+    /// 便捷版：直接在当前 tokio 运行时里起任务。
+    ///
+    /// **必须在 tokio 运行时上下文中调用**，否则 panic。测试里用它最省事；
+    /// 宿主程序请用 [`Watcher::new`] 自己驱动那个 future。
+    pub fn spawn<F: Fetcher>(client: F, config: WatcherConfig) -> (Self, mpsc::Receiver<Event>) {
+        let (watcher, events, task) = Self::new(client, config);
+        tokio::spawn(task);
+        (watcher, events)
     }
 
     /// 替换监控目标列表，保留仍然存在的目标的既有状态。
