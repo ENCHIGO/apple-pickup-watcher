@@ -287,6 +287,30 @@ fn looks_like_json(content_type: &str, body: &[u8]) -> bool {
         .is_some_and(|b| *b == b'{' || *b == b'[')
 }
 
+/// 抽象出调度引擎依赖的查询能力，便于在测试里替换掉真实网络请求。
+///
+/// 用泛型约束而不是 trait object：async fn in trait 在泛型位置可以直接写，
+/// 做成 `dyn` 还得引第三方宏来装箱 future，而引擎只需要一个具体实现，不值得。
+pub trait Fetcher: Clone + Send + Sync + 'static {
+    fn pickup_message(
+        &self,
+        region: &'static Region,
+        store_number: &str,
+        parts: &[String],
+    ) -> impl std::future::Future<Output = Result<StoreAvailability, ApiError>> + Send;
+}
+
+impl Fetcher for AppleClient {
+    async fn pickup_message(
+        &self,
+        region: &'static Region,
+        store_number: &str,
+        parts: &[String],
+    ) -> Result<StoreAvailability, ApiError> {
+        AppleClient::pickup_message(self, region, store_number, parts).await
+    }
+}
+
 /// 单个零件号在单个门店的查询结果。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartStatus {

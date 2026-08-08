@@ -20,3 +20,4 @@
 
 pub mod apple;
 pub mod model;
+pub mod watcher;
