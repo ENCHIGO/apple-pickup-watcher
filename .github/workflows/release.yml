@@ -1,197 +1,275 @@
 name: Release
 
+# 打包并发布 Tauri 桌面端安装包。
+#
+# 两条触发路径：
+#   1. push 一个 v* 标签 —— 正式发版，会创建 GitHub Release（草稿，见下面 releaseDraft 的说明）。
+#   2. 手动 workflow_dispatch —— 只构建、不发布，用来验证这条流水线本身还能跑通。
+#      改动了这个文件之后请先手动跑一次，别拿真实发版当测试。
+#
+# 关于「草稿」：产物是四个作业并行上传的，同时 tauri-action 会把各平台的签名信息
+# 合并进同一个 latest.json。如果 Release 一创建就是公开的，GitHub 会立刻把它标成
+# Latest，而这时 `releases/latest/download/latest.json` 要么 404，要么只包含已经跑完
+# 的那一两个平台 —— 用户的自动更新会在这个窗口里拿到半成品。所以这里固定发草稿，
+# 四个作业全绿之后由人到 Releases 页面点一下 “Publish release”。
+# **不点就没人能收到更新**，这一步不能忘。
+
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
+# 默认只读；需要写 Release 的权限在 build 作业里单独提权。
 permissions:
   contents: read
 
-env:
-  GO_VERSION: "1.26.2"
-  BINARY: apple-pickup-watcher
-  APP_NAME: Apple Pickup Watcher
-  APP_ID: io.github.enchigo.apple-pickup-watcher
+concurrency:
+  # 同一个标签重复触发时排队而不是互相取消：四个作业都要往同一个 Release 里塞
+  # 产物和 latest.json，中途被砍掉会留下一个残缺的 Release。
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
     name: ${{ matrix.label }}
     runs-on: ${{ matrix.runner }}
-    # Fyne 依赖 CGO（OpenGL、系统窗口 API 都要链接本地库），beep 在各平台也要
-    # 链接系统音频库，所以每个目标平台必须在对应的 runner 上原生构建。
-    # 在 ubuntu 上设 GOOS=darwin 直接交叉编译是编不过的：没有 macOS SDK，
-    # 也没有对应的 C 交叉工具链。macos-latest 出 arm64，macos-15-intel 出 amd64。
+    permissions:
+      contents: write
+
+    # Tauri 的产物必须在目标平台上原生构建：Windows 要 MSVC 工具链和 WebView2，
+    # macOS 要 Xcode 的 SDK 与 codesign，Linux 要 webkit2gtk 的一堆 C 头文件。
+    # 这里刻意不做交叉编译 —— 每个 runner 只出它自己架构的包，所以下面也不给
+    # `tauri build` 传 --target，用宿主机默认目标即可。
     strategy:
       fail-fast: false
       matrix:
         include:
           - label: macOS (Apple Silicon)
             runner: macos-latest
-            goos: darwin
-            goarch: arm64
-          # macos-15-intel 是 GitHub 当前提供的 Intel runner（有效期至 2027-08）。
-          # 上一代标签 macos-13 已于 2025-12-04 退役，指定它会让作业在初始化阶段
-          # 直接失败，进而跳过整个 publish，Releases 页面一个产物都不会有。
-          # 不要试图在 arm64 上交叉出 amd64：CGO 项目没有可用的交叉工具链。
+
+          # macos-15-intel 是 GitHub 当前提供的 Intel runner。
+          # 上一代标签 macos-13 已于 2025-12-04 退役，写它会让作业在初始化阶段直接
+          # 失败 —— 这个坑本仓库踩过一次，整条发布流水线因此空转。
+          # 换标签前先去 actions/runner-images 的 README 确认它还在列表里。
           - label: macOS (Intel)
             runner: macos-15-intel
-            goos: darwin
-            goarch: amd64
+
           - label: Windows (x64)
             runner: windows-latest
-            goos: windows
-            goarch: amd64
-            # -H=windowsgui 让程序以 GUI 子系统启动，否则双击 exe 会额外弹出
-            # 一个黑色控制台窗口，看起来像是运行出错了。
-            extra_ldflags: -H=windowsgui
+
+          # 固定 24.04 而不是写 ubuntu-latest：Linux 产物的 glibc 下限由构建机决定，
+          # 用浮动标签会在 GitHub 把 ubuntu-latest 挪到 26.04 的那天悄悄抬高门槛，
+          # 老发行版上的用户只会看到「GLIBC_2.xx not found」。
+          # 24.04 对应 glibc 2.39，这一点写进了下面的 Release 说明。
           - label: Linux (x64)
-            runner: ubuntu-latest
-            goos: linux
-            goarch: amd64
+            runner: ubuntu-24.04
 
     defaults:
       run:
-        # Windows runner 默认是 pwsh。统一成 bash，四个平台就能共用同一套脚本。
+        # Windows runner 默认是 pwsh。统一成 bash，四个平台共用同一套脚本。
         shell: bash
 
     steps:
       - uses: actions/checkout@v7
 
-      # Wayland 那几个包不能省：Fyne v2.8 带的 GLFW 3.4 会同时编译 X11 与
-      # Wayland 两个后端，只装 xorg-dev 会卡在 wayland-client-core.h 找不到。
-      - name: 安装 Fyne 与音频依赖
-        if: matrix.goos == 'linux'
+      # pnpm 必须装在 setup-node 之前：setup-node 的 `cache: pnpm` 要靠调用
+      # `pnpm store path` 才知道该缓存哪个目录，PATH 里没有 pnpm 它会直接报错。
+      #
+      # version 也不能省。package.json 里没有 packageManager 字段，
+      # pnpm/action-setup 在两者都缺的情况下会失败退出而不是挑个默认值。
+      # 反过来，将来如果给 package.json 加了 packageManager，就要把这里的 version 删掉，
+      # 两边都写且对不上会被判成版本冲突而报错。
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v7
+        with:
+          # lts/* = 当前最新的 LTS。本项目不锁具体小版本，Vite 7 只要求 Node 20.19+。
+          node-version: lts/*
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # 缓存整个 target/ 与 cargo registry。Tauri 的依赖树很大（webkit/wry/tao 一层层
+      # 下来上千个 crate），冷编译在免费 runner 上是十几分钟起步。
+      # 缓存键里已经含有作业名与 rustc 版本，四个平台不会互相污染。
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # 显式声明工作区根目录与 target 目录的对应关系。Cargo.toml 在仓库根，
+          # 默认值本来就是这个，写出来是为了将来把 workspace 挪走时能一眼看到要改哪。
+          workspaces: ". -> target"
+
+      # 这些包一个都不能省，缺任何一个都是在**编译期**报 C 头文件找不到，
+      # 而不是在运行时才暴露，日志里只有一行 fatal error，很难对上是缺哪个包：
+      #
+      #   libwebkit2gtk-4.1-dev  —— WebView 后端（wry）。Tauri v2 用的是 4.1，
+      #                             不是 v1 时代的 4.0，装错版本 pkg-config 直接找不到。
+      #   libgtk-3-dev           —— 窗口、菜单。通常由 webkit2gtk 依赖带进来，
+      #                             显式列出是为了它哪天不再被带进来时报错能指向明处。
+      #   libayatana-appindicator3-dev
+      #                          —— 系统托盘。src-tauri 开了 tauri 的 "tray-icon" 特性，
+      #                             这个项目就是要常驻托盘盯库存的，删了直接编不过。
+      #   librsvg2-dev           —— 图标栅格化。
+      #   libxdo-dev / libssl-dev
+      #                          —— Tauri v2 官方前置依赖清单里的项，见
+      #                             https://v2.tauri.app/start/prerequisites/
+      #   libasound2-dev         —— **本项目特有**：apw-core 依赖 rodio → cpal → alsa-sys，
+      #                             需要 ALSA 的开发头文件。Tauri 官方清单里没有这一条，
+      #                             照着官网抄会漏掉它，然后卡在 alsa-sys 的 build 脚本上。
+      #   patchelf               —— 打 AppImage 时改可执行文件的 rpath，缺了 bundler 会中途失败。
+      #   file / wget / xdg-utils
+      #                          —— AppImage 的打包脚本在运行时会调用这几个命令行工具。
+      #                             ubuntu runner 上一般已经有了，列出来只是为了自证完整。
+      - name: 安装 Tauri 与音频的系统依赖（仅 Linux）
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            gcc \
-            pkg-config \
-            libgl1-mesa-dev \
-            xorg-dev \
-            libxkbcommon-dev \
-            libwayland-dev \
-            wayland-protocols \
-            libwayland-bin \
-            libdecor-0-dev \
-            libasound2-dev
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            libasound2-dev \
+            patchelf \
+            file \
+            wget \
+            xdg-utils
 
-      - uses: actions/setup-go@v7
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+      # tauri-action 不会替我们装前端依赖，得自己来。
+      # CI 环境下 pnpm 本来就默认 --frozen-lockfile，写出来是为了让「锁文件没跟着
+      # package.json 一起提交」这种情况明确地失败，而不是让 CI 悄悄改锁文件。
+      - name: 安装前端依赖
+        run: pnpm install --frozen-lockfile
 
-      - name: 编译
+      # ── 签名密钥缺失时的降级处理 ────────────────────────────────────────────
+      # tauri.conf.json 里配了 updater 的 pubkey，Tauri CLI 因此会在打包结束后强制
+      # 对所有「可用于更新」的产物（.app.tar.gz / nsis / msi / AppImage / deb / rpm）
+      # 签名，找不到私钥就直接报错退出：
+      #   "A public key has been found, but no private key. Make sure to set
+      #    `TAURI_SIGNING_PRIVATE_KEY` environment variable."
+      # 也就是说密钥没配的话，整条流水线连一个安装包都产不出来。
+      #
+      # 解法是给 `tauri build` 加 --no-sign，它会把签名整步跳过（只打印一行 warning），
+      # 安装包照常产出，只是没有 .sig。tauri-action 那边不需要额外设置：它生成
+      # latest.json 前会先找 .sig，一个都没有时打印
+      #   "Signature not found for the updater JSON. Skipping upload..."
+      # 然后跳过，不会让作业失败。
+      #
+      # 注意 --no-sign 同时也会跳过 macOS/Windows 的证书签名 —— 本项目本来就没有
+      # 证书签名，所以没有额外损失。
+      #
+      # --no-sign 是 `tauri build` 的参数，已在 tauri-cli v2.11.4（pnpm-lock.yaml 当前
+      # 锁定的版本）上确认存在。如果哪天把 @tauri-apps/cli 降级到更老的版本，
+      # 先跑 `pnpm exec tauri build --help | grep no-sign` 确认它还在，否则这里的
+      # 降级逻辑会变成「参数不认识」导致构建失败。
+      #
+      # 为什么要绕这么一圈用 output 而不是直接 `if: secrets.X != ''`：
+      # GitHub 的上下文可用性表里，step 的 if: 只认 github/needs/matrix/env/steps 等，
+      # **不包含 secrets**，写了也永远判不出来。secrets 只能出现在 env: / with: / run: 里。
+      - name: 检测更新签名密钥
+        id: signing
         env:
-          CGO_ENABLED: "1"
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          EXTRA_LDFLAGS: ${{ matrix.extra_ldflags }}
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           set -eu
-          mkdir -p dist
-          name="$BINARY"
-          if [ "$GOOS" = "windows" ]; then
-            name="$BINARY.exe"
-          fi
-          # migrated_fynedo 与 Makefile 的 build 目标保持一致：向 Fyne 声明界面
-          # 更新已全部走 fyne.Do，避免发布出去的程序每次启动都打印一句
-          # 「本应用尚未迁移」的不实警告。CI 的测试作业不加这个标签，
-          # 以便继续开着 Fyne 的跨线程访问检查。
-          go build -trimpath -tags migrated_fynedo -ldflags "-s -w $EXTRA_LDFLAGS" \
-            -o "dist/$name" ./cmd/"$BINARY"
-
-      # 图标不在仓库里时跳过 .app 打包，只发布可执行文件。宁可少一个产物，
-      # 也不要让整条发布流水线因为缺一张图片而失败。
-      - name: 打包 macOS .app
-        if: matrix.goos == 'darwin'
-        run: |
-          set -eu
-          if [ ! -f assets/icon.png ]; then
-            echo "仓库内没有 assets/icon.png，跳过 .app 打包"
-            exit 0
-          fi
-          go install fyne.io/tools/cmd/fyne@latest
-          # fyne package 会自己重新编译一遍，不会复用上一步 dist/ 里的产物，
-          # 所以 migrated_fynedo 必须在这里再传一次。漏掉的话，macOS 用户真正
-          # 双击运行的这个 .app 就会打印那三行「尚未迁移到 fyne.Do」的不实警告，
-          # 而上一步为可执行文件做的规避完全帮不上忙。与 Makefile 的 package-mac 一致。
-          (cd ./cmd/"$BINARY" && "$(go env GOPATH)/bin/fyne" package \
-            -name "$APP_NAME" -appID "$APP_ID" -icon "$GITHUB_WORKSPACE/assets/icon.png" \
-            -tags migrated_fynedo)
-          mv "./cmd/$BINARY/$APP_NAME.app" dist/
-          # ad-hoc 签名让用户在自己机器上清掉隔离属性后即可运行。
-          # 这不是 Apple 公证，下载后仍需执行 xattr -cr，README 里有说明。
-          xattr -cr "dist/$APP_NAME.app"
-          codesign --force --deep --sign - "dist/$APP_NAME.app"
-
-      - name: 归档
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          set -eu
-          base="${BINARY}_${TAG}_${GOOS}_${GOARCH}"
-          mkdir -p out
-          cp LICENSE NOTICE README.md dist/
-          if [ "$GOOS" = "windows" ]; then
-            (cd dist && 7z a -tzip "../out/${base}.zip" ./*)
+          if [ -n "${SIGNING_KEY:-}" ]; then
+            echo "sign=true" >> "$GITHUB_OUTPUT"
+            echo "已配置签名密钥，将产出带签名的更新包与 latest.json。"
           else
-            tar -czf "out/${base}.tar.gz" -C dist .
+            echo "sign=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::未配置 TAURI_SIGNING_PRIVATE_KEY，本次产出未签名安装包，且不会生成 latest.json，应用内自动更新在这个版本上不可用。补配仓库 Secret 后重跑本流水线即可。"
           fi
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.goos }}-${{ matrix.goarch }}
-          path: out/*
-          if-no-files-found: error
-          retention-days: 7
-
-  publish:
-    name: 发布 Release
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: out
-          merge-multiple: true
-
-      - name: 生成校验和
-        run: |
-          set -eu
-          cd out
-          # 先写到上一级再挪回来，免得校验和文件把自己也算进去。
-          sha256sum ./* > ../SHA256SUMS.txt
-          mv ../SHA256SUMS.txt .
-          cat SHA256SUMS.txt
-
-      # 标签名经环境变量传入而不是直接内插进脚本，避免命令注入。
-      - name: 创建 Release 并上传产物
+      - name: 构建、打包并发布
+        uses: tauri-apps/tauri-action@v1
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          set -eu
-          notes=$(cat <<'EOF'
-          ### 安装说明
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 两个都留空也没关系：上一步已经把 --no-sign 备好了。
+          # 本项目生成密钥时用的是空密码，密码 Secret 不配也能签（Tauri 在 CI 环境下
+          # 会把缺失的密码当成空字符串）。
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          # 手动触发时这三项留空 —— tauri-action 的约定是：tagName / releaseName /
+          # releaseId 都不给，就只构建、不碰 Release。正好用来空跑验证流水线。
+          tagName: ${{ github.event_name == 'push' && github.ref_name || '' }}
+          releaseName: ${{ github.event_name == 'push' && github.ref_name || '' }}
 
-          - **macOS**：应用未经 Apple 公证，首次打开会被 Gatekeeper 拦下并提示「已损坏」。
-            解压后执行 `xattr -cr "/Applications/Apple Pickup Watcher.app"` 即可正常启动。
-          - **Linux**：需要系统已安装 OpenGL 与 ALSA 运行库。
-          - 校验产物完整性请对照 `SHA256SUMS.txt`。
+          # 先发草稿，人工确认四个平台都齐了再发布。理由见文件开头。
+          #
+          # 假设：四个作业并行地「找不到就创建」同一个 Release，靠的是 tauri-action
+          # 自己的去重。这是官方 README 里给出的矩阵写法，理论上仍有极小概率同时创建
+          # 出两个草稿。真遇到了（Releases 里出现两条同名草稿）再拆一个前置作业专门
+          # 建 Release、后续作业用 releaseId 引用即可 —— 但那样 latest.json 里的下载
+          # 地址会退化成 releases/latest/download/<bundle>，代价更大，所以先不这么做。
+          releaseDraft: true
+          prerelease: false
 
-          本项目基于 [hteen/apple-store-helper](https://github.com/hteen/apple-store-helper) 修改，
-          以 GPL-3.0 发布，详见仓库内的 `LICENSE` 与 `NOTICE`。
-          EOF
-          )
-          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-            gh release upload "$TAG" --repo "$REPO" --clobber out/*
-          else
-            gh release create "$TAG" --repo "$REPO" --title "$TAG" \
-              --notes "$notes" --generate-notes out/*
-          fi
+          # 生成并上传 updater 用的 latest.json。tauri.conf.json 里的 endpoint 指向
+          # releases/latest/download/latest.json，靠的就是这个文件。
+          # 四个作业会各自往同一个 latest.json 里合并自己平台的条目，action 内部对
+          # 这个文件有重试逻辑，不需要我们串行化。
+          uploadUpdaterJson: true
+
+          # Windows 上 targets: "all" 会同时产出 .msi 和 setup.exe(NSIS)，
+          # 这项决定 latest.json 里指向哪一个。选 NSIS：它配合 tauri.conf.json 里的
+          # windows.installMode = "passive" 能安静地就地升级，MSI 走 msiexec 需要提权。
+          updaterJsonPreferNsis: true
+
+          # 手动空跑时没有 Release 可传，把产物挂成 workflow artifact，
+          # 否则这次运行什么都拿不到、也就验证不了打包结果。
+          # 默认命名是 [platform]-[arch]-[bundle]，四个作业不会撞名。
+          uploadWorkflowArtifacts: ${{ github.event_name == 'workflow_dispatch' }}
+
+          # 刻意保持默认的 0。retryAttempts 会连**构建**一起重试，编译错误重来一遍
+          # 只是白烧十几分钟。latest.json 的上传冲突 action 内部本来就自带一次重试。
+          retryAttempts: 0
+
+          args: ${{ steps.signing.outputs.sign == 'false' && '--no-sign' || '' }}
+
+          # 四个作业传的是同一段文字，后跑完的作业会用它覆盖 Release 说明，
+          # 内容一致所以结果是幂等的。改这里记得别引入 ${{ }}，会被当成表达式求值。
+          releaseBody: |
+            ### 下载哪一个
+
+            | 系统 | 文件 |
+            | --- | --- |
+            | macOS（Apple Silicon）| `*_aarch64.dmg` |
+            | macOS（Intel）| `*_x64.dmg` |
+            | Windows | `*-setup.exe`（推荐）或 `*_x64_en-US.msi` |
+            | Linux | `*_amd64.deb` 或 `*_amd64.AppImage` |
+
+            ### macOS：首次打开被拦下
+
+            安装包没有经过 Apple 公证，Gatekeeper 会提示「已损坏，无法打开」。
+            这不是文件真的坏了。把应用拖进「应用程序」后执行一次：
+
+            ```sh
+            xattr -cr "/Applications/Apple Pickup Watcher.app"
+            ```
+
+            之后就能正常启动，这条命令只需要执行一次。
+
+            ### Linux：运行库要求
+
+            产物在 Ubuntu 24.04 上构建，需要 glibc ≥ 2.39，更老的发行版请自行从源码编译。
+
+            - `.deb`：`sudo apt install ./apple-pickup-watcher_*_amd64.deb` 会自动拉齐依赖。
+              手动装的话需要 `libwebkit2gtk-4.1-0`、`libayatana-appindicator3-1`（托盘图标）、
+              以及 ALSA 运行库 `libasound2t64`（播放到货提示音要用）。
+            - `.AppImage`：需要系统里有 FUSE 2（Ubuntu 24.04 上是 `libfuse2t64`）。
+              不想装的话可以用 `./apple-pickup-watcher_*.AppImage --appimage-extract-and-run` 运行。
+
+            ### 关于自动更新
+
+            应用会向本仓库的 Releases 查询新版本。如果本次发布的资产里没有 `latest.json`，
+            说明构建时仓库未配置更新签名密钥，这个版本只能手动下载升级。
+
+            ### 许可与来源
+
+            本项目基于 [hteen/apple-store-helper](https://github.com/hteen/apple-store-helper) 修改，
+            以 GPL-3.0 发布。详见仓库内的 `LICENSE` 与 `NOTICE`。

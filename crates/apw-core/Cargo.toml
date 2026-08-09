@@ -1,0 +1,27 @@
+[package]
+name = "apw-core"
+description = "Apple 直营店到店取货库存监控的核心逻辑，不依赖任何界面框架"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+tokio.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+rand.workspace = true
+rodio.workspace = true
+dirs.workspace = true
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "test-util"] }
+
+[features]
+# live 打开后才会跑针对 Apple 真实接口的契约测试：
+#   cargo test -p apw-core --features live -- --ignored --nocapture
+# 默认关闭，免得每次 cargo test 都去打扰 Apple 的服务。
+live = []
