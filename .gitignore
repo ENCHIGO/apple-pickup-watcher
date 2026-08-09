@@ -1,35 +1,28 @@
-# 构建产物
-/dist/
-/build/
-/fyne-cross/
-*.app/
-*.exe
-*.dll
-*.so
-*.dylib
-*.zip
-*.tar.gz
-*.dmg
-
-# make build 直接产出的二进制（与仓库根同名，无扩展名）
-/apple-pickup-watcher
-
-# Go 测试与分析产物
-*.test
-*.out
-coverage.txt
-
-# 本地设置文件。
-# 正常情况下设置写在系统用户配置目录，不会出现在仓库里；
-# 这几条是为了兜住从工作目录启动的调试场景，避免把个人门店和 Bark 地址提交上去。
-settings.json
-user_settings.json
-
-# 编辑器与操作系统
-.DS_Store
-.idea/
-.vscode/
-*.swp
-
 # Rust
-/rust/target/
+/target/
+**/*.rs.bk
+
+# 前端
+node_modules
+/dist
+dist-ssr
+*.local
+
+# 日志
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Tauri 更新签名私钥。绝对不能提交 —— 泄露等于任何人都能给你的用户推送
+# 一个"合法签名"的更新包。
+*.key
+/.tauri/
+
+# 编辑器与系统
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.swp
+*.sw?

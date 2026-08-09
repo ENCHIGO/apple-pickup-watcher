@@ -1,0 +1,34 @@
+[workspace]
+resolver = "3"
+members = ["crates/apw-core", "src-tauri"]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.90"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/ENCHIGO/apple-pickup-watcher"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+rand = "0.9"
+rodio = { version = "0.22", default-features = false, features = ["playback", "symphonia-mp3"] }
+dirs = "6"
+
+# 发布构建的体积优化。这是个要让用户下载的桌面应用，几 MB 的差别是实打实的。
+[profile.release]
+# 裁掉符号表与调试信息。崩溃栈会因此变得难读，但我们本来也没有崩溃上报，
+# 真要排查是让用户跑 debug 构建复现，而不是解读 release 的栈。
+strip = true
+# 跨 crate 的链接时优化。编译慢不少，但只在发版时付出这个代价。
+lto = true
+# 单个代码生成单元，让 LTO 能看到全局。同样是拿编译时间换体积。
+codegen-units = 1
+# panic 直接终止：这个程序里所有可恢复的错误都走 Result，没有任何地方
+# 依赖 unwind 来做清理，保留 unwind 表纯属浪费。
+panic = "abort"
+opt-level = "s"

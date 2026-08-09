@@ -1,70 +1,250 @@
 name: CI
 
 on:
+  # 刻意写 branches 而不是留空的 `push:`：留空时推 tag 也会触发，
+  # 于是每打一个 v* 标签，CI 和 Release 就各把整棵 Tauri 依赖树编译一遍。
   push:
     branches: ["**"]
   pull_request:
+  # 每天一次的 Apple 真实接口契约测试，见下面的 live job。
+  # 22:23 UTC = 次日 06:23 北京时间。刻意避开整点：GitHub 的定时任务在整点
+  # 排队最重，写 "0 22 * * *" 经常被推迟几十分钟。
+  #
+  # 两个已知限制，改这里之前先知道：
+  #   1. schedule 只在**默认分支**上的工作流定义生效。这份文件目前还在
+  #      rust-tauri 分支上，合并回默认分支之前定时任务一次都不会跑，
+  #      要验证只能用下面的 workflow_dispatch 手动触发。
+  #   2. 仓库连续 60 天没有活动时，GitHub 会自动停用定时任务并发邮件通知，
+  #      需要去 Actions 页面手动重新启用。
+  schedule:
+    - cron: "23 22 * * *"
+  # 手动触发：改完接口相关代码后可以立刻验一次，不必等到第二天。
+  workflow_dispatch:
 
-# 同一分支上的旧任务在有新提交时直接取消，避免排队浪费额度。
+# 这条流水线不发布任何东西，也不写回仓库，只读足够。
+permissions:
+  contents: read
+
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # event_name 放进 group：定时的契约测试和 push/PR 的检查各成一组，
+  # 免得定时任务把正在跑的检查挤掉，或者反过来。
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  # 定时任务不取消：它一天只有一次，被顶掉就等于这天没测。
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 env:
-  GO_VERSION: "1.26.2"
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  # package.json 里没有 packageManager 字段，pnpm/action-setup 无从推断版本，
+  # 必须显式给出。哪天在 package.json 补上了 packageManager，就要把这里的
+  # version 输入删掉 —— 两处都写且不一致时，该 action 会直接报错退出。
+  PNPM_VERSION: "9"
+  # lts/* 让 setup-node 解析到当前的 Node LTS。想要完全可复现就钉成具体大版本
+  # （例如 "24"）；本项目对 Node 版本不敏感，vite 7 只要求 Node >= 20。
+  NODE_VERSION: "lts/*"
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # 日常检查：格式、clippy、Rust 测试、前端类型检查与构建。
+  # Linux 上跑全套，这是唯一一个「必须绿」的 job。
+  # ---------------------------------------------------------------------------
   check:
-    name: 格式、静态检查与测试
+    name: 检查（Linux）
+    # 只在 push / PR 上跑。schedule 与 workflow_dispatch 是为下面的契约测试
+    # 准备的，手动触发时没必要把整套检查再跑一遍（要重跑从 UI 上 re-run 即可）。
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
-      # Fyne 走 CGO 调用 OpenGL 与窗口系统，beep 在 Linux 上通过 ALSA 播放音频，
-      # 这些头文件 runner 默认没有，缺任何一个都会在编译期报 C 头文件找不到，
-      # 而不是在测试里失败，排查起来很费时间。
-      #
-      # Wayland 那几个包不能省：Fyne v2.8 带的 GLFW 3.4 会同时编译 X11 与
-      # Wayland 两个后端，只装 xorg-dev 会卡在
-      # wl_platform.h:27 fatal error: wayland-client-core.h: No such file。
-      - name: 安装 Fyne 与音频依赖
+      # Tauri v2 在 Linux 上的编译期依赖，缺任何一个都是编译失败而不是测试失败，
+      # 报错还是一句 C 头文件找不到，排查很费时间。逐条说明，别随手删：
+      #   - libwebkit2gtk-4.1-dev  Tauri v2 的 WebView。注意是 4.1 不是 4.0，
+      #                            4.0 是 Tauri v1 用的，在 ubuntu-24.04 上根本没有这个包。
+      #   - libayatana-appindicator3-dev  托盘图标。src-tauri 开了 tauri 的
+      #                            tray-icon feature，少了它链接期就报错。
+      #   - librsvg2-dev / libxdo-dev / libssl-dev / file  Tauri 官方 Linux
+      #                            prerequisites 里列的，照抄。
+      #   - libasound2-dev         apw-core 用 rodio 播提示音，rodio 在 Linux 上
+      #                            经 cpal 走 ALSA，没有这个包连 cargo test 都编不过。
+      #                            这一条不在 Tauri 官方清单里，是本项目额外需要的。
+      #   - pkg-config             alsa-sys 等 *-sys crate 靠它找库；runner 上通常
+      #                            自带，写出来是为了不依赖 runner 镜像的默认内容。
+      # 打包 AppImage 需要的 patchelf 这里没装：CI 不出安装包，只有 release 需要。
+      # 改动这个列表时记得同步 .github/workflows/release.yml 里的同名步骤。
+      - name: 安装 Tauri 与音频的系统依赖
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            gcc \
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libssl-dev \
+            libasound2-dev \
+            build-essential \
             pkg-config \
-            libgl1-mesa-dev \
-            xorg-dev \
-            libxkbcommon-dev \
-            libwayland-dev \
-            wayland-protocols \
-            libwayland-bin \
-            libdecor-0-dev \
-            libasound2-dev
+            file
 
-      - uses: actions/setup-go@v7
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          # 用 stable 而不是钉死 1.94：这个项目没有 rust-toolchain.toml，
+          # 本地也是跟着 stable 走的。Cargo.toml 里的 rust-version 是下限，
+          # 真正的编译器版本由这里决定。
+          components: rustfmt, clippy
 
-      # 这里刻意用 gofmt -l 而不是 go fmt：后者会就地改写文件，CI 上改了也没人
-      # 看得见，结果是格式问题被静默吞掉。列出文件并让任务失败才有意义。
-      - name: gofmt 检查
+      # 缓存要放在装好工具链之后：缓存 key 里含 rustc 版本，顺序反了会拿到错的 key。
+      # 缓存的是 ~/.cargo 与 target/ 里的**依赖**产物，本工作区自己的 crate 每次
+      # 重编（这正是我们想要的：避免陈旧产物掩盖问题）。
+      - uses: Swatinem/rust-cache@v2
+
+      # 格式检查不需要编译，放在最前面，几十秒内就能给出反馈。
+      # 用 --check 而不是直接 cargo fmt：后者会就地改写文件，CI 上改了没人看得见，
+      # 结果是格式问题被静默吞掉。
+      - name: cargo fmt
+        run: cargo fmt --all --check
+
+      # --- 前端 ---------------------------------------------------------------
+      # pnpm 必须在 setup-node 之前装好：setup-node 的 cache: pnpm 会去调用
+      # pnpm 来定位它的 store 目录，顺序反了会报 "Unable to locate executable file: pnpm"。
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: 安装前端依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript 类型检查
+        run: pnpm exec tsc --noEmit
+
+      # 放在 cargo 命令之前是有意的，但理由不是「不这样就编不过」。
+      #
+      # generate_context! 宏确实会在编译期检查 frontendDist 指向的 dist/ 目录，
+      # 但那个检查有前提（tauri-codegen 的 context.rs）：
+      #     } else if dev && config.build.dev_url.is_some() { /* 跳过检查 */ }
+      # dev 构建且配了 devUrl（我们配了 http://localhost:1420）时会走进这个分支，
+      # 用空资源占位、根本不看 dist/。而 clippy 与 cargo test 都是 dev profile，
+      # 所以缺 dist/ 时它们**照样能通过** —— 本地实测确认过。
+      # 真正会因此 panic 的是 release 构建（tauri build），那条路径在 release.yml 里，
+      # 且 tauri-action 会先跑 beforeBuildCommand 把 dist/ 生成出来。
+      #
+      # 那为什么还要放前面？因为前端构建失败应当尽早暴露：它只要几秒，而 Rust 那几步
+      # 动辄几分钟，让人等十分钟才发现是一个 TypeScript 报错很浪费。
+      - name: 构建前端
+        run: pnpm exec vite build
+
+      # --- Rust ---------------------------------------------------------------
+      # --all-features 会连 apw-core 的 live feature 一起打开，也就是说
+      # crates/apw-core/tests/live.rs 会被编译进来。这是好事：契约测试的代码
+      # 也该被 lint 和类型检查覆盖，免得它悄悄烂掉、等到定时任务那天才发现编不过。
+      # clippy 只编译不执行，所以这一步不会向 Apple 发出任何请求。
+      - name: cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      # 这里**绝对不能**加 --all-features：那会真的执行 live.rs，向 Apple 的
+      # 线上接口发七次请求。真实接口的契约测试只在下面按天定时的 live job 里跑。
+      - name: cargo test
+        run: cargo test
+
+  # ---------------------------------------------------------------------------
+  # macOS 上的编译与测试。
+  #
+  # 为什么值得加：这个程序的用户和作者主要在 macOS 上，而 macOS 专属的编译问题
+  # （tauri 的 objc 绑定、rodio 的 CoreAudio 后端、托盘图标）在 Linux 上一点都
+  # 暴露不出来。没有这个 job，「macOS 编译不过」要等到打 tag、release 流水线跑到
+  # 一半才发现，那时候标签已经推出去了，收拾起来很麻烦。
+  #
+  # 代价与折中：macOS runner 排队更慢，冷缓存下 Tauri 依赖树要编十来分钟（有缓存
+  # 后两三分钟）；公开仓库不计费，私有仓库按 10 倍分钟数计。所以这里做了两处收敛：
+  #   1. 不重复跑 fmt 和 clippy —— 这两项与平台无关，Linux 上跑过就够了。
+  #   2. 只在 PR 和默认分支的 push 上跑，功能分支的中途提交跳过（那些提交通常
+  #      随后就会以 PR 的形式再检查一次）。
+  # 如果觉得这个 job 太慢或太贵，直接整段删掉，Linux 的 check 仍然是完整的。
+  check-macos:
+    name: 检查（macOS）
+    # github.event.repository.default_branch 避免把分支名写死；push 事件的
+    # payload 里带这个字段。（假设：合并回默认分支后才能实测到这条路径，
+    # 在 PR 上只会走前半个条件。）
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' &&
+       github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      # macOS 不需要装系统依赖：WebView 用系统自带的 WKWebView，音频用 CoreAudio，
+      # 都在 SDK 里，Xcode Command Line Tools 是 runner 预装的。
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: 安装前端依赖
+        run: pnpm install --frozen-lockfile
+
+      # 这一步在 macOS 上其实可以省（dev profile 不检查 dist/，理由见 Linux job 里的
+      # 长注释）。保留它是为了让两个 job 的步骤序列一致 —— 差异越少，将来某一边出问题
+      # 时越容易对照排查。几秒钟的代价，换的是「两边跑的是同一套流程」这个确定性。
+      - name: 构建前端
+        run: pnpm exec vite build
+
+      # 同样不能加 --all-features。
+      - name: cargo test
+        run: cargo test
+
+  # ---------------------------------------------------------------------------
+  # 针对 Apple 真实接口的契约测试，一天一次。
+  #
+  # 这个 job 是这个项目存在的理由：上游就是因为 Apple 悄悄换了接口而彻底失效，
+  # 又因为没有任何测试，半年时间里没人发现程序报的「无货」其实是被拦截了。
+  # 单元测试拿假响应验证解析逻辑，拦不住这种事 —— 只有真的打一次 Apple 才行。
+  #
+  # 失败就是失败，不做任何容错：这里没有重试，也没有 continue-on-error。
+  # 「被拦截」正是要报警的信号，加重试等于把唯一的信号磨平。GitHub 会为默认分支上
+  # 失败的定时任务给仓库主人发邮件，这就是通知渠道。
+  # ---------------------------------------------------------------------------
+  live:
+    name: Apple 接口契约测试（每日）
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # 七个地区、每次请求之间至少间隔 2 秒，正常几十秒就跑完。
+    # 设上限是为了防止对端挂起把 runner 一直占着。
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      # 只需要 ALSA：apw-core 不依赖 tauri，编译它用不到 webkit2gtk 那一套，
+      # 所以这里的依赖列表比上面的 check job 短得多，装全套纯属浪费一分多钟。
+      - name: 安装音频依赖
         run: |
-          unformatted=$(gofmt -l .)
-          if [ -n "$unformatted" ]; then
-            echo "以下文件未通过 gofmt，请在本地执行 make fmt 后重新提交："
-            echo "$unformatted"
-            exit 1
-          fi
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
 
-      - name: go vet
-        run: go vet ./...
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: 编译
-        run: go build ./...
+      - uses: Swatinem/rust-cache@v2
 
-      # -race 是这个项目的重点：上游那些「用着用着就闪退」的问题，根子在界面
-      # 线程与轮询 goroutine 无锁共享状态。没有竞态检测的测试挡不住这类回归。
-      - name: 测试（竞态检测）
-        run: go test -race -count=1 ./...
+      # --test live 把范围限定在 crates/apw-core/tests/live.rs 这一个测试目标上，
+      # 另外那 125 个离线用例由 check job 负责，没必要在这里再跑一遍。
+      # live.rs 整个文件挂了 #![cfg(feature = "live")]，不开 feature 时它编译成空，
+      # 这也是为什么日常的 cargo test 不会碰到 Apple。
+      # --nocapture 让测试里打印的接口响应片段直接出现在日志里：接口一旦变了，
+      # 光看 panic 信息不够，得能看到 Apple 实际返回了什么。
+      - name: 对 Apple 线上接口跑契约测试
+        run: cargo test -p apw-core --features live --test live -- --nocapture
