@@ -195,25 +195,21 @@ impl AppleClient {
 
     /// 保证任意两次出站请求之间至少间隔 `min_interval`。
     async fn throttle(&self) {
-        let wait = {
+        let slot = {
             let mut last = self.last_sent.lock().await;
             let now = Instant::now();
-            let wait = match *last {
-                Some(prev) => {
-                    let elapsed = now.saturating_duration_since(prev);
-                    self.config.min_interval.saturating_sub(elapsed)
-                }
-                None => Duration::ZERO,
+            // `last` 存的是上一次**预约**的发送时刻，可能仍在未来。必须在它之上
+            // 累加间隔，而不是拿它和 now 求差 —— 那样几个并发调用会各自算出同一个
+            // 「再等 min_interval」，然后在同一时刻一起冲出去。
+            let slot = match *last {
+                Some(prev) => (prev + self.config.min_interval).max(now),
+                None => now,
             };
-            // 先把「预约」的发送时刻写回去再放锁，并发调用才会依次排开，
-            // 而不是一起看到同一个过去的时刻然后同时冲出去。
-            *last = Some(now + wait);
-            wait
+            *last = Some(slot);
+            slot
         };
 
-        if !wait.is_zero() {
-            tokio::time::sleep(wait).await;
-        }
+        tokio::time::sleep_until(slot).await;
     }
 
     /// 执行单次 HTTP 请求，并把失败归类。
@@ -250,14 +246,7 @@ impl AppleClient {
             .unwrap_or_default()
             .to_ascii_lowercase();
 
-        let bytes = resp
-            .bytes()
-            .await
-            .map_err(|e| ApiError::Transport(format!("读取响应失败：{e}")))?;
-        let body = bytes
-            .into_iter()
-            .take(MAX_RESPONSE_BYTES)
-            .collect::<Vec<u8>>();
+        let body = read_body_capped(resp, MAX_RESPONSE_BYTES).await?;
 
         match status.as_u16() {
             200 => {
@@ -276,6 +265,25 @@ impl AppleClient {
             code => Err(ApiError::Transport(format!("HTTP {code}"))),
         }
     }
+}
+
+/// 分块读取响应体，累计到 `max` 立刻停下。
+///
+/// 不能用 `resp.bytes()` 再 `.take(max)`：那个方法会先把整份响应缓冲进内存，
+/// 上限是在「已经吃完」之后才生效的，对超大响应或 gzip 解压炸弹起不到任何保护。
+/// 边读边截才是真的有上限。
+async fn read_body_capped(mut resp: reqwest::Response, max: usize) -> Result<Vec<u8>, ApiError> {
+    let mut body = Vec::new();
+    while body.len() < max {
+        let chunk = resp
+            .chunk()
+            .await
+            .map_err(|e| ApiError::Transport(format!("读取响应失败：{e}")))?;
+        let Some(chunk) = chunk else { break };
+        let n = chunk.len().min(max - body.len());
+        body.extend_from_slice(&chunk[..n]);
+    }
+    Ok(body)
 }
 
 fn looks_like_json(content_type: &str, body: &[u8]) -> bool {
