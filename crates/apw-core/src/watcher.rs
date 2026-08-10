@@ -20,7 +20,7 @@
 //! 把那个 future 丢掉就行，在飞的 HTTP 请求会一并取消，不需要像 Go 那样把 context
 //! 一层层往下传，也就不会漏传。
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -237,6 +237,24 @@ struct StoreOutcome {
     trouble: Option<String>,
 }
 
+/// 本轮请求覆盖到的全部目标键。
+///
+/// 用来兜住「请求发出去了，但结果没回来」：子任务 panic 时 JoinError 拿不到是哪个
+/// 门店，光看 outcomes 无从知道谁缺了数据。没有这一层，那些目标会静静地停在上一轮
+/// 的取值上，而那很可能正是「无货」—— 一次故障被伪装成了看起来正常的答案。
+fn expected_keys(groups: &[StoreGroup]) -> BTreeSet<TargetKey> {
+    let mut keys = BTreeSet::new();
+    for g in groups {
+        for part in &g.parts {
+            keys.insert(TargetKey(format!(
+                "{}|{}|{}",
+                g.locale, g.store_number, part
+            )));
+        }
+    }
+    keys
+}
+
 /// 执行一轮查询。
 ///
 /// 刻意写成不借用引擎的自由函数：调度循环需要一边跑这个 future、一边继续响应
@@ -438,6 +456,7 @@ impl<F: Fetcher> Engine<F> {
             // 之类的命令不会打断本轮，而 Stop 会直接丢弃它 —— 丢弃即取消，
             // 在飞的 HTTP 请求会跟着一起停。
             let groups = self.group_targets();
+            let expected = expected_keys(&groups);
             let queries = run_queries(self.client.clone(), groups, self.config.concurrency);
             tokio::pin!(queries);
 
@@ -460,7 +479,29 @@ impl<F: Fetcher> Engine<F> {
             };
 
             let Some(outcomes) = outcomes else { continue };
-            self.apply(outcomes).await;
+
+            // 写状态之前先把已经排队的命令处理掉。
+            //
+            // 内层 select 用了 biased，结果就绪时优先于命令。用户恰好在同一瞬间删掉
+            // 某个目标时，旧结果会先被写进去，甚至给一个已经删掉的目标发到货提醒。
+            // Stop 必须单独当作「本轮作废」，否则会在 stop() 已经回复之后还发提醒，
+            // 破坏 Watcher::stop「返回时本轮已收尾」那句承诺。
+            let mut aborted = false;
+            while let Ok(cmd) = cmd_rx.try_recv() {
+                match cmd {
+                    Command::Stop(reply) => {
+                        self.set_running(false).await;
+                        let _ = reply.send(());
+                        aborted = true;
+                    }
+                    other => self.handle_command(other).await,
+                }
+            }
+            if aborted {
+                continue;
+            }
+
+            self.apply(expected, outcomes).await;
 
             if !self.running {
                 continue;
@@ -565,7 +606,7 @@ impl<F: Fetcher> Engine<F> {
     }
 
     /// 把一轮的结果写进状态，并发出相应事件。
-    async fn apply(&mut self, outcomes: Vec<StoreOutcome>) {
+    async fn apply(&mut self, mut missing: BTreeSet<TargetKey>, outcomes: Vec<StoreOutcome>) {
         let mut ok = 0usize;
         let mut failed = 0usize;
         let mut problems = 0usize;
@@ -588,6 +629,7 @@ impl<F: Fetcher> Engine<F> {
                     "{}|{}|{}",
                     outcome.locale, outcome.store_number, part
                 ));
+                missing.remove(&key);
                 // 目标可能在本轮进行中被用户删掉了，直接忽略。
                 let Some(state) = self.states.get_mut(&key) else {
                     continue;
@@ -618,6 +660,27 @@ impl<F: Fetcher> Engine<F> {
             }
         }
 
+        // 请求发出去了却没拿回结果的目标，落回未知并说明原因。
+        // 唯一已知成因是查询子任务 panic —— 那时 JoinError 说不出是哪个门店。
+        for key in missing {
+            let changed = {
+                let Some(state) = self.states.get_mut(&key) else {
+                    continue;
+                };
+                let unknown = Availability::Unknown(UnknownReason::Transport {
+                    detail: "查询任务异常结束，本轮没有拿到结果".into(),
+                });
+                let previous = std::mem::replace(&mut state.availability, unknown);
+                state.last_checked_ms = Some(now);
+                state.consecutive_failures = state.consecutive_failures.saturating_add(1);
+                (previous != state.availability).then(|| state.clone())
+            };
+            problems += 1;
+            if let Some(snapshot) = changed {
+                self.emit_droppable(Event::StateChanged { state: snapshot });
+            }
+        }
+
         // 只有一个门店都没查成功，才认为是全局故障，进入退避。
         if failed > 0 && ok == 0 {
             self.cycle_failures = self.cycle_failures.saturating_add(1);
@@ -625,10 +688,20 @@ impl<F: Fetcher> Engine<F> {
             self.cycle_failures = 0;
         }
 
-        self.emit_droppable(Event::CycleComplete {
+        // 这条不能丢。emit_droppable 的理由是「信息都能从 CycleComplete 带的快照里
+        // 重新拿到」—— 那对 StateChanged/Trouble 成立，对 CycleComplete 自己就是循环
+        // 论证：兜底的那张网不能自己也是可丢的。
+        //
+        // 而且丢弃是确定性的而非概率性的：下面那段发事件的循环一个 await 点都没有，
+        // 一轮里的事件是在同一次 poll 里连着灌进通道的，消费方根本没机会被调度。
+        // 目标数超过通道容量时，排在最后的 CycleComplete 必然被丢，界面就会一直
+        // 停在上一轮的取值上 —— 而那很可能正是「无货」。实测 260 个目标时连续
+        // 18 轮一条都没送达。
+        self.emit_critical(Event::CycleComplete {
             healthy: problems == 0 && ok > 0,
             snapshot: self.snapshot(),
-        });
+        })
+        .await;
     }
 
     /// 下一轮的等待时长，含抖动与全局退避。

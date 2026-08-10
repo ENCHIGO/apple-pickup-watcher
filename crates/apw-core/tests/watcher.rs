@@ -475,3 +475,123 @@ async fn 事件通道再小也不会丢掉到货提醒() {
         "12 个目标同时有货，只收到 {in_stock} 条提醒 —— 有提醒被丢掉了"
     );
 }
+
+/// 快照事件不能被丢弃，哪怕通道很小、每轮都有大量状态翻转。
+///
+/// 界面的列表**只**认 CycleComplete 带来的快照（StateChanged 是可丢的，前端刻意
+/// 不拿它做增量）。这条事件一旦丢失，界面就会停在上一轮的取值上 —— 而那很可能
+/// 正是「无货」。这正是本项目立项要消灭的失效形态。
+///
+/// 触发是确定性的而非概率性的：apply() 里那段发事件的循环一个 await 点都没有，
+/// 一轮的事件在同一次 poll 里连着灌进通道，消费方根本没机会被调度；目标数超过通道
+/// 容量时，排在最后的 CycleComplete 必然被丢。
+///
+/// 注意这里让 fetcher **每轮在成功与失败之间翻转**：否则第一轮之后状态不再变化，
+/// 就不再有 StateChanged 突发，后续轮次的 CycleComplete 会畅通无阻，测试也就
+/// 钉不住任何东西 —— 第一版正是这么写的，把修复还原后它照样通过。
+#[tokio::test]
+async fn 快照事件在每轮翻转且通道极小时也不会丢() {
+    let round = Arc::new(AtomicUsize::new(0));
+    let seen = Arc::clone(&round);
+    let fake = FakeFetcher::new(move |nth, store, parts| {
+        // 只盯一个门店，所以「第几次调用」就是「第几轮」。相邻两轮结果必须不同，
+        // 否则第一轮之后状态不再翻转，就制造不出事件突发。
+        seen.store(nth, Ordering::SeqCst);
+        if nth % 2 == 0 {
+            Ok(ok_response(store, parts, Availability::OutOfStock))
+        } else {
+            Err(ApiError::Blocked("HTTP 541".into()))
+        }
+    });
+    let config = WatcherConfig {
+        event_buffer: 4,
+        ..fast_config()
+    };
+    let (w, mut rx) = Watcher::spawn(fake.clone(), config);
+
+    // 目标数远超通道容量，制造单轮内的事件突发。
+    let targets: Vec<Target> = (0..40)
+        .map(|i| target("R683", &format!("PART{i}/A")))
+        .collect();
+    w.set_targets(targets).await;
+    w.start().await;
+
+    // 连续等若干轮，每一轮都必须收到快照。
+    let mut cycles = 0;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
+    while cycles < 4 && tokio::time::Instant::now() < deadline {
+        match tokio::time::timeout(Duration::from_secs(3), rx.recv()).await {
+            Ok(Some(Event::CycleComplete { snapshot, .. })) => {
+                assert_eq!(snapshot.len(), 40, "快照条数不对");
+                cycles += 1;
+            }
+            Ok(Some(_)) => {}
+            Ok(None) => break,
+            Err(_) => break,
+        }
+    }
+    w.stop().await;
+
+    assert_eq!(
+        cycles, 4,
+        "通道容量 4、目标 40 个且每轮翻转，只收到 {cycles} 轮快照 —— 丢掉的那些轮里，界面会一直停在旧状态"
+    );
+}
+
+/// 查询任务异常结束时，受影响的目标必须落回未知，不能停在上一轮的取值上。
+///
+/// 引擎兜住了子任务的 panic（发 Trouble、本轮不算健康），但如果那些目标的状态没被
+/// 更新，它们会保持上一轮的值 —— 包括「无货」。一次故障因此被伪装成一个看起来正常
+/// 的答案，而这正是上游静默失效大半年的形态。
+#[tokio::test]
+async fn 查询任务异常后目标不会停在陈旧的无货上() {
+    let boom = Arc::new(AtomicUsize::new(0));
+    let flag = Arc::clone(&boom);
+    let fake = FakeFetcher::new(move |_, store, parts| {
+        if flag.load(Ordering::SeqCst) > 0 {
+            panic!("模拟查询任务内部错误");
+        }
+        Ok(ok_response(store, parts, Availability::OutOfStock))
+    });
+    let (w, mut rx) = Watcher::spawn(fake.clone(), fast_config());
+    w.set_targets(vec![target("R683", "MG724CH/A")]).await;
+    w.start().await;
+
+    // 第一轮正常，拿到真实的「无货」。
+    wait_one_cycle(&mut rx).await;
+    assert_eq!(
+        w.snapshot().await[0].availability,
+        Availability::OutOfStock,
+        "前置条件不成立"
+    );
+
+    // 之后每轮都 panic。
+    boom.store(1, Ordering::SeqCst);
+    wait_one_cycle(&mut rx).await;
+    w.stop().await;
+
+    let state = &w.snapshot().await[0];
+    assert_ne!(
+        state.availability,
+        Availability::OutOfStock,
+        "查询任务异常后仍停在陈旧的「无货」，这是本项目要根除的失效形态"
+    );
+    assert!(
+        state.availability.is_unknown(),
+        "应当落回未知，实际为 {:?}",
+        state.availability
+    );
+}
+
+/// 等一轮 CycleComplete。
+async fn wait_one_cycle(rx: &mut Receiver<Event>) {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    while tokio::time::Instant::now() < deadline {
+        match tokio::time::timeout(Duration::from_millis(500), rx.recv()).await {
+            Ok(Some(Event::CycleComplete { .. })) => return,
+            Ok(Some(_)) => {}
+            _ => break,
+        }
+    }
+    panic!("等一轮查询结束超时");
+}

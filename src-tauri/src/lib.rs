@@ -388,10 +388,16 @@ fn load_settings(notices: &mut Vec<String>) -> (Settings, Option<SettingsStore>)
         }
     };
 
+    // 「新版配置文件还不存在」才是首次运行的判据。
+    //
+    // 不能用「目标列表为空」代替：用户删光目标后保存的是一份合法的空目标配置，
+    // 而旧版 settings.json 是刻意保留不删的（为了能回退），于是下次启动会把他
+    // 亲手删掉的目标连同 locale、Bark 地址一起原样倒回来。
+    let first_run = store.path().symlink_metadata().is_err();
+
     match store.load() {
         Ok(settings) => {
-            // 首次运行且没有新版配置时，试着把 Go 版的设置迁移过来。
-            if settings.targets.is_empty()
+            if first_run
                 && let Some(legacy) = store.import_legacy()
                 && !legacy.targets.is_empty()
             {
@@ -399,6 +405,11 @@ fn load_settings(notices: &mut Vec<String>) -> (Settings, Option<SettingsStore>)
                     "已从旧版设置迁移了 {} 条监控目标。",
                     legacy.targets.len()
                 ));
+                // 立刻落盘。否则用户不改任何设置时新版文件一直不存在，
+                // 每次启动都要重迁一遍，用户删掉的目标也会一直复活。
+                if let Err(err) = store.save(&legacy) {
+                    notices.push(format!("迁移结果暂时没能保存：{err}"));
+                }
                 return (legacy, Some(store));
             }
             (settings, Some(store))

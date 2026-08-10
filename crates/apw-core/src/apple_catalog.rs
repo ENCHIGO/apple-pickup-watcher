@@ -137,7 +137,7 @@ async fn fetch_page_once(
     url: &str,
     region: &Region,
 ) -> Result<Vec<u8>, ApiError> {
-    let resp = http
+    let mut resp = http
         .get(url)
         .timeout(PAGE_TIMEOUT)
         .header(reqwest::header::USER_AGENT, PAGE_USER_AGENT)
@@ -154,11 +154,18 @@ async fn fetch_page_once(
         .map_err(|e| ApiError::Transport(e.to_string()))?;
 
     let status = resp.status().as_u16();
-    let bytes = resp
-        .bytes()
-        .await
-        .map_err(|e| ApiError::Transport(format!("读取响应失败：{e}")))?;
-    let body: Vec<u8> = bytes.into_iter().take(MAX_PAGE_BYTES).collect();
+    // 边读边截。购买页有两三 MB，若 Apple 哪天返回一个异常巨大的响应（或压缩炸弹），
+    // 先整读再切等于没有上限。
+    let mut body: Vec<u8> = Vec::new();
+    while body.len() < MAX_PAGE_BYTES {
+        let chunk = resp
+            .chunk()
+            .await
+            .map_err(|e| ApiError::Transport(format!("读取响应失败：{e}")))?;
+        let Some(chunk) = chunk else { break };
+        let n = chunk.len().min(MAX_PAGE_BYTES - body.len());
+        body.extend_from_slice(&chunk[..n]);
+    }
 
     match status {
         200 => {
