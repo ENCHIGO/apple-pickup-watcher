@@ -5,6 +5,18 @@
 
 跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.2.0。
 
+**English** — Apple Pickup Watcher monitors in-store pickup availability at Apple Retail
+Stores and alerts you the moment a specific iPhone model becomes available at the store you
+picked. It is a cross-platform desktop app (macOS / Windows / Linux) built with Rust and
+Tauri, covering seven regions: China mainland, Hong Kong, Taiwan, Japan, Singapore,
+Australia and Malaysia.
+
+It is a rewrite of [hteen/apple-store-helper](https://github.com/hteen/apple-store-helper)
+(GPL-3.0, unmaintained). That project's stock endpoint now returns **HTTP 541** for every
+request, and because it reported failed lookups as “out of stock”, it kept looking healthy
+while showing no stock forever. See [常见问题 / FAQ](#常见问题--faq) for the diagnosis and
+the endpoint that still works.
+
 ---
 
 ## 来源与许可
@@ -300,6 +312,74 @@ macOS 的 Intel 构建用 `macos-15-intel` runner，arm64 用 `macos-latest`。
 上一代的 `macos-13` 标签已于 2025-12-04 退役，写它会让作业在初始化阶段就直接失败 ——
 连日志都没有，只有一行调度错误。这个坑本项目踩过一次，整条发布流水线因此空转。
 改这里之前请先确认新标签当前有效。
+
+---
+
+## 常见问题 / FAQ
+
+这一节回答的是几个真实被反复问到的问题（上游 issue #127 #126 #124 #122 #118 都是同一件事）。
+
+### 为什么 apple-store-helper 一直显示「无货」，但官网明明有货？
+
+因为它使用的库存接口已经失效了，而失效的表现不是报错，是「永远无货」。
+
+`/shop/fulfillment-messages` 现在对任意请求恒定返回 **HTTP 541**，响应体是一个 128002 字节
+的「Page Not Found」拦截页。可复现：
+
+```shell
+curl -sS -o /dev/null -w 'HTTP %{http_code}  size=%{size_download}\n' \
+  'https://www.apple.com.cn/shop/fulfillment-messages?little=true&mt=regular&parts.0=MG724CH%2FA&store=R683'
+# HTTP 541  size=128002
+```
+
+中国大陆站与美国站返回的字节数完全相同，同一时刻 apple.com.cn 首页正常返回 200 ——
+可以排除偶发故障和 IP 被封。换 UA、补请求头、先取 cookie 再请求，都仍然 541。
+
+真正让它「看起来正常」的是另一半：那个项目在请求失败时返回空结果，上层把查不到的型号
+一律标成无货（`services/listen.go:226-230` 与 `:147`）。所以接口没了之后，界面一切正常，
+只是永远显示无货 —— 这比直接报错更容易让人错过购买时机。
+
+### HTTP 541 是什么意思？
+
+541 不是标准 HTTP 状态码，是 Apple 边缘节点自定义的拦截响应。看到它基本可以确定请求被
+挡下了，而不是「没有库存」。降低查询频率、更换 User-Agent、加重试都无法绕过 —— 问题不在
+频率或伪装，在于那个接口本身已经不在了。
+
+### 现在还能用的接口是哪个？
+
+`/shop/retail/pickup-message`：
+
+```shell
+curl -sS 'https://www.apple.com.cn/shop/retail/pickup-message?pl=true&mts.0=regular&parts.0=MG724CH%2FA&store=R683'
+# HTTP 200，返回 JSON
+```
+
+响应结构与旧接口不同：门店在 `body.stores[]`（不再是 `body.content.pickupMessage.stores`），
+状态在 `partsAvailability.<零件号>.pickupDisplay`（取值 `available` / `unavailable` /
+`ineligible`），`messageTypes` 下只有 `regular` 而没有 `compact`。一次请求可以带多个零件号，
+所以每个门店每轮只需发一次请求。七个地区都实测可用。
+
+### Why does apple-store-helper always show “out of stock”?
+
+Its stock endpoint `/shop/fulfillment-messages` now returns **HTTP 541** with a 128002-byte
+“Page Not Found” interception page for every request, regardless of part number or store.
+Worse, that project treated a failed lookup as “out of stock”, so the UI kept looking healthy
+while never actually querying anything. Lowering the polling interval or changing the
+User-Agent does not help — the endpoint is simply gone.
+
+The endpoint that still works is `/shop/retail/pickup-message`, with a different response
+shape (`body.stores[]`, `partsAvailability.<part>.pickupDisplay`, and only `regular` under
+`messageTypes`). All seven regions verified.
+
+### 这个项目和上游、以及其他 fork 有什么不同？
+
+最主要的一条不是换了接口，而是**「查不到」和「无货」被当成两件事**。状态有三种：有货、
+无货、未知；未知必须携带原因（被拦截 / 限流 / 接口结构变了 / 网络失败），界面上用完全
+不同的配色显示，并把「查不到多少项」单独标出来。接口哪天再变，你会立刻看到告警，而不是
+对着一屏看起来正常的「无货」空等。
+
+另外有一个每天自动跑的契约测试，直接请求 Apple 的真实接口。上游正是因为没有这道防线，
+接口失效后半年多没人发现。
 
 ---
 
