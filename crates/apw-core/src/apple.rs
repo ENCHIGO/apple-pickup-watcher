@@ -172,25 +172,13 @@ impl AppleClient {
         query: &[(String, String)],
         region: &Region,
     ) -> Result<Vec<u8>, ApiError> {
-        let mut last_err = None;
-
-        for attempt in 0..=self.config.max_retries {
-            if attempt > 0 {
-                // 指数退避。被拦截或限流时继续以原频率猛冲只会让情况更糟。
-                let backoff = Duration::from_secs(1 << (attempt - 1));
-                tokio::time::sleep(backoff).await;
-            }
-
+        with_retry(self.config.max_retries, || async {
+            // 限速放在重试循环内部：每一次真正的出站请求都要排队，
+            // 重试不该成为绕过全局节流的后门。
             self.throttle().await;
-
-            match self.get_once(url, query, region).await {
-                Ok(body) => return Ok(body),
-                Err(err) if err.is_retryable() => last_err = Some(err),
-                Err(err) => return Err(err),
-            }
-        }
-
-        Err(last_err.unwrap_or_else(|| ApiError::Transport("重试次数耗尽".into())))
+            self.get_once(url, query, region).await
+        })
+        .await
     }
 
     /// 保证任意两次出站请求之间至少间隔 `min_interval`。
@@ -248,23 +236,58 @@ impl AppleClient {
 
         let body = read_body_capped(resp, MAX_RESPONSE_BYTES).await?;
 
-        match status.as_u16() {
-            200 => {
-                // 状态码 200 也未必是 JSON：被拦截时可能返回 HTML。
-                if looks_like_json(&content_type, &body) {
-                    Ok(body)
-                } else {
-                    Err(ApiError::Blocked("HTTP 200 但响应不是 JSON".into()))
-                }
-            }
-            // 541 是 Apple 自定义的拦截状态码，不是标准 HTTP 状态码。
-            541 => Err(ApiError::Blocked("HTTP 541".into())),
-            403 => Err(ApiError::Blocked("HTTP 403".into())),
-            429 => Err(ApiError::RateLimited("HTTP 429".into())),
-            code if code >= 500 => Err(ApiError::RateLimited(format!("HTTP {code}"))),
-            code => Err(ApiError::Transport(format!("HTTP {code}"))),
+        if let Some(err) = classify_status(status.as_u16()) {
+            return Err(err);
+        }
+        // 状态码 200 也未必是 JSON：被拦截时可能返回 HTML。
+        if looks_like_json(&content_type, &body) {
+            Ok(body)
+        } else {
+            Err(ApiError::Blocked("HTTP 200 但响应不是 JSON".into()))
         }
     }
+}
+
+/// 把非 200 的状态码归类成本模块定义的错误；200 返回 `None`，交给调用方按各自的
+/// 内容规则判断（库存接口要求是 JSON，购买页只要求非空）。
+///
+/// 抽出来是因为库存查询与购买页抓取原本各写了一份，五个分支逐字相同。同一件事有
+/// 两处定义，迟早会只改其中一处 —— 比如哪天 Apple 换个新的拦截状态码。
+pub(crate) fn classify_status(code: u16) -> Option<ApiError> {
+    match code {
+        200 => None,
+        // 541 是 Apple 自定义的拦截状态码，不是标准 HTTP 状态码。
+        541 => Some(ApiError::Blocked("HTTP 541".into())),
+        403 => Some(ApiError::Blocked("HTTP 403".into())),
+        429 => Some(ApiError::RateLimited("HTTP 429".into())),
+        c if c >= 500 => Some(ApiError::RateLimited(format!("HTTP {c}"))),
+        c => Some(ApiError::Transport(format!("HTTP {c}"))),
+    }
+}
+
+/// 带指数退避的重试。只有可自愈的错误才重试，结构不符与业务错误重试多少次都一样。
+///
+/// 同样是原本两处各写一份：库存查询与购买页抓取的退避逻辑此前逐字相同。
+pub(crate) async fn with_retry<T, F, Fut>(max_retries: u32, mut once: F) -> Result<T, ApiError>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<T, ApiError>>,
+{
+    let mut last_err = None;
+
+    for attempt in 0..=max_retries {
+        if attempt > 0 {
+            // 被拦截或限流时继续以原频率猛冲只会让情况更糟。
+            tokio::time::sleep(Duration::from_secs(1u64 << (attempt - 1))).await;
+        }
+        match once().await {
+            Ok(v) => return Ok(v),
+            Err(err) if err.is_retryable() => last_err = Some(err),
+            Err(err) => return Err(err),
+        }
+    }
+
+    Err(last_err.unwrap_or_else(|| ApiError::Transport("重试次数耗尽".into())))
 }
 
 /// 分块读取响应体，累计到 `max` 立刻停下。
@@ -272,7 +295,10 @@ impl AppleClient {
 /// 不能用 `resp.bytes()` 再 `.take(max)`：那个方法会先把整份响应缓冲进内存，
 /// 上限是在「已经吃完」之后才生效的，对超大响应或 gzip 解压炸弹起不到任何保护。
 /// 边读边截才是真的有上限。
-async fn read_body_capped(mut resp: reqwest::Response, max: usize) -> Result<Vec<u8>, ApiError> {
+pub(crate) async fn read_body_capped(
+    mut resp: reqwest::Response,
+    max: usize,
+) -> Result<Vec<u8>, ApiError> {
     let mut body = Vec::new();
     while body.len() < max {
         let chunk = resp

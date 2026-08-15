@@ -114,22 +114,7 @@ async fn fetch_page(
     family: &str,
 ) -> Result<Vec<u8>, ApiError> {
     let url = region.buy_page_url(family);
-    let mut last_err = None;
-
-    for attempt in 0..=MAX_RETRIES {
-        if attempt > 0 {
-            // 指数退避。被拦截或限流时继续猛冲只会让情况更糟。
-            tokio::time::sleep(Duration::from_secs(1u64 << (attempt - 1))).await;
-        }
-
-        match fetch_page_once(http, &url, region).await {
-            Ok(body) => return Ok(body),
-            Err(err) if err.is_retryable() => last_err = Some(err),
-            Err(err) => return Err(err),
-        }
-    }
-
-    Err(last_err.unwrap_or_else(|| ApiError::Transport("重试次数耗尽".into())))
+    crate::apple::with_retry(MAX_RETRIES, || fetch_page_once(http, &url, region)).await
 }
 
 async fn fetch_page_once(
@@ -137,7 +122,7 @@ async fn fetch_page_once(
     url: &str,
     region: &Region,
 ) -> Result<Vec<u8>, ApiError> {
-    let mut resp = http
+    let resp = http
         .get(url)
         .timeout(PAGE_TIMEOUT)
         .header(reqwest::header::USER_AGENT, PAGE_USER_AGENT)
@@ -154,35 +139,17 @@ async fn fetch_page_once(
         .map_err(|e| ApiError::Transport(e.to_string()))?;
 
     let status = resp.status().as_u16();
-    // 边读边截。购买页有两三 MB，若 Apple 哪天返回一个异常巨大的响应（或压缩炸弹），
-    // 先整读再切等于没有上限。
-    let mut body: Vec<u8> = Vec::new();
-    while body.len() < MAX_PAGE_BYTES {
-        let chunk = resp
-            .chunk()
-            .await
-            .map_err(|e| ApiError::Transport(format!("读取响应失败：{e}")))?;
-        let Some(chunk) = chunk else { break };
-        let n = chunk.len().min(MAX_PAGE_BYTES - body.len());
-        body.extend_from_slice(&chunk[..n]);
-    }
+    let body = crate::apple::read_body_capped(resp, MAX_PAGE_BYTES).await?;
 
-    match status {
-        200 => {
-            if body.iter().all(u8::is_ascii_whitespace) {
-                return Err(ApiError::Blocked("HTTP 200 但响应体为空".into()));
-            }
-            // 这里不校验内容是不是真的商品页：拦截页同样是 HTML，靠 Content-Type
-            // 分不出来。真假交给后面的解析步骤判定。
-            Ok(body)
-        }
-        // 541 是 Apple 自定义的拦截状态码，不是标准 HTTP 状态码。
-        541 => Err(ApiError::Blocked("HTTP 541".into())),
-        403 => Err(ApiError::Blocked("HTTP 403".into())),
-        429 => Err(ApiError::RateLimited("HTTP 429".into())),
-        code if code >= 500 => Err(ApiError::RateLimited(format!("HTTP {code}"))),
-        code => Err(ApiError::Transport(format!("HTTP {code}"))),
+    if let Some(err) = crate::apple::classify_status(status) {
+        return Err(err);
     }
+    if body.iter().all(u8::is_ascii_whitespace) {
+        return Err(ApiError::Blocked("HTTP 200 但响应体为空".into()));
+    }
+    // 这里不校验内容是不是真的商品页：拦截页同样是 HTML，靠 Content-Type 分不出来。
+    // 真假交给后面的解析步骤判定。
+    Ok(body)
 }
 
 /// 从购买页 HTML 中截出 `productSelectionData` 的值。
