@@ -13,7 +13,7 @@
 
 use apw_core::apple_catalog;
 use apw_core::catalog::{Catalog, CatalogError};
-use apw_core::model::{REGIONS, Region, region_by_locale};
+use apw_core::model::{Category, Family, REGIONS, Region, region_by_locale};
 
 /// 造一段带 `productSelectionData` 的购买页片段。
 fn page(body: &str) -> String {
@@ -69,9 +69,10 @@ fn 七个地区都能从内嵌数据读出商品与门店() {
                 region.locale
             );
             assert!(
-                p.title.starts_with("iPhone"),
-                "{} 的展示名不像机型名：{}",
+                p.title.starts_with(expected_prefix(p.category)),
+                "{} 的 {:?} 展示名不像机型名：{}",
                 region.locale,
+                p.category,
                 p.title
             );
             // 容量必须已经规范化过，界面直接拿去显示。
@@ -85,6 +86,37 @@ fn 七个地区都能从内嵌数据读出商品与门店() {
         for s in &stores {
             assert!(!s.number.is_empty(), "{} 有编号为空的门店", region.locale);
             assert!(s.title.ends_with(&s.name), "门店展示名应当以门店名结尾");
+        }
+    }
+}
+
+/// 每个品类的展示名都该以什么开头。
+///
+/// Mac 与 Apple Watch 的商品数据里没有机型字段，展示名只能从购买页 slug 来 ——
+/// 而 `/shop/buy-mac` 下面除了 Mac 还挂着显示器，所以那一类只能要求非空。
+fn expected_prefix(category: Category) -> &'static str {
+    match category {
+        Category::Iphone => "iPhone",
+        Category::Ipad => "iPad",
+        Category::Mac => "",
+        Category::Watch => "Apple Watch",
+    }
+}
+
+#[test]
+fn 四个品类在每个地区都有商品() {
+    // 少了哪个品类，运行时的表现只是那个品类的下拉框空空如也 —— 用户会以为
+    // 这个程序压根不支持 Mac，而不是「数据没抓下来」。
+    let catalog = Catalog::new();
+    for region in REGIONS {
+        let products = catalog.products(region.locale).expect("内嵌数据应当可用");
+        for category in Category::ALL {
+            assert!(
+                products.iter().any(|p| p.category == *category),
+                "{} 的内嵌数据里没有 {} 商品",
+                region.locale,
+                category.title()
+            );
         }
     }
 }
@@ -118,8 +150,13 @@ fn 日本站按零件号去重() {
             p.part_number
         );
     }
-    // 原始数据里共 86 条记录、43 个不同零件号。
-    assert_eq!(products.len(), 43);
+    // 条数随 Apple 上下架而变，钉死它只会让快照一更新测试就红。真正要守住的
+    // 是「同一零件号只出现一次」，那条上面已经断言过了。
+    assert!(
+        products.len() > 100,
+        "日本站只有 {} 个型号，太少了",
+        products.len()
+    );
 }
 
 #[test]
@@ -203,15 +240,45 @@ static NO_FAMILY_REGION: Region = Region {
     families: &[],
 };
 
+/// 一个只配了 iPhone 购买页的地区，用来验证「按品类筛完是空的」也走同一条路。
+static IPHONE_ONLY_REGION: Region = Region {
+    title: "测试",
+    locale: "zh_CN",
+    base_url: "https://127.0.0.1:1",
+    families: &[Family {
+        category: Category::Iphone,
+        slug: "iphone-17",
+    }],
+};
+
 #[tokio::test]
-async fn 没有配置机型的地区不去发请求() {
+async fn 没有可抓的购买页时不去发请求() {
     let catalog = Catalog::new();
     let http = reqwest::Client::builder().build().expect("构造客户端失败");
 
-    match catalog.refresh_products(&NO_FAMILY_REGION, &http).await {
-        Err(CatalogError::NoFamilies { locale }) => assert_eq!(locale, "zh_CN"),
-        other => panic!("应当报「没有配置任何机型」，实际是 {other:?}"),
+    match catalog
+        .refresh_products(&NO_FAMILY_REGION, None, &http)
+        .await
+    {
+        Err(CatalogError::NoFamilies { locale, .. }) => assert_eq!(locale, "zh_CN"),
+        other => panic!("应当报「没有可抓取的购买页」，实际是 {other:?}"),
     }
+
+    // 按品类筛完是空的，同样不该去打网络。base_url 指向一个连不上的地址：
+    // 万一将来有人拆掉那道前置检查，这里会明确失败，而不是偷偷发真实请求。
+    match catalog
+        .refresh_products(&IPHONE_ONLY_REGION, Some(Category::Mac), &http)
+        .await
+    {
+        Err(CatalogError::NoFamilies { locale, category }) => {
+            assert_eq!(locale, "zh_CN");
+            // 错误里必须说清是哪个品类没有，否则用户只会看到「这个地区没配」，
+            // 而他明明能在 iPhone 那栏正常刷新。
+            assert_eq!(category, "Mac");
+        }
+        other => panic!("应当报「没有可抓取的购买页」，实际是 {other:?}"),
+    }
+
     // 刷新失败不该动到既有目录。
     assert!(!catalog.products("zh_CN").expect("仍然可读").is_empty());
 }
@@ -221,7 +288,8 @@ async fn 没有配置机型的地区不去发请求() {
 #[test]
 fn 正常页面能抓出商品() {
     let html = page(&format!("productSelectionData: {SELECTION}"));
-    let products = apple_catalog::parse_buy_page(html.as_bytes()).expect("应当解析成功");
+    let products = apple_catalog::parse_buy_page(html.as_bytes(), Category::Iphone, "iphone-17")
+        .expect("应当解析成功");
 
     assert_eq!(products.len(), 2);
     assert_eq!(products[0].part_number, "MG724CH/A");
@@ -238,7 +306,8 @@ fn 先出现的同名字符串不会让整页失败() {
         r#"note: "productSelectionData", tag: 'productSelectionData',
            productSelectionData: {SELECTION}"#
     ));
-    let products = apple_catalog::parse_buy_page(html.as_bytes()).expect("应当跳过假命中");
+    let products = apple_catalog::parse_buy_page(html.as_bytes(), Category::Iphone, "iphone-17")
+        .expect("应当跳过假命中");
     assert_eq!(products.len(), 2);
 }
 
@@ -253,7 +322,8 @@ fn 更长的标识符不会被误认() {
          productSelectionData: {SELECTION}"
     ));
 
-    let products = apple_catalog::parse_buy_page(html.as_bytes()).expect("应当命中真正的属性");
+    let products = apple_catalog::parse_buy_page(html.as_bytes(), Category::Iphone, "iphone-17")
+        .expect("应当命中真正的属性");
     assert_eq!(products.len(), 2);
     assert!(
         products.iter().all(|p| p.part_number != "OLD000/A"),
@@ -264,7 +334,7 @@ fn 更长的标识符不会被误认() {
 #[test]
 fn 只有更长标识符时明确报错() {
     let html = page(&format!("legacy_productSelectionData: {SELECTION}"));
-    match apple_catalog::parse_buy_page(html.as_bytes()) {
+    match apple_catalog::parse_buy_page(html.as_bytes(), Category::Iphone, "iphone-17") {
         Err(CatalogError::PageSchema { detail }) => {
             assert!(detail.contains("更长标识符"), "错误说明太含糊：{detail}");
         }
@@ -282,8 +352,9 @@ fn 带引号的键也认() {
         "productSelectionData\n\t:",
     ] {
         let html = page(&format!("{key} {SELECTION}"));
-        let products = apple_catalog::parse_buy_page(html.as_bytes())
-            .unwrap_or_else(|e| panic!("键写法 {key:?} 应当被接受：{e}"));
+        let products =
+            apple_catalog::parse_buy_page(html.as_bytes(), Category::Iphone, "iphone-17")
+                .unwrap_or_else(|e| panic!("键写法 {key:?} 应当被接受：{e}"));
         assert_eq!(products.len(), 2);
     }
 }
@@ -297,14 +368,15 @@ fn 花括号配平但内容不是json时继续找下一个候选() {
         r#"tip: "productSelectionData 用法：productSelectionData: {{ 看这里 }}",
            productSelectionData: {SELECTION}"#
     ));
-    let products = apple_catalog::parse_buy_page(html.as_bytes()).expect("应当跳过假命中");
+    let products = apple_catalog::parse_buy_page(html.as_bytes(), Category::Iphone, "iphone-17")
+        .expect("应当跳过假命中");
     assert_eq!(products.len(), 2);
 }
 
 #[test]
 fn 只有不是json的候选时报错而不是返回空目录() {
     let html = page("productSelectionData: { 这不是 JSON }");
-    match apple_catalog::parse_buy_page(html.as_bytes()) {
+    match apple_catalog::parse_buy_page(html.as_bytes(), Category::Iphone, "iphone-17") {
         Err(CatalogError::PageSchema { detail }) => {
             assert!(detail.contains("合法 JSON"), "错误说明太含糊：{detail}");
         }
@@ -326,7 +398,8 @@ fn 颜色字段里内嵌含花括号的html不会算错配对() {
     }"#;
     let html = page(&format!("productSelectionData: {selection}"));
 
-    let products = apple_catalog::parse_buy_page(html.as_bytes()).expect("应当解析成功");
+    let products = apple_catalog::parse_buy_page(html.as_bytes(), Category::Iphone, "iphone-17")
+        .expect("应当解析成功");
     assert_eq!(products.len(), 1);
     assert_eq!(products[0].title, "iPhone 17 512GB 黑色");
 }
@@ -337,7 +410,8 @@ fn 找不到全局变量时退化成全页搜索() {
     let html = format!(
         "<script>window.SOMETHING_ELSE = {{ productSelectionData: {SELECTION} }};</script>"
     );
-    let products = apple_catalog::parse_buy_page(html.as_bytes()).expect("应当仍能找到");
+    let products = apple_catalog::parse_buy_page(html.as_bytes(), Category::Iphone, "iphone-17")
+        .expect("应当仍能找到");
     assert_eq!(products.len(), 2);
 }
 
@@ -351,7 +425,7 @@ fn 页面里根本没有商品数据时报错() {
         // 值不是对象。
         page(r#"productSelectionData: "已下线""#),
     ] {
-        match apple_catalog::parse_buy_page(html.as_bytes()) {
+        match apple_catalog::parse_buy_page(html.as_bytes(), Category::Iphone, "iphone-17") {
             Err(CatalogError::PageSchema { .. }) => {}
             other => panic!("页面 {html:?} 应当报结构不符，实际是 {other:?}"),
         }
@@ -371,14 +445,16 @@ fn 缺字段的商品条目不会拖垮整段数据() {
         "displayValues":{"dimensionColor":{"black":{"value":"黑色"}}}
     }"#;
     let products =
-        apple_catalog::parse_product_selection(selection.as_bytes()).expect("应当解析成功");
+        apple_catalog::parse_product_selection(selection.as_bytes(), Category::Iphone, "iphone-17")
+            .expect("应当解析成功");
 
     // 没有零件号的条目被丢掉，剩下两条都留着。
     assert_eq!(products.len(), 2);
     assert_eq!(products[0].title, "iPhone 17 黑色");
-    // 什么都没有的那条至少还有零件号，展示名不硬拼。
+    // 连 familyType 都没有的那条，退回购买页 slug ——「iPhone 17」是实打实
+    // 知道的（它就是从那一页抓来的），比留一个空白强。
     assert_eq!(products[1].part_number, "MG999CH/A");
-    assert_eq!(products[1].title, "");
+    assert_eq!(products[1].title, "iPhone 17");
 }
 
 #[test]
@@ -390,7 +466,8 @@ fn 取不到本地化颜色名时退回色值() {
         "displayValues":{"dimensionColor":{"title":{"singleVariantDisplayTitle":"颜色:"}}}
     }"#;
     let products =
-        apple_catalog::parse_product_selection(selection.as_bytes()).expect("应当解析成功");
+        apple_catalog::parse_product_selection(selection.as_bytes(), Category::Iphone, "iphone-17")
+            .expect("应当解析成功");
     assert_eq!(products[0].color, "cosmicorange");
     assert_eq!(products[0].title, "iPhone 17 512GB cosmicorange");
 }

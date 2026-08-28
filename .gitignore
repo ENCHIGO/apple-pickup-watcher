@@ -26,3 +26,6 @@ pnpm-debug.log*
 .DS_Store
 *.swp
 *.sw?
+
+# 生成快照的脚本留下的字节码缓存
+__pycache__/

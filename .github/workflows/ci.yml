@@ -105,6 +105,13 @@ jobs:
       - name: cargo fmt
         run: cargo fmt --all --check
 
+      # 内嵌离线快照是 crates/apw-core/data/generate.py 生成的，而它写坏的
+      # 那种错误 Rust 测试兜不住：脚本要是抓错了对象、把一份旧目录写进快照，
+      # 生成的文件仍然是合法 JSON、商品也非空，全套 Rust 测试照样绿。
+      # 所以脚本自己那几处判断要单独测。不联网，几十毫秒。
+      - name: 快照生成脚本自检
+        run: python3 crates/apw-core/data/generate.py --self-test
+
       # --- 前端 ---------------------------------------------------------------
       # pnpm 必须在 setup-node 之前装好：setup-node 的 cache: pnpm 会去调用
       # pnpm 来定位它的 store 目录，顺序反了会报 "Unable to locate executable file: pnpm"。

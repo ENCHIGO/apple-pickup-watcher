@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use apw_core::apple::{AppleClient, ClientConfig};
 use apw_core::catalog::Catalog;
-use apw_core::model::{Availability, Target, UnknownReason, region_by_locale};
+use apw_core::model::{Availability, Category, Target, UnknownReason, region_by_locale};
 use apw_core::watcher::{Event, Watcher, WatcherConfig};
 
 /// 从内嵌目录里挑出真实的门店与型号，跑一轮完整监控。
@@ -137,30 +137,61 @@ async fn 全栈跑通一轮真实监控() {
 ///
 /// 这条路径决定了新机发布后用户能不能自己更新型号列表，而不必等作者发版 ——
 /// 上游作者停更之后，那份手工维护的目录就永远停在了旧机型上。
+///
+/// 四个品类逐个刷，而不是一次性全刷完再看总数：Mac 与 Apple Watch 的购买页
+/// 是另一种数据排布（规格收在 `dimensions` 里、零件号在别的字段上），只看总数
+/// 的话，这两类整个解析不出来也会被 iPhone 和 iPad 的几百个型号盖过去。
 #[tokio::test(flavor = "multi_thread")]
 async fn 能从官网抓到最新型号() {
     let catalog = Catalog::new();
     let region = region_by_locale("zh_CN").expect("地区表里应当有中国大陆");
-    let before = catalog.products("zh_CN").map(|p| p.len()).unwrap_or(0);
 
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
         .expect("构造 http 客户端失败");
 
-    let count = catalog
-        .refresh_products(region, &http)
-        .await
-        .unwrap_or_else(|e| panic!("在线刷新失败，购买页结构可能已变：{e}"));
+    for category in Category::ALL {
+        let before = catalog
+            .products("zh_CN")
+            .map(|p| p.iter().filter(|p| p.category == *category).count())
+            .unwrap_or(0);
 
-    assert!(count > 0, "在线刷新返回 0 个型号");
-    let after = catalog.products("zh_CN").expect("刷新后目录应当可用");
-    println!(
-        "内嵌 {before} 个型号，从官网抓到 {count} 个，刷新后 {} 个",
-        after.len()
-    );
-    for p in after.iter().take(5) {
-        println!("  {}  {}", p.part_number, p.title);
+        let count = catalog
+            .refresh_products(region, Some(*category), &http)
+            .await
+            .unwrap_or_else(|e| {
+                panic!("{} 在线刷新失败，购买页结构可能已变：{e}", category.title())
+            });
+        assert!(count > 0, "{} 在线刷新返回 0 个型号", category.title());
+
+        let after: Vec<_> = catalog
+            .products("zh_CN")
+            .expect("刷新后目录应当可用")
+            .into_iter()
+            .filter(|p| p.category == *category)
+            .collect();
+
+        println!(
+            "\n{}：内嵌 {before} 个，从官网抓到 {count} 个，刷新后 {} 个",
+            category.title(),
+            after.len()
+        );
+        for p in after.iter().take(3) {
+            println!("  {}  {}", p.part_number, p.title);
+        }
+
+        // 展示名是用户在下拉框里唯一的判断依据。空的、或者跟别人一字不差的
+        // 展示名，等于让用户掷骰子决定监控哪个零件号。
+        let mut titles = std::collections::HashSet::new();
+        for p in &after {
+            assert!(!p.title.is_empty(), "{} 的展示名是空的", p.part_number);
+            assert!(
+                titles.insert(p.title.clone()),
+                "{} 的展示名「{}」和别人重了",
+                p.part_number,
+                p.title
+            );
+        }
     }
-    assert!(!after.is_empty());
 }

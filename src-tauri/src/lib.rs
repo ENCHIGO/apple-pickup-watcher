@@ -14,7 +14,7 @@ use std::time::Duration;
 use apw_core::apple::{AppleClient, ClientConfig};
 use apw_core::catalog::Catalog;
 use apw_core::config::{MIN_INTERVAL_SECONDS, Settings, SettingsStore};
-use apw_core::model::{Product, REGIONS, Store, Target, region_by_locale};
+use apw_core::model::{Category, Product, REGIONS, Store, Target, region_by_locale};
 use apw_core::notify::{Bark, Multi, Notification, Notifier, Sound};
 use apw_core::watcher::{Event, TargetState, Watcher, WatcherConfig};
 use serde::Serialize;
@@ -37,6 +37,17 @@ const NOTICE_CHANNEL: &str = "watcher://notice";
 struct RegionDto {
     title: &'static str,
     locale: &'static str,
+}
+
+/// 品类的可序列化形式。
+///
+/// 界面上的品类下拉框由这里驱动，而不是在前端另抄一份常量：抄一份就迟早会有
+/// 一边先加了品类、另一边还蒙在鼓里。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CategoryDto {
+    value: Category,
+    title: &'static str,
 }
 
 struct AppState {
@@ -84,6 +95,17 @@ fn list_regions() -> Vec<RegionDto> {
 }
 
 #[tauri::command]
+fn list_categories() -> Vec<CategoryDto> {
+    Category::ALL
+        .iter()
+        .map(|c| CategoryDto {
+            value: *c,
+            title: c.title(),
+        })
+        .collect()
+}
+
+#[tauri::command]
 fn list_stores(state: tauri::State<'_, AppState>, locale: String) -> Result<Vec<Store>, String> {
     state.catalog.stores(&locale).map_err(|e| e.to_string())
 }
@@ -96,16 +118,20 @@ fn list_products(
     state.catalog.products(&locale).map_err(|e| e.to_string())
 }
 
-/// 从 Apple 官网抓最新型号，替换该地区的内存副本，返回抓到的型号数。
+/// 从 Apple 官网抓最新型号，替换该地区该品类的内存副本，返回抓到的型号数。
+///
+/// `category` 为 `None` 时抓该地区的全部购买页。界面传的是当前选中的品类：
+/// 一次只抓那几页，用户想看新出的 Mac 不必等 iPhone、iPad、Watch 一起抓完。
 #[tauri::command]
 async fn refresh_products(
     state: tauri::State<'_, AppState>,
     locale: String,
+    category: Option<Category>,
 ) -> Result<usize, String> {
     let region = region_by_locale(&locale).ok_or_else(|| format!("认不出地区 {locale}"))?;
     state
         .catalog
-        .refresh_products(region, &state.http)
+        .refresh_products(region, category, &state.http)
         .await
         .map_err(|e| e.to_string())
 }
@@ -499,6 +525,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_regions,
+            list_categories,
             list_stores,
             list_products,
             refresh_products,
