@@ -9,7 +9,7 @@
 //! `switch` 的穷尽性检查，Rust 这边加一个状态、前端漏处理就编译不过。这是刻意
 //! 设计的，不是巧合，所以必须钉住。
 
-use apw_core::model::{Availability, Product, Store, Target, UnknownReason};
+use apw_core::model::{Availability, Category, Product, Store, Target, UnknownReason};
 use serde_json::json;
 
 fn to_value<T: serde::Serialize>(v: &T) -> serde_json::Value {
@@ -99,6 +99,7 @@ fn 跨边界的结构统一用小驼峰() {
 
     let product = Product {
         part_number: "MG724CH/A".into(),
+        category: Category::Iphone,
         family: "iphone17".into(),
         capacity: "512GB".into(),
         color: "黑色".into(),
@@ -106,6 +107,9 @@ fn 跨边界的结构统一用小驼峰() {
     };
     let v = to_value(&product);
     assert!(v.get("partNumber").is_some(), "Product 应当用小驼峰：{v}");
+    // 品类是个纯字符串标签，前端照着它筛下拉框。写成对象或者数字，
+    // TypeScript 那边的联合类型就对不上了。
+    assert_eq!(v.get("category"), Some(&json!("iphone")));
 
     let store = Store {
         number: "R683".into(),
@@ -113,6 +117,22 @@ fn 跨边界的结构统一用小驼峰() {
         title: "上海-环球港".into(),
     };
     assert!(to_value(&store).get("number").is_some());
+}
+
+#[test]
+fn 品类的线上格式是小写标识符() {
+    // 前端的 Category 联合类型逐字写着这四个串。谁改了 Rust 的 serde 标注，
+    // 这里会先红，而不是等界面上品类下拉框选完什么都筛不出来才发现。
+    for (category, want) in [
+        (Category::Iphone, "iphone"),
+        (Category::Ipad, "ipad"),
+        (Category::Mac, "mac"),
+        (Category::Watch, "watch"),
+    ] {
+        assert_eq!(to_value(&category), json!(want));
+        let back: Category = serde_json::from_value(json!(want)).expect("前端传回来的品类必须认得");
+        assert_eq!(back, category);
+    }
 }
 
 #[test]

@@ -1,15 +1,16 @@
 # Apple Pickup Watcher
 
 盯着 Apple 直营店的「到店取货」库存，某个型号在你选的门店可取货时立刻提醒你。
-支持七个地区：中国大陆、中国香港、中国台湾、日本、Singapore、Australia、Malaysia。
+支持 **iPhone、iPad、Mac、Apple Watch** 四个品类，七个地区：中国大陆、中国香港、
+中国台湾、日本、Singapore、Australia、Malaysia。
 
 跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.2.0。
 
 **English** — Apple Pickup Watcher monitors in-store pickup availability at Apple Retail
-Stores and alerts you the moment a specific iPhone model becomes available at the store you
-picked. It is a cross-platform desktop app (macOS / Windows / Linux) built with Rust and
-Tauri, covering seven regions: China mainland, Hong Kong, Taiwan, Japan, Singapore,
-Australia and Malaysia.
+Stores and alerts you the moment a specific model becomes available at the store you
+picked. It covers iPhone, iPad, Mac and Apple Watch. It is a cross-platform desktop app
+(macOS / Windows / Linux) built with Rust and Tauri, covering seven regions: China
+mainland, Hong Kong, Taiwan, Japan, Singapore, Australia and Malaysia.
 
 It is a rewrite of [hteen/apple-store-helper](https://github.com/hteen/apple-store-helper)
 (GPL-3.0, unmaintained). That project's stock endpoint now returns **HTTP 541** for every
@@ -72,6 +73,7 @@ v0.1.x 是 Go + Fyne 实现。v0.2.0 换成了 Rust + Tauri，界面重写为 Re
 | --- | --- | --- |
 | 发布体积 | 约 38 MB | 8 MB 量级 |
 | 关闭窗口 | 退出程序 | 收进系统托盘继续跑 |
+| 覆盖品类 | 只有 iPhone | iPhone / iPad / Mac / Apple Watch |
 | 型号列表 | 硬编码，等作者发版 | 可从 Apple 官网在线更新 |
 | 更新 | 手动看 Release | 应用内检查更新 |
 | 设置文件 | `settings.json` | `settings.v2.json` |
@@ -83,7 +85,9 @@ v0.1.x 是 Go + Fyne 实现。v0.2.0 换成了 Rust + Tauri，界面重写为 Re
   隐藏的，WebView 可能被系统节流甚至挂起 —— 把「及时提醒」挂在一个会被挂起的执行环境上
   是不能接受的。
 - **型号列表可在线更新。** 界面上有「从 Apple 官网更新型号列表」的按钮，新机发售当天就能
-  盯，不必等这个程序发新版。抓不到时自动退回随程序内嵌的离线快照，不会因此变得不可用。
+  盯，不必等这个程序发新版。按钮只抓**当前品类**的那几页 —— 四个品类加起来二十页购买页，
+  想看新出的 Mac 没有理由等 iPhone、iPad、Watch 一起抓完。抓不到时自动退回随程序内嵌的
+  离线快照，不会因此变得不可用。
 - **应用内更新检查只提示，不静默安装。** 发现新版本会在界面上显示一条提示，装不装由你点。
 - **配置可以共存、可以回退。** 设置文件换成了 `settings.v2.json`（两版的 JSON 字段命名不同，
   共用一个文件名会让两个版本互相把对方的配置读成缺省值再覆盖掉）。首次启动时，如果新版
@@ -129,9 +133,11 @@ xattr -cr "/Applications/Apple Pickup Watcher.app"
 ## 怎么用
 
 1. 选**地区**。地区决定了查哪个 Apple 在线商店，换地区后门店和型号会一起重选。
-2. 选**门店**和**型号**，点「添加」。可以加多条，不同门店、不同型号混着加都行。
-3. 点「开始」。表格里每一行会显示状态：有货 / 无货 / 未知 / 待查询，以及最后检查时间。
-4. 某一行从非有货变成有货时，会同时：弹系统通知、播提示音、发 Bark 推送（如已配置），
+2. 选**品类**（iPhone / iPad / Mac / Apple Watch）。它只是型号下拉框的筛选器，
+   已经加进列表的监控目标不受影响 —— 四个品类是混在一张表里盯的。
+3. 选**门店**和**型号**，点「添加」。可以加多条，不同品类、不同门店混着加都行。
+4. 点「开始」。表格里每一行会显示状态：有货 / 无货 / 未知 / 待查询，以及最后检查时间。
+5. 某一行从非有货变成有货时，会同时：弹系统通知、播提示音、发 Bark 推送（如已配置），
    并按设置打开该地区的购物袋页面。
 
 看到「监控当前不可信」的告警，说明有目标处于未知状态 —— 展开能看到具体原因（被拦截、
@@ -230,6 +236,7 @@ pnpm tauri build              # 打安装包，产物在 target/release/bundle/
 cargo test                                                    # 全部离线测试，不碰网络
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all --check
+python3 crates/apw-core/data/generate.py --self-test           # 快照生成脚本自检，不联网
 pnpm exec tsc --noEmit
 pnpm exec vite build
 ```
@@ -238,12 +245,14 @@ pnpm exec vite build
 
 ```
 crates/apw-core/   核心逻辑，不依赖任何界面框架，可脱离 GUI 单独测试
-                     model     三态库存类型、地区表、监控目标
-                     apple     Apple 接口客户端：限速、退避重试、错误分类、响应解析
-                     catalog   商品与门店目录（内嵌快照 + 在线刷新）
-                     watcher   调度引擎（actor 模型）
-                     notify    Bark 推送与提示音
-                     config    设置持久化与旧版迁移
+                     model          三态库存类型、地区表、品类与购买页、监控目标
+                     apple          Apple 接口客户端：限速、退避重试、错误分类、响应解析
+                     apple_catalog  从购买页抠出商品数据（两种页面排布都认）
+                     catalog        商品与门店目录（内嵌快照 + 在线刷新）
+                     watcher        调度引擎（actor 模型）
+                     notify         Bark 推送与提示音
+                     config         设置持久化与旧版迁移
+                   data/            内嵌离线快照，由 data/generate.py 重新生成
 src-tauri/         Tauri 应用外壳（crate 名 apw-app）：装配、IPC 转译、托盘、系统通知
 src/               React 19 + TypeScript 前端
 ```
@@ -304,6 +313,21 @@ cargo test -p apw-core --features live --test live -- --nocapture --test-threads
 
 测试里那张零件号表（`crates/apw-core/tests/live.rs` 的 `CASES`）会随机型更新而失效。届时
 应当**更新这张表，而不是删掉测试**。
+
+### 重新生成内嵌的离线快照
+
+```shell
+python3 crates/apw-core/data/generate.py
+```
+
+它会把七个地区、四个品类共二十页购买页各抓一遍，把用得到的字段裁出来写进
+`crates/apw-core/data/products_<locale>.json`。抓不全时**非零退出**且不掩盖失败 ——
+静默写出一份缺页的快照，等于把「兜底目录」变成「兜底目录里刚好没有你要的那台机器」。
+
+平时不需要跑它：程序运行时会自己从购买页现抓，快照只是断网或被拦截时的兜底。
+真正需要跑的时候是两种：Apple 换了新一代机型（`model.rs` 的 `DEFAULT_FAMILIES` 里
+加了新 slug），或者购买页的数据结构变了。上游是把这份数据手工从浏览器开发者工具里
+复制进仓库，于是每发一代新机都得等作者更新并发版。
 
 ### 打包平台
 

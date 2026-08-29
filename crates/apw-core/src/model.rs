@@ -120,6 +120,63 @@ impl UnknownReason {
     }
 }
 
+/// 一个可监控的商品品类。
+///
+/// 品类不只是界面上的一个筛选器：它决定购买页挂在哪条路径下
+/// （`/shop/buy-iphone` 与 `/shop/buy-mac` 是两套页面），也决定那页数据该按
+/// 哪种形状解析（见 [`crate::apple_catalog`]）。因此它必须是一个类型，而不是
+/// 散落在各处的字符串。
+///
+/// 变体顺序就是界面上的排列顺序，也是商品排序时的第一关键字。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Category {
+    Iphone,
+    Ipad,
+    Mac,
+    Watch,
+}
+
+impl Category {
+    /// 全部品类，顺序与变体声明一致。
+    ///
+    /// 写成常量而不是让调用方自己列举：将来新增品类时，凡是遍历这里的地方
+    /// 都会自动跟上，不会有谁悄悄漏掉一个。
+    pub const ALL: &'static [Category] = &[Self::Iphone, Self::Ipad, Self::Mac, Self::Watch];
+
+    /// 购买页所在的路径段，如 `buy-iphone`。
+    pub fn buy_path(self) -> &'static str {
+        match self {
+            Self::Iphone => "buy-iphone",
+            Self::Ipad => "buy-ipad",
+            Self::Mac => "buy-mac",
+            Self::Watch => "buy-watch",
+        }
+    }
+
+    /// 界面上展示的品类名。四个地区站点都用这一组英文原名，无需本地化。
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::Iphone => "iPhone",
+            Self::Ipad => "iPad",
+            Self::Mac => "Mac",
+            Self::Watch => "Apple Watch",
+        }
+    }
+}
+
+/// 一个可抓取的购买页：品类 + slug。
+///
+/// slug 单独存在没有意义 —— `apple-watch` 和 `macbook-air` 只有配上各自的品类
+/// 才能拼出地址。把两者绑在一个类型里，就不存在「拿 Mac 的 slug 去拼 iPhone
+/// 的路径」这种拼错的可能。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Family {
+    pub category: Category,
+    /// 购买页 slug，如 `iphone-17`、`macbook-air`。
+    pub slug: &'static str,
+}
+
 /// 一个 Apple 在线商店的地区站点。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Region {
@@ -132,8 +189,8 @@ pub struct Region {
     /// 注意中国大陆用的是独立域名 `www.apple.com.cn`，而不是 `www.apple.com/cn`。
     /// 上游按 `www.apple.com/{shortCode}` 统一拼接，对中国大陆是错的。
     pub base_url: &'static str,
-    /// 需要抓取的 iPhone 购买页 slug，用于在线刷新商品目录。
-    pub families: &'static [&'static str],
+    /// 需要抓取的购买页，用于在线刷新商品目录。
+    pub families: &'static [Family],
 }
 
 impl Region {
@@ -147,9 +204,19 @@ impl Region {
         format!("{}/shop/bag", self.base_url)
     }
 
-    /// 某个机型的购买页地址，用于在线刷新商品目录。
-    pub fn buy_page_url(&self, family: &str) -> String {
-        format!("{}/shop/buy-iphone/{family}", self.base_url)
+    /// 某个购买页的地址，用于在线刷新商品目录。
+    pub fn buy_page_url(&self, family: &Family) -> String {
+        format!(
+            "{}/shop/{}/{}",
+            self.base_url,
+            family.category.buy_path(),
+            family.slug
+        )
+    }
+
+    /// 该地区某个品类下的全部购买页。
+    pub fn families_in(&self, category: Category) -> impl Iterator<Item = &'static Family> {
+        self.families.iter().filter(move |f| f.category == category)
     }
 
     /// 该地区请求应当带的 `Accept-Language`。
@@ -164,11 +231,100 @@ impl Region {
     }
 }
 
-/// 当前在售的 iPhone 购买页 slug。
+/// 当前在售的购买页。
 ///
 /// 新机型发布后只需在这里追加一行，商品目录会自动从 Apple 官网抓取，
 /// 不必像上游那样每代都手工从开发者工具里复制 `productSelectionData`。
-const DEFAULT_FAMILIES: &[&str] = &["iphone-17", "iphone-17-pro", "iphone-air"];
+///
+/// 七个地区共用同一张表：实测这些 slug 在每个站点都存在（见
+/// `tests/live.rs` 里的契约测试）。某个地区少了其中一页也不至于出事 ——
+/// [`crate::catalog::Catalog::refresh_products`] 会保住其余页的结果，
+/// 只把失败的那几页报出来。
+const DEFAULT_FAMILIES: &[Family] = &[
+    Family {
+        category: Category::Iphone,
+        slug: "iphone-17",
+    },
+    Family {
+        category: Category::Iphone,
+        slug: "iphone-17-pro",
+    },
+    Family {
+        category: Category::Iphone,
+        slug: "iphone-air",
+    },
+    Family {
+        category: Category::Ipad,
+        slug: "ipad-pro",
+    },
+    Family {
+        category: Category::Ipad,
+        slug: "ipad-air",
+    },
+    Family {
+        category: Category::Ipad,
+        slug: "ipad",
+    },
+    Family {
+        category: Category::Ipad,
+        slug: "ipad-mini",
+    },
+    Family {
+        category: Category::Mac,
+        slug: "macbook-air",
+    },
+    Family {
+        category: Category::Mac,
+        slug: "macbook-pro",
+    },
+    Family {
+        category: Category::Mac,
+        slug: "macbook-neo",
+    },
+    Family {
+        category: Category::Mac,
+        slug: "imac",
+    },
+    Family {
+        category: Category::Mac,
+        slug: "mac-mini",
+    },
+    Family {
+        category: Category::Mac,
+        slug: "mac-studio",
+    },
+    // 显示器不是 Mac，但 Apple 自己把它们摆在 /shop/buy-mac 下面，取货查询
+    // 也走同一个接口。盯一台 Studio Display 到货和盯一台 Mac 是同一件事，
+    // 没有理由单开一个品类。
+    Family {
+        category: Category::Mac,
+        slug: "studio-display",
+    },
+    Family {
+        category: Category::Mac,
+        slug: "studio-display-xdr",
+    },
+    Family {
+        category: Category::Watch,
+        slug: "apple-watch",
+    },
+    Family {
+        category: Category::Watch,
+        slug: "apple-watch-se",
+    },
+    Family {
+        category: Category::Watch,
+        slug: "apple-watch-ultra",
+    },
+    Family {
+        category: Category::Watch,
+        slug: "apple-watch-hermes",
+    },
+    Family {
+        category: Category::Watch,
+        slug: "apple-watch-hermes-ultra",
+    },
+];
 
 /// 内置地区表。
 ///
@@ -224,17 +380,23 @@ pub fn region_by_locale(locale: &str) -> Option<&'static Region> {
     REGIONS.iter().find(|r| r.locale == locale)
 }
 
-/// 一个具体可购买的 iPhone 配置（机型 + 容量 + 颜色）。
+/// 一个具体可购买的配置（机型 + 各项规格）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Product {
     /// Apple 零件号，如 `MG724CH/A`，查询库存时的唯一标识。
     pub part_number: String,
-    /// 机型系列，如 `iphone17`。
+    /// 所属品类。界面靠它分组，[`crate::catalog`] 靠它决定刷新哪一批购买页。
+    pub category: Category,
+    /// 机型系列，如 `iphone17`、`macbook-air`。
+    ///
+    /// iPhone 与 iPad 用购买页数据里的 `familyType`（同一页可能有好几个，
+    /// 比如 Pro 和 Pro Max 就同页）；Mac 与 Apple Watch 的数据里没有这个字段，
+    /// 退回用购买页 slug。两者都只用来分组和排序，不参与任何库存判定。
     pub family: String,
-    /// 存储容量，如 `512GB`。
+    /// 存储容量，如 `512GB`。Apple Watch 这类没有容量维度的品类为空。
     pub capacity: String,
-    /// 颜色的本地化名称，如「黑色」。
+    /// 颜色的本地化名称，如「黑色」。取不到时为空。
     pub color: String,
     /// 界面展示名，如「iPhone 17 512GB 黑色」。
     pub title: String,

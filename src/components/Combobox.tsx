@@ -21,7 +21,7 @@ export interface ComboboxOption {
 /**
  * 可搜索的下拉。
  *
- * 门店有 49 个、型号有 43 个，普通 select 只能一路滚，实际用起来很痛苦，
+ * 门店有 49 个、型号有几百个，普通 select 只能一路滚，实际用起来很痛苦，
  * 尤其是在发售当晚要快。所以搜索是硬需求，不是锦上添花。
  */
 export function Combobox({
@@ -56,13 +56,25 @@ export function Combobox({
           disabled={disabled}
           className={cn("justify-between font-normal", className)}
         >
-          <span className={cn("truncate", !selected && "text-muted-foreground")}>
+          <span
+            // 触发器宽度是固定的，选中项再长也只能截断；挂个原生 title，
+            // 想确认自己选的到底是哪一台时鼠标悬停就能看全。
+            title={selected?.label}
+            className={cn("truncate", !selected && "text-muted-foreground")}
+          >
             {selected ? selected.label : placeholder}
           </span>
           <ChevronsUpDown className="opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+      <PopoverContent
+        // 下拉面板可以比触发器宽。Mac 的展示名带着芯片和核心数，动辄五十来个
+        // 字（「MacBook Pro 16 英寸 M5 Max 芯片 18 核中央处理器、40 核图形处理器
+        // 标准显示屏 深空黑色」），面板要是跟触发器一样宽，被截掉的正好是区分
+        // 两台机器的那半句 —— 用户面对两条看起来一模一样的选项只能猜。
+        className="w-auto min-w-(--radix-popover-trigger-width) max-w-[min(90vw,42rem)] p-0"
+        align="start"
+      >
         <Command>
           <CommandInput placeholder={searchPlaceholder} className="select-text" />
           <CommandList>
@@ -82,7 +94,8 @@ export function Combobox({
                       option.value === value ? "opacity-100" : "opacity-0",
                     )}
                   />
-                  <span className="truncate">{option.label}</span>
+                  {/* 宽到 42rem 还放不下就折行，不截断：截断会把区分项藏起来。 */}
+                  <span className="whitespace-normal">{option.label}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

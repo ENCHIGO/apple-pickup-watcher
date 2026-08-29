@@ -42,6 +42,7 @@ import {
   installUpdate,
   refreshProducts,
   saveSettings,
+  setCategory,
   setIntervalSeconds,
   setTargets,
   startWatching,
@@ -51,6 +52,7 @@ import {
 } from "@/lib/store";
 import {
   type Availability,
+  type Category,
   describeAvailability,
   formatTime,
   isUntrusted,
@@ -109,9 +111,14 @@ export default function App() {
     () => ui.stores.map((s) => ({ value: s.number, label: s.title })),
     [ui.stores],
   );
+  // 只列当前品类。四个品类的型号加起来好几百条，全堆进一个下拉框，
+  // 想找一台 Mac 得先划过所有 iPhone。
   const productOptions = useMemo(
-    () => ui.products.map((p) => ({ value: p.partNumber, label: p.title })),
-    [ui.products],
+    () =>
+      ui.products
+        .filter((p) => p.category === ui.category)
+        .map((p) => ({ value: p.partNumber, label: p.title })),
+    [ui.products, ui.category],
   );
 
   const targets = useMemo(() => ui.rows.map((r) => r.target), [ui.rows]);
@@ -234,6 +241,25 @@ export default function App() {
           </div>
 
           <div className="grid gap-1.5">
+            <Label>品类</Label>
+            <Combobox
+              className="w-36"
+              options={ui.categories.map((c) => ({ value: c.value, label: c.title }))}
+              value={ui.category}
+              onChange={(value) => {
+                // 换品类后旧的型号不再在下拉框里，清掉待添加的选择。门店不用清，
+                // 它跟品类无关。
+                setPartNumber("");
+                setCategory(value as Category);
+              }}
+              placeholder="选择品类"
+              searchPlaceholder="搜索品类…"
+              emptyText="没有匹配的品类"
+              disabled={ui.categories.length === 0}
+            />
+          </div>
+
+          <div className="grid gap-1.5">
             <Label>门店</Label>
             <Combobox
               className="w-56"
@@ -250,11 +276,11 @@ export default function App() {
           <div className="grid gap-1.5">
             <Label>型号</Label>
             <Combobox
-              className="w-72"
+              className="w-80"
               options={productOptions}
               value={partNumber}
               onChange={setPartNumber}
-              placeholder="选择 iPhone 型号"
+              placeholder="选择型号"
               searchPlaceholder="搜索型号…"
               emptyText="没有匹配的型号"
               disabled={productOptions.length === 0}
@@ -270,7 +296,7 @@ export default function App() {
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="从 Apple 官网更新型号列表"
+                aria-label="从 Apple 官网更新当前品类的型号列表"
                 disabled={ui.refreshing}
                 onClick={() => void refreshProducts()}
               >
@@ -278,7 +304,7 @@ export default function App() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              从 Apple 官网更新型号列表。新机发布后用这个，不必等程序更新。
+              从 Apple 官网更新当前品类的型号列表。新机发布后用这个，不必等程序更新。
             </TooltipContent>
           </Tooltip>
         </section>

@@ -15,7 +15,8 @@
 use std::time::Duration;
 
 use apw_core::apple::{ApiError, AppleClient, ClientConfig};
-use apw_core::model::{Availability, UnknownReason, region_by_locale};
+use apw_core::catalog::Catalog;
+use apw_core::model::{Availability, Category, UnknownReason, region_by_locale};
 
 /// 每个地区挑一家真实门店和一个真实零件号。
 ///
@@ -108,6 +109,65 @@ async fn 无效零件号不会被判成无货() {
                 );
             }
         }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn 四个品类的零件号接口都认() {
+    // 「iPad / Mac / Apple Watch 也能用同一个取货接口查」是整个多品类支持的前提。
+    // 它是个关于 Apple 的假设，不是我们能在本地测出来的东西：一旦哪天 Mac 的
+    // 零件号不再被这个接口接受，界面上会是一屏「未知」，而用户只会以为又被拦了。
+    //
+    // 零件号从内嵌目录里现取，不写死：写死的表会随机型更新失效，然后有人为了
+    // 让 CI 变绿而删掉测试。
+    let client = client();
+    let region = region_by_locale("zh_CN").expect("地区表里应当有中国大陆");
+    let catalog = Catalog::new();
+    let products = catalog.products("zh_CN").expect("内嵌目录应当可用");
+
+    for category in Category::ALL {
+        let product = products
+            .iter()
+            .find(|p| p.category == *category)
+            .unwrap_or_else(|| panic!("内嵌目录里没有 {} 商品", category.title()));
+        let parts = vec![product.part_number.clone()];
+
+        let result = client
+            .pickup_message(region, "R683", &parts)
+            .await
+            .unwrap_or_else(|e| {
+                panic!(
+                    "{} 的零件号 {} 查询失败：{e}",
+                    category.title(),
+                    product.part_number
+                )
+            });
+
+        let status = result.parts.get(&product.part_number).unwrap_or_else(|| {
+            panic!(
+                "{} 的响应里没有零件号 {}（接口可能不接受这个品类）",
+                category.title(),
+                product.part_number
+            )
+        });
+
+        // 有货没货取决于当下库存，不做断言。要守住的是「必须拿到明确答复」——
+        // 拿不到就说明这条链路对这个品类是断的。
+        assert!(
+            !status.availability.is_unknown(),
+            "{} 的 {} 没拿到明确答复：{:?}",
+            category.title(),
+            product.part_number,
+            status.availability
+        );
+
+        println!(
+            "{:11} {:12} -> {:4} （{}）",
+            category.title(),
+            product.part_number,
+            status.availability.label(),
+            product.title
+        );
     }
 }
 

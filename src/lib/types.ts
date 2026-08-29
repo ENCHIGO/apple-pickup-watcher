@@ -43,8 +43,23 @@ export interface Region {
   locale: string;
 }
 
+/** 与 Rust 侧 `model::Category` 一一对应。 */
+export type Category = "iphone" | "ipad" | "mac" | "watch";
+
+/**
+ * 品类选项。
+ *
+ * 由 Rust 侧的 `list_categories` 提供，不在这里另抄一份常量 —— 抄一份就迟早会
+ * 有一边先加了品类、另一边还蒙在鼓里。
+ */
+export interface CategoryOption {
+  value: Category;
+  title: string;
+}
+
 export interface Product {
   partNumber: string;
+  category: Category;
   family: string;
   capacity: string;
   color: string;
