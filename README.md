@@ -269,6 +269,28 @@ src/               React 19 + TypeScript 前端
 
 ## 给维护者
 
+### main 受保护，改动一律走 PR
+
+`main` 上开了分支保护，**对仓库管理员同样生效**：
+
+| 规则 | 状态 |
+| --- | --- |
+| 合并前必须通过 `检查（Linux）`、`检查（macOS）` | 是 |
+| 禁止 force push | 是 |
+| 禁止删除分支 | 是 |
+| 对管理员同样生效（`enforce_admins`） | 是 |
+| 要求 PR review | 否 —— 单人仓库要求 approval 等于把自己锁在外面 |
+
+**这条会在发版时绊到你**：改版本号那一次提交也得走 PR，直接 `git push origin main` 会被
+拒绝，报 `2 of 2 required status checks are expected`。别以为是仓库坏了。
+
+要临时绕过（比如线上出事要立刻修），只能去 Settings → Branches 把规则关掉再打开 ——
+刻意没留后门，单人仓库最大的风险恰恰是自己手滑。
+
+`force push` 那条连管理员也挡，且**不受 `enforce_admins` 影响** —— 把 `enforce_admins`
+关掉也照样推不上去，这两个开关管的不是同一件事。所以想删掉一个已经推上 main 的提交，
+唯一的办法是去 Settings → Branches 临时勾上 Allow force pushes，推完立刻取消勾选。
+
 ### 发布需要两个 GitHub Secret
 
 Tauri 的更新包需要签名，签名用两个仓库 Secret：
