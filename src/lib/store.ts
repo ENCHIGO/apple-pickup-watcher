@@ -14,6 +14,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import type {
+  Category,
+  CategoryOption,
   Product,
   Region,
   Settings,
@@ -36,8 +38,17 @@ export interface UiState {
   trouble: string | null;
   logs: string[];
   regions: Region[];
+  categories: CategoryOption[];
   stores: Store[];
   products: Product[];
+  /**
+   * 当前正在挑选的品类。
+   *
+   * 只是个筛选器，所以不进设置、不落盘：它决定型号下拉框里显示哪一批商品，
+   * 以及刷新按钮去抓哪几页。已经加进监控列表的目标不受它影响 —— 列表里
+   * 四个品类是混在一起的，不然用户切一下品类就以为自己的监控项没了。
+   */
+  category: Category;
   settings: Settings;
   /** 正在从 Apple 官网刷新型号列表。 */
   refreshing: boolean;
@@ -63,8 +74,10 @@ let state: UiState = {
   trouble: null,
   logs: [],
   regions: [],
+  categories: [],
   stores: [],
   products: [],
+  category: "iphone",
   settings: DEFAULT_SETTINGS,
   refreshing: false,
   ready: false,
@@ -168,13 +181,14 @@ export function connect(): Promise<void> {
       listen<string>(NOTICE_CHANNEL, (e) => pushLog(`启动提示：${e.payload}`)),
     ]);
 
-    const [regions, settings, rows, running] = await Promise.all([
+    const [regions, categories, settings, rows, running] = await Promise.all([
       invoke<Region[]>("list_regions"),
+      invoke<CategoryOption[]>("list_categories"),
       invoke<Settings>("get_settings"),
       invoke<TargetState[]>("get_snapshot"),
       invoke<boolean>("is_running"),
     ]);
-    update({ regions, settings, rows, running, ready: true });
+    update({ regions, categories, settings, rows, running, ready: true });
     await loadCatalog(settings.locale);
     // 启动时静默查一次。查不到就算了，不打扰用户 —— 网络不通、GitHub 抽风
     // 都会走到这里，跟「有没有新版本」是两回事。
@@ -217,6 +231,10 @@ export async function saveSettings(next: Settings): Promise<void> {
   }
 }
 
+export function setCategory(category: Category): void {
+  update({ category });
+}
+
 export async function changeLocale(locale: string): Promise<void> {
   await saveSettings({ ...state.settings, locale });
   await loadCatalog(locale);
@@ -248,19 +266,32 @@ export async function setIntervalSeconds(seconds: number): Promise<void> {
   }
 }
 
-/** 从 Apple 官网抓最新型号。 */
+/**
+ * 从 Apple 官网抓最新型号。
+ *
+ * 只抓当前品类的那几页。全部品类加起来有二十页、几十兆 HTML，用户想看新出的
+ * Mac 没有理由等着 iPhone、iPad、Watch 一起抓完。
+ */
 export async function refreshProducts(): Promise<void> {
   if (state.refreshing) return;
   update({ refreshing: true });
   const locale = state.settings.locale;
+  const category = state.category;
   try {
-    const count = await invoke<number>("refresh_products", { locale });
-    pushLog(`已从 Apple 官网更新 ${count} 个型号。`);
-    await loadCatalog(locale);
+    const count = await invoke<number>("refresh_products", { locale, category });
+    // 说「抓到」而不是「更新」：这个数字是本轮成功抓下来的不同零件号数，
+    // 不等于目录里真的多了或改了多少行。
+    pushLog(`已从 Apple 官网抓到 ${count} 个型号。`);
   } catch (err) {
     // 抓取失败仍可继续用内嵌的离线目录，只是可能缺最新机型。
     pushLog(`更新型号列表失败（仍可使用内置目录）：${String(err)}`);
   } finally {
+    // 无论成败都重载一次目录。**失败时也必须重载**：后端是一页一页安装的，
+    // 一个品类有八页，其中几页成功、几页失败是常事，成功那几页的新数据此刻
+    // 已经在后端生效了。不重载的话界面还停在旧目录上，等到下一次因为别的
+    // 原因重载时，这批变更才悄悄冒出来 —— 那时候已经没有任何提示说明它们
+    // 是哪来的了。
+    await loadCatalog(locale);
     update({ refreshing: false });
   }
 }
