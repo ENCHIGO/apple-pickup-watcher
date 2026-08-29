@@ -4,7 +4,7 @@
 支持 **iPhone、iPad、Mac、Apple Watch** 四个品类，七个地区：中国大陆、中国香港、
 中国台湾、日本、Singapore、Australia、Malaysia。
 
-跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.2.0。
+跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.3.0。
 
 **English** — Apple Pickup Watcher monitors in-store pickup availability at Apple Retail
 Stores and alerts you the moment a specific model becomes available at the store you
@@ -65,11 +65,11 @@ the endpoint that still works.
 
 ---
 
-## v0.2.0 相对 Go 版 v0.1.x 的变化
+## 相对 Go 版 v0.1.x 的变化
 
 v0.1.x 是 Go + Fyne 实现。v0.2.0 换成了 Rust + Tauri，界面重写为 React + TypeScript。
 
-| | v0.1.x（Go + Fyne） | v0.2.0（Rust + Tauri） |
+| | v0.1.x（Go + Fyne） | 现在（Rust + Tauri） |
 | --- | --- | --- |
 | 发布体积 | 约 38 MB | 8 MB 量级 |
 | 关闭窗口 | 退出程序 | 收进系统托盘继续跑 |
