@@ -10,6 +10,7 @@
 //! 设计的，不是巧合，所以必须钉住。
 
 use apw_core::model::{Availability, Category, Product, Store, Target, UnknownReason};
+use apw_core::watcher::{Event, TroubleAdvice};
 use serde_json::json;
 
 fn to_value<T: serde::Serialize>(v: &T) -> serde_json::Value {
@@ -133,6 +134,29 @@ fn 品类的线上格式是小写标识符() {
         let back: Category = serde_json::from_value(json!(want)).expect("前端传回来的品类必须认得");
         assert_eq!(back, category);
     }
+}
+
+#[test]
+fn 故障建议的线上格式是小写标识符() {
+    // 前端的 TroubleAdvice 联合类型逐字写着这两个串，而界面正是靠它决定要不要
+    // 把「换条网络试试」那句话摆出来。对不上的话，用户看到的还是一句干巴巴的
+    // 「请求被 Apple 拦截」，不知道自己其实有得可做 —— 而这条提示存在的全部
+    // 理由就是让他知道。
+    for (advice, want) in [
+        (TroubleAdvice::TryAnotherNetwork, "try_another_network"),
+        (TroubleAdvice::WaitForUpdate, "wait_for_update"),
+    ] {
+        assert_eq!(to_value(&advice), json!(want));
+    }
+
+    // 没有建议时必须是 null，不能是缺字段 —— 前端按 `advice !== null` 判断。
+    let event = Event::Trouble {
+        reason: "门店 R683 查询失败".into(),
+        advice: None,
+    };
+    let v = to_value(&event);
+    assert_eq!(v.get("advice"), Some(&serde_json::Value::Null));
+    assert_eq!(v.get("type").and_then(|t| t.as_str()), Some("trouble"));
 }
 
 #[test]

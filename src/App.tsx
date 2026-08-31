@@ -53,6 +53,7 @@ import {
 import {
   type Availability,
   type Category,
+  describeAdvice,
   describeAvailability,
   formatTime,
   isUntrusted,
@@ -190,10 +191,18 @@ export default function App() {
             <AlertTriangle />
             <AlertTitle>监控当前不可信</AlertTitle>
             <AlertDescription>
-              {ui.trouble}
+              {ui.trouble.reason}
               <span className="mt-1 block">
                 此时列表里的状态不代表门店的真实库存，请先排查原因，不要干等。
               </span>
+              {ui.trouble.advice !== null && (
+                // 用户自己能做的那件事要单独拎出来。只说「被拦截了」而不说
+                // 「换条网络试试」，用户只会盯着一个反复告警的窗口发呆 ——
+                // issue #3 里那位就干等了三个小时。
+                <span className="mt-1 block font-medium">
+                  {describeAdvice(ui.trouble.advice)}
+                </span>
+              )}
             </AlertDescription>
           </Alert>
         )}

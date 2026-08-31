@@ -89,6 +89,35 @@ async fn 七个地区的接口都还能用() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn 必须以http2跟apple说话() {
+    // 这条测试守的是一个「配置写漏了、功能却完全没坏」的缺陷。
+    //
+    // reqwest 的 HTTP/2 支持挂在 http2 feature 上，而我们用的是
+    // default-features = false。那个 feature 曾经漏了整整一个版本：客户端静默
+    // 退回 HTTP/1.1，查询照常成功、离线测试全绿，谁都看不出问题。但我们的 UA
+    // 自称 Chrome 130 —— 真实的 Chrome 早就不用 HTTP/1.1 跟 apple.com 说话了，
+    // 这个矛盾是最一眼可辨的机器人特征，在受风控审查的网络上直接换来 HTTP 541。
+    //
+    // 这种缺陷只有真的去连一次才发现得了，所以它必须待在契约测试里。
+    let client = client();
+
+    for locale in ["zh_CN", "zh_TW"] {
+        let region = region_by_locale(locale).expect("地区表里没有这个 locale");
+        let version = client
+            .negotiated_http_version(region)
+            .await
+            .unwrap_or_else(|e| panic!("{locale} 探测 HTTP 版本失败：{e}"));
+
+        assert!(
+            version.contains('2'),
+            "{locale} 协商出来的是 {version}，不是 HTTP/2 —— \
+             检查 Cargo.toml 里 reqwest 的 http2 feature 是不是又漏了"
+        );
+        println!("{locale:6} 协商出的协议：{version}");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn 无效零件号不会被判成无货() {
     // 本项目最关键的不变量在真实接口上也必须成立。
     let client = client();
