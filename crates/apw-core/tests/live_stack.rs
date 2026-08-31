@@ -80,7 +80,7 @@ async fn 全栈跑通一轮真实监控() {
         assert!(!remaining.is_zero(), "等一轮真实查询结束超时");
         match tokio::time::timeout(remaining, events.recv()).await {
             Ok(Some(Event::CycleComplete { healthy, .. })) => break healthy,
-            Ok(Some(Event::Trouble { reason })) => troubles.push(reason),
+            Ok(Some(Event::Trouble { reason, .. })) => troubles.push(reason),
             Ok(Some(_)) => {}
             Ok(None) => panic!("事件流意外关闭"),
             Err(_) => panic!("等一轮真实查询结束超时"),

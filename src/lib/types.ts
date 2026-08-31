@@ -93,12 +93,40 @@ export interface UpdateInfo {
   notes: string | null;
 }
 
+/**
+ * 遇到故障时用户自己能做什么。与 Rust 侧 `watcher::TroubleAdvice` 一一对应。
+ *
+ * 由引擎判定并传过来，而不是让界面去匹配那句中文里有没有「拦截」两个字 ——
+ * 那种写法在文案改动或加了别的语言之后会静默失效，而且不会有任何东西报错。
+ */
+export type TroubleAdvice = "try_another_network" | "wait_for_update";
+
+export interface Trouble {
+  reason: string;
+  advice: TroubleAdvice | null;
+}
+
 export type WatcherEvent =
   | { type: "stateChanged"; state: TargetState }
   | { type: "inStock"; state: TargetState }
   | { type: "cycleComplete"; healthy: boolean; snapshot: TargetState[] }
-  | { type: "trouble"; reason: string }
+  | { type: "trouble"; reason: string; advice: TroubleAdvice | null }
   | { type: "runStateChanged"; running: boolean };
+
+/** 把建议翻译成一句能照着做的话。 */
+export function describeAdvice(advice: TroubleAdvice): string {
+  switch (advice) {
+    case "try_another_network":
+      return (
+        "这多半不是「等一会儿就好」的故障：Apple 的边缘节点正在拦你这条网络的请求，" +
+        "而同一时刻浏览器通常一切正常。换成手机热点或另一条网络，往往立刻恢复。"
+      );
+    case "wait_for_update":
+      return "这个你改设置或换网络都解决不了，需要等程序更新。";
+    default:
+      return assertNever(advice);
+  }
+}
 
 /** 走到这里说明有分支没处理。放在 `default` 里，漏掉的分支会变成编译错误。 */
 export function assertNever(x: never): never {

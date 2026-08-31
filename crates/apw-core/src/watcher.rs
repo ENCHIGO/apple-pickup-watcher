@@ -26,6 +26,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use tokio::sync::{Semaphore, mpsc, oneshot};
 use tokio::task::JoinSet;
 
@@ -85,7 +86,11 @@ pub enum Event {
         snapshot: Vec<TargetState>,
     },
     /// 出现了需要用户注意的持续性故障。
-    Trouble { reason: String },
+    Trouble {
+        reason: String,
+        /// 用户自己能做什么；没有可做的就是 `None`。
+        advice: Option<TroubleAdvice>,
+    },
     /// 监控的启停状态发生了变化。
     RunStateChanged { running: bool },
 }
@@ -214,6 +219,36 @@ impl Watcher {
     }
 }
 
+/// 遇到这类故障时，**用户自己能做什么**。
+///
+/// 单独做成一个类型，而不是把建议直接拼进 `reason` 那句话里，是因为界面要按它
+/// 决定怎么呈现 —— 而让界面去匹配「那句中文里有没有『拦截』两个字」是最典型的
+/// 会静默失效的写法：文案改一次、或者哪天加了英文，匹配就没了，并且不会有任何
+/// 东西报错，只是提示悄悄不出现了。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TroubleAdvice {
+    /// 换一条网络多半立刻见效。
+    ///
+    /// 被 Apple 边缘节点拦下（HTTP 541）时给这条。这不是「稍等一下就好」的那种
+    /// 故障：issue #3 里那位用户的浏览器一切正常、只有本程序被拦，干等三个小时
+    /// 仍在反复报错，换成手机热点立刻恢复。用户必须知道有这个动作可做，否则
+    /// 他只会盯着一个反复告警的窗口，以为程序坏了或者自己该把间隔调得更长。
+    TryAnotherNetwork,
+    /// 用户做什么都没用，只能等新版本。
+    ///
+    /// 接口结构变了、或者程序内部出错时给这条。明说「你没法解决」也是一种有用的
+    /// 信息 —— 至少他不会去反复重装、改设置、换网络。
+    WaitForUpdate,
+}
+
+/// 一条要摆到用户面前的故障说明。
+#[derive(Debug, Clone)]
+struct TroubleReport {
+    reason: String,
+    advice: Option<TroubleAdvice>,
+}
+
 /// 一轮查询中按门店聚合出的一个请求单元。
 #[derive(Debug, Clone)]
 struct StoreGroup {
@@ -233,8 +268,8 @@ struct StoreOutcome {
     ok: bool,
     /// 本次遇到的异常数量，用于判断整轮是否健康。
     problems: usize,
-    /// 需要弹告警时的原因。
-    trouble: Option<String>,
+    /// 需要弹告警时的说明与建议。
+    trouble: Option<TroubleReport>,
 }
 
 /// 本轮请求覆盖到的全部目标键。
@@ -296,7 +331,10 @@ async fn run_queries<F: Fetcher>(
                     parts: Vec::new(),
                     ok: false,
                     problems: 1,
-                    trouble: Some(format!("查询任务内部错误已被拦截：{err}")),
+                    trouble: Some(TroubleReport {
+                        reason: format!("查询任务内部错误已被拦截：{err}"),
+                        advice: Some(TroubleAdvice::WaitForUpdate),
+                    }),
                 });
             }
         }
@@ -319,10 +357,14 @@ async fn query_one_store<F: Fetcher>(client: &F, group: StoreGroup) -> StoreOutc
                 .into_iter()
                 .map(|p| (p, Availability::Unknown(reason.clone())))
                 .collect(),
-            trouble: Some(format!(
-                "地区 {} 无法识别，这些监控项无法查询，请删除后重新添加",
-                group.locale
-            )),
+            trouble: Some(TroubleReport {
+                // 这句本身就说清了该做什么，不必再挂一条泛泛的建议。
+                reason: format!(
+                    "地区 {} 无法识别，这些监控项无法查询，请删除后重新添加",
+                    group.locale
+                ),
+                advice: None,
+            }),
             locale: group.locale,
             store_number: group.store_number,
             ok: false,
@@ -335,8 +377,18 @@ async fn query_one_store<F: Fetcher>(client: &F, group: StoreGroup) -> StoreOutc
         .await
     {
         Err(err) => {
-            let trouble = matches!(err, ApiError::Blocked(_) | ApiError::SchemaDrift { .. })
-                .then(|| format!("门店 {} 查询失败：{err}", group.store_number));
+            // 只有这两类值得打断用户：被拦截是他能动手解决的，结构漂移是他
+            // 必须知道「现在看到的一切都不作数」的。网络超时之类的过一会儿
+            // 自己就好了，弹出来只是噪音。
+            let advice = match &err {
+                ApiError::Blocked(_) => Some(TroubleAdvice::TryAnotherNetwork),
+                ApiError::SchemaDrift { .. } => Some(TroubleAdvice::WaitForUpdate),
+                _ => None,
+            };
+            let trouble = advice.map(|advice| TroubleReport {
+                reason: format!("门店 {} 查询失败：{err}", group.store_number),
+                advice: Some(advice),
+            });
 
             let reason = err.into_unknown_reason();
             let n = group.parts.len();
@@ -389,11 +441,12 @@ async fn query_one_store<F: Fetcher>(client: &F, group: StoreGroup) -> StoreOutc
             // 否则不退避、不告警，程序会继续按原频率请求一个已经失效的结构。
             let dead = resolved == 0 && !group.parts.is_empty();
             StoreOutcome {
-                trouble: dead.then(|| {
-                    format!(
+                trouble: dead.then(|| TroubleReport {
+                    reason: format!(
                         "门店 {} 的全部型号都没能拿到明确答复，Apple 可能已调整接口",
                         group.store_number
-                    )
+                    ),
+                    advice: Some(TroubleAdvice::WaitForUpdate),
                 }),
                 locale: group.locale,
                 store_number: group.store_number,
@@ -620,8 +673,11 @@ impl<F: Fetcher> Engine<F> {
             }
             problems += outcome.problems;
 
-            if let Some(reason) = outcome.trouble {
-                self.emit_droppable(Event::Trouble { reason });
+            if let Some(report) = outcome.trouble {
+                self.emit_droppable(Event::Trouble {
+                    reason: report.reason,
+                    advice: report.advice,
+                });
             }
 
             for (part, availability) in outcome.parts {
