@@ -22,6 +22,7 @@ import type {
   Store,
   Target,
   TargetState,
+  Trouble,
   UpdateInfo,
   WatcherEvent,
 } from "./types";
@@ -35,7 +36,7 @@ export interface UiState {
   rows: TargetState[];
   running: boolean;
   /** 非 null 表示「当前的状态不可信」，界面要挂一条持续可见的告警。 */
-  trouble: string | null;
+  trouble: Trouble | null;
   logs: string[];
   regions: Region[];
   categories: CategoryOption[];
@@ -149,7 +150,7 @@ function applyEvent(event: WatcherEvent): void {
     }
 
     case "trouble":
-      update({ trouble: event.reason });
+      update({ trouble: { reason: event.reason, advice: event.advice } });
       pushLog(`告警：${event.reason}`);
       break;
 

@@ -165,6 +165,30 @@ impl AppleClient {
         parse_pickup_message(&body, store_number)
     }
 
+    /// 探测与 `region` 之间实际协商出来的 HTTP 版本。
+    ///
+    /// 这个方法存在的唯一理由是给契约测试当护栏，功能上没人需要它。
+    ///
+    /// `reqwest` 的 HTTP/2 支持挂在 `http2` feature 上，而这个 crate 用的是
+    /// `default-features = false`。那个 feature 曾经漏了整整一个版本：客户端
+    /// 静默退回 HTTP/1.1，所有查询照常成功、所有测试照常通过，**功能上完全
+    /// 看不出来**。但对 Apple 的边缘节点来说，一个自称 Chrome 130 的客户端
+    /// 用 HTTP/1.1 跟它说话，是最一眼可辨的机器人特征 —— 真实的 Chrome 已经
+    /// 多年不这么干了。受风控审查的网络上，用户因此收到一屏 HTTP 541。
+    ///
+    /// 这种「配置写漏了、功能却没坏」的缺陷，只能靠一条真的去连一次的测试兜住。
+    pub async fn negotiated_http_version(&self, region: &Region) -> Result<String, ApiError> {
+        self.throttle().await;
+        let resp = self
+            .http
+            .get(region.bag_url())
+            .header(reqwest::header::USER_AGENT, &self.config.user_agent)
+            .send()
+            .await
+            .map_err(|e| ApiError::Transport(e.to_string()))?;
+        Ok(format!("{:?}", resp.version()))
+    }
+
     /// 执行一次带限速与退避重试的 GET，返回响应体。
     async fn get(
         &self,
