@@ -3,6 +3,7 @@
 //! 这里只做「发请求 + 解析响应 + 分类错误」三件事，不含调度或界面逻辑，
 //! 因此可以脱离应用单独测试。
 
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -114,15 +115,26 @@ pub struct AppleClient {
     config: ClientConfig,
     /// 上一次出站请求的时刻，用于全局限速。
     last_sent: Arc<Mutex<Option<Instant>>>,
+    /// Cookie 罐。
+    ///
+    /// 自己持有一份而不是用 `cookie_store(true)` 那个隐藏的内部罐，是为了能
+    /// 查得到里面到底有没有东西 —— 契约测试要断言「暖场之后真的攒到了 cookie」。
+    /// 一个「以为自己在带 cookie、其实罐是空的」的客户端，功能上和现在一模一样，
+    /// 没有任何迹象。
+    jar: Arc<reqwest::cookie::Jar>,
+    /// 已经暖过场的地区 locale。
+    warmed: Arc<Mutex<HashSet<String>>>,
 }
 
 impl AppleClient {
     pub fn new(config: ClientConfig) -> Result<Self, ApiError> {
+        let jar = Arc::new(reqwest::cookie::Jar::default());
         let http = reqwest::Client::builder()
             .timeout(config.timeout)
             .connect_timeout(Duration::from_secs(5))
             .pool_idle_timeout(Duration::from_secs(90))
             .pool_max_idle_per_host(8)
+            .cookie_provider(jar.clone())
             .build()
             .map_err(|e| ApiError::Transport(format!("构造 HTTP 客户端失败：{e}")))?;
 
@@ -130,7 +142,72 @@ impl AppleClient {
             http,
             config,
             last_sent: Arc::new(Mutex::new(None)),
+            jar,
+            warmed: Arc::new(Mutex::new(HashSet::new())),
         })
+    }
+
+    /// 确保这个地区的 cookie 已经攒上了。
+    ///
+    /// # 为什么非做不可
+    ///
+    /// Apple 的边缘节点会对**没带 cookie** 的取货查询下手。issue #3 的报告者在
+    /// 同一个浏览器里做了十轮成对对照，只差带不带 cookie：
+    ///
+    /// ```text
+    /// 带 cookie  10/10 全部 200
+    /// 不带 cookie 8/10  返回 541
+    /// ```
+    ///
+    /// 而这件事**只在受审查的网络上才看得出来**：在没被盯上的网络里，带不带
+    /// cookie 都是 200，怎么对照都测不出差别。所以别拿「我这里两种都正常」
+    /// 当反证 —— 这个假设正是这么被误杀过一次的。
+    ///
+    /// 一次成功的查询本身也会带回 cookie（那个端点自己就发 8 个 Set-Cookie），
+    /// 所以在正常网络上这次暖场之后就再也不会发生。但受审查的网络上第一次查询
+    /// 就会被拦，攒不到 cookie，只能先主动取一次页面。
+    ///
+    /// **失败不影响查询**：暖场取不到页面时什么都不做，让真正的查询照常发出去。
+    /// 让一次辅助请求的失败去决定库存判定，正是这个项目最不该有的东西。
+    async fn ensure_warm(&self, region: &Region) {
+        if self.warmed.lock().await.contains(region.locale) {
+            return;
+        }
+
+        self.throttle().await;
+        let ok = self
+            .http
+            .get(region.bag_url())
+            .header(reqwest::header::USER_AGENT, &self.config.user_agent)
+            .header(
+                reqwest::header::ACCEPT,
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            )
+            .header(reqwest::header::ACCEPT_LANGUAGE, region.accept_language())
+            .send()
+            .await
+            .is_ok_and(|r| r.status().is_success());
+
+        if ok {
+            self.warmed.lock().await.insert(region.locale.to_string());
+        }
+    }
+
+    /// 忘掉某地区的暖场标记，下一轮会重新攒 cookie。
+    ///
+    /// 被拦截时调用。cookie 会过期，也会被边缘节点作废；一直拿着一份不再被认可
+    /// 的 cookie 反复重试，只会一直被拦。
+    async fn forget_warm(&self, region: &Region) {
+        self.warmed.lock().await.remove(region.locale);
+    }
+
+    /// 这个地区当前攒到的 cookie，没有则返回 `None`。契约测试用。
+    pub fn cookies_for(&self, region: &Region) -> Option<String> {
+        use reqwest::cookie::CookieStore;
+        let url = region.bag_url().parse().ok()?;
+        self.jar
+            .cookies(&url)
+            .and_then(|v| v.to_str().ok().map(str::to_owned))
     }
 
     /// 查询 `store_number` 门店中 `parts` 各型号的可取货状态。
@@ -159,9 +236,21 @@ impl AppleClient {
             query.push((format!("parts.{i}"), part.clone()));
         }
 
-        let body = self
-            .get(&region.pickup_message_url(), &query, region)
-            .await?;
+        // 先把 cookie 攒上再查。见 ensure_warm 的文档：没带 cookie 的查询会被
+        // Apple 的边缘节点拦下，而且只在受审查的网络上才拦。
+        self.ensure_warm(region).await;
+
+        let body = match self.get(&region.pickup_message_url(), &query, region).await {
+            Ok(body) => body,
+            Err(err) => {
+                if matches!(err, ApiError::Blocked(_)) {
+                    // 带着 cookie 还被拦，多半是它已经过期或被作废了。丢掉标记，
+                    // 下一轮重新攒一份，而不是抱着一份不再被认可的 cookie 死磕。
+                    self.forget_warm(region).await;
+                }
+                return Err(err);
+            }
+        };
         parse_pickup_message(&body, store_number)
     }
 

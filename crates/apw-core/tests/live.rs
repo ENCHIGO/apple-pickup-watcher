@@ -118,6 +118,46 @@ async fn 必须以http2跟apple说话() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn 查询时必须带上cookie() {
+    // Apple 的边缘节点会对没带 cookie 的取货查询下手。issue #3 的报告者在同一个
+    // 浏览器里做了十轮成对对照，唯一的变量就是带不带 cookie：
+    //
+    //     带 cookie   10/10 全部 200
+    //     不带 cookie  8/10  返回 541
+    //
+    // 要命的是这件事**只在受审查的网络上才看得出来**：在没被盯上的网络里两种
+    // 都是 200，怎么对照都测不出差别 —— 这个假设正是这么被误杀过一次的。
+    //
+    // 所以这条测试不去验「带了 cookie 就不会被拦」（在这里验不出来），只钉住
+    // 一件能验的事：**罐子里真的有东西**。一个「以为自己在带 cookie、其实罐是
+    // 空的」的客户端，功能上和现在一模一样，不会有任何迹象。
+    let client = client();
+    let region = region_by_locale("zh_TW").expect("地区表里应当有中国台湾");
+
+    assert!(
+        client.cookies_for(region).is_none(),
+        "还没发过任何请求，cookie 罐就该是空的"
+    );
+
+    let parts = vec!["MDV94TA/A".to_string()];
+    client
+        .pickup_message(region, "R713", &parts)
+        .await
+        .unwrap_or_else(|e| panic!("查询失败：{e}"));
+
+    let cookies = client
+        .cookies_for(region)
+        .expect("查过一次之后，cookie 罐不该还是空的 —— 暖场或响应里的 Set-Cookie 没生效");
+
+    println!("攒到的 cookie：{cookies}");
+    // Apple 的 shop 会话 cookie。名字变了要来更新这里，而不是删掉断言。
+    assert!(
+        cookies.contains("dssid2") || cookies.contains("as_dc"),
+        "攒到的 cookie 里没有 shop 的会话项：{cookies}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn 无效零件号不会被判成无货() {
     // 本项目最关键的不变量在真实接口上也必须成立。
     let client = client();
