@@ -4,7 +4,7 @@
 支持 **iPhone、iPad、Mac、Apple Watch** 四个品类，七个地区：中国大陆、中国香港、
 中国台湾、日本、Singapore、Australia、Malaysia。
 
-跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.3.1。
+跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.3.2。
 
 **English** — Apple Pickup Watcher monitors in-store pickup availability at Apple Retail
 Stores and alerts you the moment a specific model becomes available at the store you
@@ -397,6 +397,27 @@ curl -sS -o /dev/null -w 'HTTP %{http_code}  size=%{size_download}\n' \
 541 不是标准 HTTP 状态码，是 Apple 边缘节点自定义的拦截响应。看到它基本可以确定请求被
 挡下了，而不是「没有库存」。降低查询频率、更换 User-Agent、加重试都无法绕过 —— 问题不在
 频率或伪装，在于那个接口本身已经不在了。
+
+### 程序报「请求被 Apple 拦截：HTTP 541」，可浏览器打开官网一切正常？
+
+**先别去调查询间隔，那多半没用。** 这个问题（[issue #3](https://github.com/ENCHIGO/apple-pickup-watcher/issues/3)）
+的报告者把间隔从 5 秒改到 120 秒，照样被拦 —— 一个门店两分钟一次请求，换算下来每秒 0.025 次，
+没有任何以流量为判准的风控会对这个数字有反应。
+
+真正的原因是**没带 cookie**。报告者在同一个浏览器里做了十轮成对对照，唯一的变量就是带不带 cookie：
+
+```
+带 cookie   10/10 全部 200
+不带 cookie  8/10  返回 541
+```
+
+而这件事**只在被风控盯上的网络上才看得出来**：在没被盯上的网络里，带不带 cookie 都是 200，
+怎么对照都测不出差别。我们自己就因此误判过一次 —— 拿「本机两种都正常」当反证，把正确的
+假设枪毙了，转头去追 TLS 指纹，绕了一大圈。**在复现不了问题的环境里得到的阴性结果，
+什么都不能证明。**
+
+v0.3.2 起客户端会先取一次购买页把 cookie 攒上再查询，被拦时丢掉重攒。如果你装的是更早的
+版本，升级即可；升级后仍被拦的话，请开一个 issue 并附上日志。
 
 ### 现在还能用的接口是哪个？
 
