@@ -43,7 +43,7 @@ Code review 和 Automatic reviews。`AGENTS.md` 的 `Code Review Rules` 定义�
 
 ## 验证
 
-- 环境初始化成功，`pnpm exec tsc --noEmit`、`pnpm exec vite build` 和 `cargo test` 可以执行；不添加 `--features live`。
+- 环境初始化成功，`pnpm exec tsc --noEmit`、`pnpm test`、`pnpm exec vite build` 和 `cargo test` 可以执行；不添加 `--features live`。
 - 新建非草稿 PR 后收到 Codex 审查，或手动触发后收到机器人响应和审查结果。
 - 检查机器人审查对应当前 PR 的提交；GitHub 分支保护和现有 CI 继续生效。
 

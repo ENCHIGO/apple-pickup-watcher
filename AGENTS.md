@@ -7,7 +7,7 @@ Apple Pickup Watcher 是 Rust + Tauri v2 + React/TypeScript 桌面应用。
 
 - `crates/apw-core/`：库存类型、Apple 客户端、商品目录、监控调度、通知与配置持久化。
 - `src-tauri/`：桌面装配、IPC、托盘、系统通知和购物袋打开。
-- `src/`：React 界面与前端状态。
+- `src/`：React 界面与前端状态；`tests/`：前端交互及异步状态回归。
 - `crates/apw-core/data/`：离线快照及其生成脚本。
 
 ## Development and validation
@@ -23,6 +23,7 @@ Codex 云端 Ubuntu 环境可用 `bash scripts/codex-setup.sh` 安装开发依�
 cargo fmt --all --check
 python3 crates/apw-core/data/generate.py --self-test
 pnpm exec tsc --noEmit
+pnpm test
 pnpm exec vite build
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
