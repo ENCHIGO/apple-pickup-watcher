@@ -130,6 +130,9 @@ jobs:
       - name: TypeScript 类型检查
         run: pnpm exec tsc --noEmit
 
+      - name: 前端状态与交互回归测试
+        run: pnpm test
+
       # 放在 cargo 命令之前是有意的，但理由不是「不这样就编不过」。
       #
       # generate_context! 宏确实会在编译期检查 frontendDist 指向的 dist/ 目录，

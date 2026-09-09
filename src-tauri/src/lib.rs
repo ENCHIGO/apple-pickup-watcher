@@ -23,6 +23,11 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use tauri_plugin_updater::UpdaterExt;
 
+mod auto_open;
+mod notification_queue;
+
+use auto_open::AutoOpenBag;
+
 /// 前端事件通道名。前端用 `listen("watcher://event", ...)` 订阅。
 const EVENT_CHANNEL: &str = "watcher://event";
 /// 启动过程中的降级说明通道：配置读不出来之类的事必须让用户看见。
@@ -318,10 +323,26 @@ fn emit_system_notification(app: &AppHandle, n: &Notification) {
 
 /// 消费引擎事件：转发给前端，并在有货时发提醒。
 async fn pump_events(app: AppHandle, mut events: tokio::sync::mpsc::Receiver<Event>) {
+    let mut auto_open_bag = AutoOpenBag::default();
+    let (notifications, pending) = notification_queue::channel();
+    let notification_app = app.clone();
+    tauri::async_runtime::spawn(notification_queue::run(pending, move |notification| {
+        let app = notification_app.clone();
+        async move {
+            if let Err(err) = dispatch_notification(&app, notification).await {
+                let _ = app.emit(NOTICE_CHANNEL, format!("发送提醒时出错：{err}"));
+            }
+        }
+    }));
+
     while let Some(event) = events.recv().await {
         // 先原样转发。前端拿到的事件流应当与引擎发出的完全一致，
         // 中间少一层可能出错的翻译。
         let _ = app.emit(EVENT_CHANNEL, &event);
+
+        if let Event::RunStateChanged { running } = &event {
+            auto_open_bag.on_run_state_changed(*running);
+        }
 
         if let Event::InStock { state } = &event {
             let target = &state.target;
@@ -339,16 +360,19 @@ async fn pump_events(app: AppHandle, mut events: tokio::sync::mpsc::Receiver<Eve
                 .map(|s| s.settings_snapshot())
                 .unwrap_or_default();
 
-            if settings.open_bag_on_hit
-                && let Some(region) = region_by_locale(&target.locale)
+            use tauri_plugin_opener::OpenerExt;
+            if let Err(err) =
+                auto_open_bag.open_if_needed(settings.open_bag_on_hit, &target.locale, |url| {
+                    app.opener().open_url(url, None::<&str>)
+                })
             {
-                use tauri_plugin_opener::OpenerExt;
-                let _ = app.opener().open_url(region.bag_url(), None::<&str>);
+                let _ = app.emit(NOTICE_CHANNEL, format!("打开购物袋失败：{err}"));
             }
 
-            if let Err(err) = dispatch_notification(&app, notification).await {
-                // 提醒没发出去是遗憾，但绝不能让监控本身停下来。
-                let _ = app.emit(NOTICE_CHANNEL, format!("发送提醒时出错：{err}"));
+            // 不逐项等待网络推送，否则15个Bark超时会让快照和暂停状态迟到150秒。
+            // 队列满时保留背压，不丢提醒，也不无限创建后台任务。
+            if notifications.send(notification).await.is_err() {
+                let _ = app.emit(NOTICE_CHANNEL, "提醒发送任务已停止，无法发送到货提醒");
             }
         }
     }
