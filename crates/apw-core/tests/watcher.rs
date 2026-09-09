@@ -230,6 +230,174 @@ async fn 有货提醒是边沿触发的() {
 }
 
 #[tokio::test]
+async fn 命中后仍继续查询所有目标但持续有货只提醒一次() {
+    let fake =
+        FakeFetcher::new(|_, store, parts| Ok(ok_response(store, parts, Availability::InStock)));
+    let (w, mut rx) = Watcher::spawn(fake.clone(), fast_config());
+    w.set_targets(vec![target("R683", "MG724CH/A")]).await;
+    w.start().await;
+
+    let mut alerts = 0;
+    for _ in 0..3 {
+        alerts += count_in_stock(&wait_cycle(&mut rx).await);
+    }
+    w.stop().await;
+
+    assert_eq!(alerts, 1);
+    assert!(fake.call_count() >= 3, "命中项仍须每轮查询");
+    assert!(
+        fake.seen_parts
+            .lock()
+            .await
+            .iter()
+            .all(|parts| parts == &["MG724CH/A"])
+    );
+}
+
+#[tokio::test]
+async fn 暂停后重新开始会重新布防并等待新查询确认有货() {
+    let fake =
+        FakeFetcher::new(|_, store, parts| Ok(ok_response(store, parts, Availability::InStock)));
+    let (w, mut rx) = Watcher::spawn(fake.clone(), fast_config());
+    w.set_targets(vec![target("R683", "MG724CH/A")]).await;
+    w.start().await;
+    assert_eq!(count_in_stock(&wait_cycle(&mut rx).await), 1);
+    w.stop().await;
+    let previous = w.snapshot().await;
+    let calls = fake.call_count();
+
+    w.start().await;
+    assert_eq!(w.snapshot().await, previous, "重新布防应保留上次结果供展示");
+    let resumed = wait_cycle(&mut rx).await;
+    assert!(fake.call_count() > calls, "必须重新查到有货才能再次提醒");
+    assert_eq!(count_in_stock(&resumed), 1, "用户重新开始后应再次提醒");
+    assert_eq!(count_in_stock(&wait_cycle(&mut rx).await), 0);
+    w.stop().await;
+}
+
+#[tokio::test]
+async fn 运行中重复开始不会重新布防() {
+    let fake =
+        FakeFetcher::new(|_, store, parts| Ok(ok_response(store, parts, Availability::InStock)));
+    let (w, mut rx) = Watcher::spawn(fake, fast_config());
+    w.set_targets(vec![target("R683", "MG724CH/A")]).await;
+    w.start().await;
+    assert_eq!(count_in_stock(&wait_cycle(&mut rx).await), 1);
+
+    w.start().await;
+    assert_eq!(count_in_stock(&wait_cycle(&mut rx).await), 0);
+    w.stop().await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn 查询快照和运行状态不会提前下一轮() {
+    let fake =
+        FakeFetcher::new(|_, store, parts| Ok(ok_response(store, parts, Availability::OutOfStock)));
+    let config = WatcherConfig {
+        interval: Duration::from_secs(60),
+        ..fast_config()
+    };
+    let (w, mut rx) = Watcher::spawn(fake.clone(), config);
+    w.set_targets(vec![target("R683", "MG724CH/A")]).await;
+    w.start().await;
+    wait_cycle(&mut rx).await;
+
+    assert_eq!(w.snapshot().await.len(), 1);
+    assert!(w.is_running().await);
+    w.start().await;
+    assert!(
+        tokio::time::timeout(Duration::from_secs(1), wait_cycle(&mut rx))
+            .await
+            .is_err(),
+        "只读命令和重复开始不能绕过60秒查询间隔"
+    );
+    assert_eq!(fake.call_count(), 1);
+
+    tokio::time::advance(Duration::from_secs(59)).await;
+    wait_cycle(&mut rx).await;
+    assert_eq!(fake.call_count(), 2, "命令处理后应继续原来的等待截止时间");
+    w.stop().await;
+}
+
+#[tokio::test]
+async fn 事件积压时仍能启停且最新运行态可靠投递() {
+    let fake =
+        FakeFetcher::new(|_, store, parts| Ok(ok_response(store, parts, Availability::InStock)));
+    let config = WatcherConfig {
+        event_buffer: 1,
+        ..fast_config()
+    };
+    let (w, mut rx) = Watcher::spawn(fake, config);
+    w.set_targets(vec![target("R683", "MG724CH/A")]).await;
+    w.start().await;
+    // 容量为1的通道留着首个开始事件，查询完成后的到货事件会受到背压。
+    tokio::time::sleep(Duration::from_millis(30)).await;
+    tokio::time::timeout(Duration::from_millis(200), w.stop())
+        .await
+        .expect("事件积压不能卡住暂停");
+    tokio::time::timeout(Duration::from_millis(200), w.start())
+        .await
+        .expect("事件积压不能卡住重新开始");
+    tokio::time::timeout(Duration::from_millis(200), w.stop())
+        .await
+        .expect("第二次暂停也须返回");
+    assert!(
+        !tokio::time::timeout(Duration::from_millis(200), w.is_running())
+            .await
+            .unwrap()
+    );
+
+    let mut running_states = Vec::new();
+    while running_states.len() < 2 {
+        let event = tokio::time::timeout(Duration::from_secs(1), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        if let Event::RunStateChanged { running } = event {
+            running_states.push(running);
+        }
+    }
+    assert_eq!(
+        running_states,
+        [true, false],
+        "积压的启停事件合并为最新状态"
+    );
+}
+
+#[tokio::test]
+async fn 事件积压时删除目标不会再提醒或由旧快照恢复() {
+    let fake =
+        FakeFetcher::new(|_, store, parts| Ok(ok_response(store, parts, Availability::InStock)));
+    let config = WatcherConfig {
+        event_buffer: 1,
+        ..fast_config()
+    };
+    let (w, mut rx) = Watcher::spawn(fake, config);
+    w.set_targets(vec![target("R683", "REMOVE/A"), target("R683", "KEEP/A")])
+        .await;
+    w.start().await;
+    tokio::time::sleep(Duration::from_millis(30)).await;
+    let mut kept = target("R683", "KEEP/A");
+    kept.product_name = "更新后的商品名".into();
+    w.set_targets(vec![kept.clone()]).await;
+    assert_eq!(w.snapshot().await.len(), 1);
+
+    let events = wait_cycle(&mut rx).await;
+    assert_eq!(count_in_stock(&events), 1);
+    for event in events {
+        match event {
+            Event::InStock { state } => assert_eq!(state.target, kept),
+            Event::CycleComplete { snapshot, .. } => {
+                assert_eq!(snapshot.len(), 1);
+                assert_eq!(snapshot[0].target, kept);
+            }
+            _ => {}
+        }
+    }
+    w.stop().await;
+}
+
+#[tokio::test]
 async fn 同一门店的多个型号合并成一次请求() {
     // 既是效率问题也是风控问题：每个型号单独发一次，出站请求量会翻好几倍。
     let fake =

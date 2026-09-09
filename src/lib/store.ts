@@ -208,15 +208,22 @@ export const watcherStore = { subscribe, getSnapshot };
 
 // ---- 命令。全部只是转发，不含任何业务判断。
 
+let catalogRequest = 0;
+
 /** 载入某地区的门店与型号目录。 */
 export async function loadCatalog(locale: string): Promise<void> {
+  // 官网刷新可能在用户切换地区后才完成，不再为旧地区发起目录请求。
+  if (locale !== state.settings.locale) return;
+  const request = ++catalogRequest;
+  const isCurrent = () => request === catalogRequest && locale === state.settings.locale;
   try {
     const [stores, products] = await Promise.all([
       invoke<Store[]>("list_stores", { locale }),
       invoke<Product[]>("list_products", { locale }),
     ]);
-    update({ stores, products });
+    if (isCurrent()) update({ stores, products });
   } catch (err) {
+    if (!isCurrent()) return;
     // 目录读不出来不该让整个界面挂掉，但必须让用户知道下拉为什么是空的。
     update({ stores: [], products: [] });
     pushLog(`载入 ${locale} 的门店与型号失败：${String(err)}`);
@@ -226,7 +233,14 @@ export async function loadCatalog(locale: string): Promise<void> {
 export async function saveSettings(next: Settings): Promise<void> {
   try {
     const saved = await invoke<Settings>("save_settings", { settings: next });
-    update({ settings: saved });
+    if (saved.locale !== state.settings.locale) {
+      // 新地区目录返回之前不能沿用旧门店/型号，否则会添加跨区监控目标。
+      catalogRequest += 1;
+      update({ settings: saved, stores: [], products: [] });
+      await loadCatalog(saved.locale);
+    } else {
+      update({ settings: saved });
+    }
   } catch (err) {
     pushLog(`保存设置失败：${String(err)}`);
   }
@@ -238,7 +252,6 @@ export function setCategory(category: Category): void {
 
 export async function changeLocale(locale: string): Promise<void> {
   await saveSettings({ ...state.settings, locale });
-  await loadCatalog(locale);
 }
 
 export async function setTargets(targets: Target[]): Promise<void> {
