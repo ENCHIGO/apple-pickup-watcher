@@ -4,7 +4,7 @@
 支持 **iPhone、iPad、Mac、Apple Watch** 四个品类，七个地区：中国大陆、中国香港、
 中国台湾、日本、Singapore、Australia、Malaysia。
 
-跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.3.2。
+跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.3.3。
 
 **English** — Apple Pickup Watcher monitors in-store pickup availability at Apple Retail
 Stores and alerts you the moment a specific model becomes available at the store you
@@ -85,7 +85,8 @@ v0.1.x 是 Go + Fyne 实现。v0.2.0 换成了 Rust + Tauri，界面重写为 Re
   隐藏的，WebView 可能被系统节流甚至挂起 —— 把「及时提醒」挂在一个会被挂起的执行环境上
   是不能接受的。
 - **型号列表可在线更新。** 界面上有「从 Apple 官网更新型号列表」的按钮，新机发售当天就能
-  盯，不必等这个程序发新版。按钮只抓**当前品类**的那几页 —— 四个品类加起来二十页购买页，
+  获取已支持购买页上的最新型号。新增购买页 slug 的机型仍需先更新程序中的购买页清单；
+  这个按钮不会自动发现尚未配置的新购买页。按钮只抓**当前品类**的那几页 —— 四个品类加起来二十页购买页，
   想看新出的 Mac 没有理由等 iPhone、iPad、Watch 一起抓完。抓不到时自动退回随程序内嵌的
   离线快照，不会因此变得不可用。
 - **应用内更新检查只提示，不静默安装。** 发现新版本会在界面上显示一条提示，装不装由你点。
@@ -138,7 +139,13 @@ xattr -cr "/Applications/Apple Pickup Watcher.app"
 3. 选**门店**和**型号**，点「添加」。可以加多条，不同品类、不同门店混着加都行。
 4. 点「开始」。表格里每一行会显示状态：有货 / 无货 / 未知 / 待查询，以及最后检查时间。
 5. 某一行从非有货变成有货时，会同时：弹系统通知、播提示音、发 Bark 推送（如已配置），
-   并按设置打开该地区的购物袋页面。
+   并按设置打开该地区的购物袋页面。每次「开始」到「暂停」期间最多自动打开一次购物袋，
+   多个目标或多个地区同时命中时，以第一个成功打开的地区为准，其余目标仍会提醒。
+
+命中后会**继续查询全部监控目标**，可通过每行的「最后检查」时间确认轮询是否在继续。
+同一次监控期间，持续有货不会每轮重复提醒；变为无货或未知后再次有货时才重新提醒。
+点击「暂停」再「开始」会重新启用所有目标的到货提醒：下一次查询确认仍有货，也会再次
+提醒并允许打开一次购物袋，无需删除重加。
 
 看到「监控当前不可信」的告警，说明有目标处于未知状态 —— 展开能看到具体原因（被拦截、
 被限流、接口结构变了……）。**这时候表格里的「无货」不代表真的没货**，告警消失前不要拿它
@@ -237,6 +244,7 @@ cargo test                                                    # 全部离线测�
 cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --all --check
 python3 crates/apw-core/data/generate.py --self-test           # 快照生成脚本自检，不联网
+pnpm test                                                     # 前端交互与异步状态回归，不联网
 pnpm exec tsc --noEmit
 pnpm exec vite build
 ```

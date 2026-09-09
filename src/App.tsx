@@ -101,11 +101,11 @@ export default function App() {
 
   const [storeNumber, setStoreNumber] = useState("");
   const [partNumber, setPartNumber] = useState("");
-  const [barkDraft, setBarkDraft] = useState("");
+  const [barkDraft, setBarkDraft] = useState<string | null>(null);
   const [intervalDraft, setIntervalDraft] = useState<number | null>(null);
 
-  // 设置从后端载入之前，输入框用后端的值做初值；之后由用户的草稿接管。
-  const barkValue = barkDraft || ui.settings.barkUrl;
+  // null 表示尚未编辑；空字符串是用户明确清空，不能退回已保存的地址。
+  const barkValue = barkDraft ?? ui.settings.barkUrl;
   const intervalValue = intervalDraft ?? ui.settings.intervalSeconds;
 
   const storeOptions = useMemo(
@@ -345,7 +345,7 @@ export default function App() {
               value={barkValue}
               onChange={(e) => setBarkDraft(e.target.value)}
               onBlur={() => {
-                setBarkDraft("");
+                setBarkDraft(null);
                 void saveSettings({ ...ui.settings, barkUrl: barkValue.trim() });
               }}
             />

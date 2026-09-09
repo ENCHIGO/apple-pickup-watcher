@@ -20,7 +20,7 @@
 //! 把那个 future 丢掉就行，在飞的 HTTP 请求会一并取消，不需要像 Go 那样把 context
 //! 一层层往下传，也就不会漏传。
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::future::Future;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -66,11 +66,11 @@ impl TargetState {
 pub enum Event {
     /// 某个目标的状态发生了变化。可丢弃：真实状态随时能从快照重新取。
     StateChanged { state: TargetState },
-    /// 某个目标从非有货变成了有货 —— 需要提醒用户的时刻。
+    /// 某个目标变为有货，或重新开始监控后首次确认有货。
     ///
-    /// **这条事件不允许丢**：它是整个程序存在的理由。投递用的是会产生背压的
-    /// `send().await`，而不是丢弃式的 `try_send`。Go 版对所有事件一视同仁地
-    /// 满即丢，于是界面一卡顿，用户就会看到「有货」却收不到任何提醒。
+    /// 正常监控时可靠投递并产生背压；用户暂停会取消本轮尚未投递的提醒。
+    /// Go 版对所有事件一视同仁地满即丢，于是界面一卡顿，用户就会看到
+    /// 「有货」却收不到任何提醒。
     InStock { state: TargetState },
     /// 一轮查询结束，带上完整快照。
     ///
@@ -91,7 +91,7 @@ pub enum Event {
         /// 用户自己能做什么；没有可做的就是 `None`。
         advice: Option<TroubleAdvice>,
     },
-    /// 监控的启停状态发生了变化。
+    /// 监控的启停状态发生了变化。可靠投递；积压时合并为最新运行态。
     RunStateChanged { running: bool },
 }
 
@@ -181,6 +181,7 @@ impl Watcher {
     }
 
     /// 启动监控。返回时引擎已经进入运行态。
+    /// 从暂停恢复会重新布防，首轮确认有货时再次提醒；运行中重复调用不重新布防。
     pub async fn start(&self) {
         let (tx, rx) = oneshot::channel();
         if self.cmd.send(Command::Start(tx)).await.is_ok() {
@@ -470,6 +471,10 @@ struct Engine<F: Fetcher> {
     client: F,
     config: WatcherConfig,
     events: mpsc::Sender<Event>,
+    /// 最多缓存一轮的关键事件，投递完才查下一轮；启停事件合并为最新状态。
+    pending_events: VecDeque<Event>,
+    /// 重新开始时已显示有货的目标，等新的查询确认后再提醒一次。
+    rearmed: BTreeSet<TargetKey>,
 
     targets: Vec<Target>,
     states: BTreeMap<TargetKey, TargetState>,
@@ -487,6 +492,8 @@ impl<F: Fetcher> Engine<F> {
             client,
             config,
             events,
+            pending_events: VecDeque::new(),
+            rearmed: BTreeSet::new(),
             targets: Vec::new(),
             states: BTreeMap::new(),
             running: false,
@@ -496,6 +503,9 @@ impl<F: Fetcher> Engine<F> {
 
     async fn run(mut self, mut cmd_rx: mpsc::Receiver<Command>) {
         loop {
+            if self.flush_events(&mut cmd_rx).await.is_none() {
+                return;
+            }
             if !self.running {
                 // 没在跑就安静地等命令，不浪费任何一次唤醒。
                 match cmd_rx.recv().await {
@@ -554,19 +564,34 @@ impl<F: Fetcher> Engine<F> {
                 continue;
             }
 
-            self.apply(expected, outcomes).await;
+            self.apply(expected, outcomes);
 
-            if !self.running {
+            let Some(restarted) = self.flush_events(&mut cmd_rx).await else {
+                return;
+            };
+            if !self.running || restarted {
                 continue;
             }
 
             let delay = self.next_delay();
-            tokio::select! {
-                () = tokio::time::sleep(delay) => {}
-                maybe = cmd_rx.recv() => match maybe {
-                    Some(cmd) => self.handle_command(cmd).await,
-                    None => return,
-                },
+            let sleep = tokio::time::sleep(delay);
+            tokio::pin!(sleep);
+            loop {
+                tokio::select! {
+                    () = &mut sleep => break,
+                    maybe = cmd_rx.recv() => match maybe {
+                        Some(cmd) => {
+                            // 新目标应立即查询；只读命令、重复开始和设置间隔都
+                            // 不能绕过当前等待。新间隔从下一次等待开始生效。
+                            let targets_changed = matches!(cmd, Command::SetTargets(_));
+                            self.handle_command(cmd).await;
+                            if !self.running || targets_changed {
+                                break;
+                            }
+                        }
+                        None => return,
+                    },
+                }
             }
         }
     }
@@ -601,11 +626,22 @@ impl<F: Fetcher> Engine<F> {
             return;
         }
         self.running = running;
-        if !running {
+        if running {
+            self.rearmed = self
+                .states
+                .iter()
+                .filter(|(_, state)| state.availability.is_in_stock())
+                .map(|(key, _)| key.clone())
+                .collect();
+        } else {
+            // 暂停取消尚未送出的本轮结果，已经交给消费方的事件无法撤回。
+            self.pending_events.clear();
             // 重新启动时应当从干净的节奏开始，不背着上一轮的退避。
             self.cycle_failures = 0;
         }
-        self.emit_droppable(Event::RunStateChanged { running });
+        self.pending_events
+            .retain(|event| !matches!(event, Event::RunStateChanged { .. }));
+        self.emit_critical(Event::RunStateChanged { running });
     }
 
     fn set_targets(&mut self, targets: Vec<Target>) {
@@ -624,7 +660,32 @@ impl<F: Fetcher> Engine<F> {
             next.insert(key, state);
         }
         self.states = next;
+        self.rearmed.retain(|key| self.states.contains_key(key));
         self.targets = targets;
+        // 事件积压期间也能改目标：已删除项不能随后再提醒，旧快照不能把新列表覆盖回去。
+        let snapshot = self.snapshot();
+        self.pending_events.retain_mut(|event| match event {
+            Event::InStock { state } => {
+                if let Some(current) = self.states.get(&state.target.key()) {
+                    *state = current.clone();
+                    true
+                } else {
+                    false
+                }
+            }
+            Event::CycleComplete {
+                snapshot: pending,
+                healthy,
+            } => {
+                pending.clone_from(&snapshot);
+                *healthy &= !snapshot.is_empty()
+                    && snapshot
+                        .iter()
+                        .all(|state| !state.availability.is_unknown());
+                true
+            }
+            _ => true,
+        });
     }
 
     fn snapshot(&self) -> Vec<TargetState> {
@@ -659,7 +720,7 @@ impl<F: Fetcher> Engine<F> {
     }
 
     /// 把一轮的结果写进状态，并发出相应事件。
-    async fn apply(&mut self, mut missing: BTreeSet<TargetKey>, outcomes: Vec<StoreOutcome>) {
+    fn apply(&mut self, mut missing: BTreeSet<TargetKey>, outcomes: Vec<StoreOutcome>) {
         let mut ok = 0usize;
         let mut failed = 0usize;
         let mut problems = 0usize;
@@ -699,19 +760,23 @@ impl<F: Fetcher> Engine<F> {
                     state.consecutive_failures = 0;
                 }
 
-                if previous == state.availability {
+                let rearmed = self.rearmed.remove(&key);
+                let changed = previous != state.availability;
+                if !changed && !rearmed {
                     continue;
                 }
 
                 let snapshot = state.clone();
                 let became_in_stock = snapshot.availability.is_in_stock();
-                self.emit_droppable(Event::StateChanged {
-                    state: snapshot.clone(),
-                });
+                if changed {
+                    self.emit_droppable(Event::StateChanged {
+                        state: snapshot.clone(),
+                    });
+                }
                 if became_in_stock {
                     // 只在「变为有货」的瞬间提醒一次，持续有货不会重复响；
                     // 补货（离开有货再回来）时会再次触发。
-                    self.emit_critical(Event::InStock { state: snapshot }).await;
+                    self.emit_critical(Event::InStock { state: snapshot });
                 }
             }
         }
@@ -756,8 +821,7 @@ impl<F: Fetcher> Engine<F> {
         self.emit_critical(Event::CycleComplete {
             healthy: problems == 0 && ok > 0,
             snapshot: self.snapshot(),
-        })
-        .await;
+        });
     }
 
     /// 下一轮的等待时长，含抖动与全局退避。
@@ -792,7 +856,31 @@ impl<F: Fetcher> Engine<F> {
     /// 到货提醒是这个程序存在的全部理由，宁可让引擎在这里等一会儿产生背压，
     /// 也不能像 Go 版那样满了就丢 —— 那会让用户在列表里看到「有货」，却
     /// 完全收不到任何提醒。
-    async fn emit_critical(&self, event: Event) {
-        let _ = self.events.send(event).await;
+    fn emit_critical(&mut self, event: Event) {
+        self.pending_events.push_back(event);
+    }
+
+    /// 等消费方腾出空间时继续处理命令，避免暂停和快照卡在事件背压后面。
+    /// 返回是否在等待期间重新开始；通道关闭返回 None。
+    async fn flush_events(&mut self, cmd_rx: &mut mpsc::Receiver<Command>) -> Option<bool> {
+        let events = self.events.clone();
+        let mut restarted = false;
+        while !self.pending_events.is_empty() {
+            tokio::select! {
+                biased;
+                permit = events.reserve() => {
+                    let permit = permit.ok()?;
+                    if let Some(event) = self.pending_events.pop_front() {
+                        permit.send(event);
+                    }
+                }
+                maybe = cmd_rx.recv() => {
+                    let cmd = maybe?;
+                    restarted |= matches!(cmd, Command::Start(_)) && !self.running;
+                    self.handle_command(cmd).await;
+                }
+            }
+        }
+        Some(restarted)
     }
 }

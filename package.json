@@ -1,11 +1,12 @@
 {
   "name": "apple-pickup-watcher",
   "private": true,
-  "version": "0.3.2",
+  "version": "0.3.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test": "node --test tests/*.test.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },
