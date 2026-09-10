@@ -10,6 +10,7 @@
 颜色和自提门店。可选的本地 Chrome 扩展会在库存命中后打开精确 SKU，自动选择不折抵、
 不加 AppleCare+、不加配件，加入 1 台手机并推进到付款前；登录、验证码、支付信息和最终
 下单始终由用户自己完成，扩展不会读取或保存这些敏感信息。
+自动结账当前仅启用中国大陆站；其他地区仍保留提醒和打开购物袋流程。
 
 **English** — Apple Pickup Watcher monitors in-store pickup availability at Apple Retail
 Stores and alerts you the moment a specific model becomes available at the store you

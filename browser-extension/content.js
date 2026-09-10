@@ -4,17 +4,27 @@
   const core = globalThis.APWAutoCheckoutCore;
   if (!core || !core.isSupportedAppleUrl(location.href)) return;
 
-  const SESSION_KEY = "apwAutoCheckoutSessionV1";
   const CHECK_DELAY_MS = 700;
   const MAX_SESSION_MS = 30 * 60 * 1000;
   let running = false;
   let scheduled = 0;
   let lastClick = { signature: "", at: 0 };
 
+  function sessionMessage(action, value) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { namespace: "apw-auto-checkout", action, value },
+        (response) => resolve(chrome.runtime.lastError ? null : response),
+      );
+    });
+  }
+
+  // 后台脚本按 sender.tab.id 分开保存任务。另一个 Apple 商品页即便同时发生 DOM
+  // 变化，也拿不到当前标签页的 SKU 和门店，更不可能误加另一个型号。
   const storage = {
-    get: () => new Promise((resolve) => chrome.storage.local.get(SESSION_KEY, (v) => resolve(v[SESSION_KEY] ?? null))),
-    set: (value) => new Promise((resolve) => chrome.storage.local.set({ [SESSION_KEY]: value }, resolve)),
-    clear: () => new Promise((resolve) => chrome.storage.local.remove(SESSION_KEY, resolve)),
+    get: () => sessionMessage("get"),
+    set: (value) => sessionMessage("set", value),
+    clear: () => sessionMessage("clear"),
   };
 
   function visible(element) {

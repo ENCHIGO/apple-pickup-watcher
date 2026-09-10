@@ -11,11 +11,12 @@
   function isSupportedAppleUrl(value) {
     try {
       const url = new URL(value);
-      const appleStoreHost = url.hostname === "www.apple.com.cn"
-        || url.hostname === "www.apple.com"
-        || url.hostname.endsWith(".store.apple.com")
-        || url.hostname.endsWith(".store.apple.com.cn");
-      return url.protocol === "https:" && appleStoreHost && url.pathname.includes("/shop/");
+      const mainlandPublicStore = url.hostname === "www.apple.com.cn"
+        && url.pathname.startsWith("/shop/");
+      const mainlandSecureStore = (url.hostname.endsWith(".store.apple.com")
+        && url.pathname.startsWith("/cn/shop/"))
+        || (url.hostname.endsWith(".store.apple.com.cn") && url.pathname.startsWith("/shop/"));
+      return url.protocol === "https:" && (mainlandPublicStore || mainlandSecureStore);
     } catch {
       return false;
     }

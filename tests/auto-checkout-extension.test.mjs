@@ -25,6 +25,8 @@ test("only an explicit Apple Store trigger creates an automation session", () =>
   assert.equal(core.sessionFromUrl("https://www.apple.com.cn/shop/bag"), null);
   assert.equal(core.sessionFromUrl("https://www.apple.com.cn/shop/x/a/b?apwAutoCheckout=1&apwStore=R532%26bad"), null);
   assert.equal(core.isSupportedAppleUrl("https://secure4.store.apple.com/cn/shop/checkout/start"), true);
+  assert.equal(core.isSupportedAppleUrl("https://www.apple.com/jp/shop/bag"), false);
+  assert.equal(core.isSupportedAppleUrl("https://secure4.store.apple.com/jp/shop/checkout/start"), false);
 });
 
 test("final order and payment actions are always forbidden", () => {
@@ -56,10 +58,19 @@ test("manifest grants access only to Apple Store pages", () => {
   const manifest = JSON.parse(fs.readFileSync("browser-extension/manifest.json", "utf8"));
   assert.deepEqual(manifest.permissions, ["storage"]);
   assert.ok(manifest.host_permissions.length > 0);
-  assert.ok(manifest.host_permissions.every((pattern) => {
-    const publicStore = /^https:\/\/www\.apple\.com(?:\.cn)?\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?shop\/\*$/.test(pattern);
-    const secureStore = /^https:\/\/\*\.store\.apple\.com(?:\.cn)?\/\*$/.test(pattern);
-    return publicStore || secureStore;
-  }));
+  assert.deepEqual(manifest.host_permissions, [
+    "https://www.apple.com.cn/shop/*",
+    "https://*.store.apple.com/cn/shop/*",
+    "https://*.store.apple.com.cn/shop/*",
+  ]);
+  assert.deepEqual(manifest.content_scripts[0].matches, manifest.host_permissions);
   assert.equal(manifest.content_scripts[0].run_at, "document_idle");
+  assert.equal(manifest.background.service_worker, "background.js");
+});
+
+test("checkout sessions are stored separately for each sender tab", () => {
+  const source = fs.readFileSync("browser-extension/background.js", "utf8");
+  assert.match(source, /sender\.tab\?\.id/);
+  assert.match(source, /sessionKey\(tabId\)/);
+  assert.doesNotMatch(source, /storage\.local/);
 });

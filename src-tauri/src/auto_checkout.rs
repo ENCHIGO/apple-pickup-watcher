@@ -7,6 +7,11 @@
 use apw_core::model::{Target, region_by_locale};
 
 pub(crate) fn url_for(target: &Target) -> Option<String> {
+    // 扩展当前只识别中国大陆站的简体中文与英文兜底按钮。其他地区继续提醒并打开
+    // 购物袋，不能为了“看起来支持”就猜测日文或繁体中文控件。
+    if target.locale != "zh_CN" {
+        return None;
+    }
     let region = region_by_locale(&target.locale)?;
     let product = target.product_name.to_ascii_lowercase();
     let family = if product.contains("iphone 18 pro") {
@@ -99,5 +104,12 @@ mod tests {
         let url = url_for(&target("iPhone Duo 512GB 星光白色", "MK2P4CH/A", "R532"))
             .expect("Duo 已有正式购买页");
         assert!(url.contains("/shop/buy-iphone/iphone-duo/mk2p4ch/a?"));
+    }
+
+    #[test]
+    fn 未覆盖本地化按钮的地区不生成自动结账地址() {
+        let mut japanese = target("iPhone 18 Pro 512GB ブラック", "MJT74J/A", "R119");
+        japanese.locale = "ja_JP".into();
+        assert!(url_for(&japanese).is_none());
     }
 }
