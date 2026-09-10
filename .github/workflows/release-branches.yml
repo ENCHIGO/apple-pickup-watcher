@@ -1,0 +1,37 @@
+name: Release branches
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "版本标签；留空则补齐全部已发布版本"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # 不同版本分别排队，避免密集发布时某个版本的 pending 作业被替换。
+  group: release-branches-${{ github.event.release.tag_name || inputs.tag || 'backfill' }}
+  cancel-in-progress: false
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # 补齐旧版本也使用当前脚本；目标提交由版本标签单独解析。
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: 创建缺失的版本分支
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: python3 scripts/release_branches.py

@@ -112,6 +112,9 @@ jobs:
       - name: 快照生成脚本自检
         run: python3 crates/apw-core/data/generate.py --self-test
 
+      - name: 版本分支脚本测试
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
       # --- 前端 ---------------------------------------------------------------
       # pnpm 必须在 setup-node 之前装好：setup-node 的 cache: pnpm 会去调用
       # pnpm 来定位它的 store 目录，顺序反了会报 "Unable to locate executable file: pnpm"。
