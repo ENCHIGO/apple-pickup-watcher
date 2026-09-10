@@ -912,6 +912,7 @@ const FAMILY_WORDS: &[(&str, &str)] = &[
     ("plus", "Plus"),
     ("mini", "mini"),
     ("air", "Air"),
+    ("duo", "Duo"),
     ("se", "SE"),
     ("e", "e"),
 ];
@@ -1083,6 +1084,9 @@ mod tests {
             ("iphone17pro", "iPhone 17 Pro"),
             ("iphone17promax", "iPhone 17 Pro Max"),
             ("iphoneair", "iPhone Air"),
+            ("iphone18pro", "iPhone 18 Pro"),
+            ("iphone18promax", "iPhone 18 Pro Max"),
+            ("iphoneduo", "iPhone Duo"),
             ("iphone16e", "iPhone 16e"),
             ("iphone16plus", "iPhone 16 Plus"),
             ("iphone13mini", "iPhone 13 mini"),

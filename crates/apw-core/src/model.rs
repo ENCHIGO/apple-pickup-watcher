@@ -243,6 +243,14 @@ impl Region {
 const DEFAULT_FAMILIES: &[Family] = &[
     Family {
         category: Category::Iphone,
+        slug: "iphone-18-pro",
+    },
+    Family {
+        category: Category::Iphone,
+        slug: "iphone-duo",
+    },
+    Family {
+        category: Category::Iphone,
         slug: "iphone-17",
     },
     Family {

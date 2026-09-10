@@ -45,6 +45,8 @@ REGIONS = {
 
 # 与 crates/apw-core/src/model.rs 的 DEFAULT_FAMILIES 保持一致。
 FAMILIES = [
+    ("iphone", "iphone-18-pro"),
+    ("iphone", "iphone-duo"),
     ("iphone", "iphone-17"),
     ("iphone", "iphone-17-pro"),
     ("iphone", "iphone-air"),

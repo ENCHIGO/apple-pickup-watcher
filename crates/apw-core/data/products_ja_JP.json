@@ -1,6 +1,900 @@
 [
   {
     "category": "iphone",
+    "family": "iphone-18-pro",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MJR54J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJR54J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJR54J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJR64J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJR64J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJR64J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJR74J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJR74J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJR74J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJR84J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJR84J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJR84J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJR94J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJR94J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJR94J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJRC4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJRC4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJRC4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJRD4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJRD4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJRD4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJRE4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJRE4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJRE4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJRF4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJRF4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJRF4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJRG4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJRG4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJRG4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJRH4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJRH4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJRH4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJRJ4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJRJ4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJRJ4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJRK4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJRK4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJRK4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJRL4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJRL4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJRL4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJRM4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJRM4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJRM4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJRN4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJRN4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJRN4J/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJX54J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJX54J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJX54J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJX64J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJX64J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJX64J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJX74J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJX74J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJX74J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJX84J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJX84J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJX84J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJX94J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJX94J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJX94J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJXA4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJXA4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJXA4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJXC4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJXC4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJXC4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJXD4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJXD4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJXD4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJXE4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJXE4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJXE4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJXF4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJXF4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJXF4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJXG4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJXG4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJXG4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJXH4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJXH4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJXH4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJXJ4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJXJ4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJXJ4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJXK4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJXK4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJXK4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJXL4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJXL4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJXL4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJXM4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJXM4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJXM4J/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        }
+      ],
+      "displayValues": {
+        "dimensionScreensize": {
+          "6_3inch": {
+            "value": "iPhone&nbsp;18&nbsp;Pro\n<span class=\"form-label-small\">6.3インチディスプレイ<as-footnote data-id=\"8054edc379d142293eb3940b1a8ea8d1\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>2</sup></as-footnote></span>"
+          },
+          "6_9inch": {
+            "value": "iPhone&nbsp;18&nbsp;Pro&nbsp;Max\n<span class=\"form-label-small\">6.9インチディスプレイ<as-footnote data-id=\"8054edc379d142293eb3940b1a8ea8d1\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>2</sup></as-footnote></span>"
+          }
+        },
+        "dimensionColor": {
+          "black": {
+            "value": "ブラック"
+          },
+          "burgundy": {
+            "value": "バーガンディ"
+          },
+          "glacier": {
+            "value": "グレイシャー"
+          },
+          "silver": {
+            "value": "シルバー"
+          }
+        },
+        "dimensionCapacity": {
+          "1tb": {
+            "value": "1<small>TB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          },
+          "256gb": {
+            "value": "256<small>GB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          },
+          "2tb": {
+            "value": "2<small>TB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          },
+          "512gb": {
+            "value": "512<small>GB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "iphone",
+    "family": "iphone-duo",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MK244J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK244J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK244J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK254J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK254J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK254J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK264J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK264J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK264J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK274J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK274J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK274J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK284J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "1tb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK284J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "1tb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK284J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "1tb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK294J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "1tb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK294J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "1tb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK294J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "1tb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK2A4J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "2tb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK2A4J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "2tb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK2A4J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "2tb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK2C4J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "2tb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK2C4J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "2tb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK2C4J/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "2tb",
+          "dimensionColor": "nightsky"
+        }
+      ],
+      "displayValues": {
+        "dimensionColor": {
+          "nightsky": {
+            "value": "ナイトスカイ"
+          },
+          "starwhite": {
+            "value": "スターホワイト"
+          }
+        },
+        "dimensionCapacity": {
+          "1tb": {
+            "value": "1<small>TB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>\n"
+          },
+          "256gb": {
+            "value": "256<small>GB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          },
+          "2tb": {
+            "value": "2<small>TB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          },
+          "512gb": {
+            "value": "512<small>GB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "iphone",
     "family": "iphone-17",
     "data": {
       "products": [

@@ -380,18 +380,34 @@ fn write_lock<T>(lock: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
 /// 让商品排列稳定且符合直觉：先按品类，再按机型，再按容量从小到大，最后按展示名。
 ///
 /// 原始数据里的顺序是乱的（同一机型下 512GB 可能排在 256GB 前面），直接丢进
-/// 下拉框很难找。按品类和机型标识排而不是按数据里的出现顺序，是为了让离线快照
-/// 与在线抓取（抓取顺序取决于 `Region::families` 的写法）得到同一份排列。
+/// 下拉框很难找。机型不按标识字符串排：`iphone17` 会排在 `iphone18pro` 前面，
+/// 发售窗口里用户要盯的却是 18 Pro / Pro Max / Duo。其余机型仍按标识排，
+/// 这样离线快照与在线抓取会得到同一份排列。
 fn sort_products(products: &mut [Product]) {
     products.sort_by(|a, b| {
         a.category.cmp(&b.category).then_with(|| {
-            a.family.cmp(&b.family).then_with(|| {
-                crate::apple_catalog::capacity_rank(&a.capacity)
-                    .cmp(&crate::apple_catalog::capacity_rank(&b.capacity))
-                    .then_with(|| a.title.cmp(&b.title))
-            })
+            family_rank(&a.family)
+                .cmp(&family_rank(&b.family))
+                .then_with(|| {
+                    crate::apple_catalog::capacity_rank(&a.capacity)
+                        .cmp(&crate::apple_catalog::capacity_rank(&b.capacity))
+                        .then_with(|| a.title.cmp(&b.title))
+                })
         })
     });
+}
+
+/// 机型排序关键字：当前发售主力置顶，其余仍按标识排。
+///
+/// 数字越小越靠前。18 Pro / Pro Max 同属一页，`familyType` 才能把它们拆开。
+fn family_rank(family: &str) -> (u8, &str) {
+    let priority = match family {
+        "iphone18pro" => 0,
+        "iphone18promax" => 1,
+        "iphoneduo" => 2,
+        _ => 10,
+    };
+    (priority, family)
 }
 
 /// 内嵌快照里的一页。
@@ -856,9 +872,61 @@ mod tests {
     }
 
     #[test]
+    fn 发售主力机型排在其他型号前面() {
+        let mut products = vec![
+            product("A/A", "iPhone 17 256GB 黑色"),
+            Product {
+                family: "iphoneair".to_string(),
+                title: "iPhone Air 256GB 黑色".to_string(),
+                ..product("B/A", "iPhone Air 256GB 黑色")
+            },
+            Product {
+                family: "iphoneduo".to_string(),
+                title: "iPhone Duo 256GB 黑色".to_string(),
+                ..product("C/A", "iPhone Duo 256GB 黑色")
+            },
+            Product {
+                family: "iphone18promax".to_string(),
+                title: "iPhone 18 Pro Max 256GB 黑色".to_string(),
+                ..product("D/A", "iPhone 18 Pro Max 256GB 黑色")
+            },
+            Product {
+                family: "iphone18pro".to_string(),
+                title: "iPhone 18 Pro 256GB 黑色".to_string(),
+                ..product("E/A", "iPhone 18 Pro 256GB 黑色")
+            },
+        ];
+
+        sort_products(&mut products);
+
+        let families: Vec<&str> = products.iter().map(|p| p.family.as_str()).collect();
+        assert_eq!(
+            families,
+            [
+                "iphone18pro",
+                "iphone18promax",
+                "iphoneduo",
+                "iphone17",
+                "iphoneair"
+            ]
+        );
+    }
+
+    #[test]
     fn 商品按品类机型与容量排序() {
         let catalog = Catalog::new();
         let products = catalog.products("zh_CN").expect("内嵌数据应当可用");
+
+        let mut iphone_families = Vec::new();
+        for product in products.iter().filter(|p| p.category == Category::Iphone) {
+            if iphone_families.last() != Some(&product.family.as_str()) {
+                iphone_families.push(product.family.as_str());
+            }
+        }
+        assert!(
+            iphone_families.starts_with(&["iphone18pro", "iphone18promax", "iphoneduo"]),
+            "当前发售主力应当排在最前，实际是 {iphone_families:?}"
+        );
 
         for pair in products.windows(2) {
             let (a, b) = (&pair[0], &pair[1]);
@@ -867,7 +935,10 @@ mod tests {
                 continue;
             }
             if a.family != b.family {
-                assert!(a.family < b.family, "机型排序不对：{a:?} 在 {b:?} 之前");
+                assert!(
+                    family_rank(&a.family) <= family_rank(&b.family),
+                    "机型排序不对：{a:?} 在 {b:?} 之前"
+                );
                 continue;
             }
             let (ra, rb) = (
