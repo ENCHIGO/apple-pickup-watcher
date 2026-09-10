@@ -4,13 +4,10 @@
 支持 **iPhone、iPad、Mac、Apple Watch** 四个品类，七个地区：中国大陆、中国香港、
 中国台湾、日本、Singapore、Australia、Malaysia。
 
-跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.4.2。
+跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.4.0。
 
-型号目录已包含 iPhone 18 Pro / Pro Max 与 iPhone Duo。iPhone 可分别选择机型、存储容量、
-颜色和自提门店。可选的本地 Chrome 扩展会在库存命中后打开精确 SKU，自动选择不折抵、
-不加 AppleCare+、不加配件，加入 1 台手机并推进到付款前；登录、验证码、支付信息和最终
-下单始终由用户自己完成，扩展不会读取或保存这些敏感信息。
-自动结账当前仅启用中国大陆站；其他地区仍保留提醒和打开购物袋流程。
+iPhone 可按机型、存储容量和颜色逐步选择，再指定要监控的门店。库存命中后发出提醒，
+并按设置打开购物袋；添加商品、选择取货门店、结账及付款均由用户在 Apple 官网手动完成。
 
 **English** — Apple Pickup Watcher monitors in-store pickup availability at Apple Retail
 Stores and alerts you the moment a specific model becomes available at the store you
@@ -142,7 +139,8 @@ xattr -cr "/Applications/Apple Pickup Watcher.app"
 1. 选**地区**。地区决定了查哪个 Apple 在线商店，换地区后门店和型号会一起重选。
 2. 选**品类**（iPhone / iPad / Mac / Apple Watch）。它只是型号下拉框的筛选器，
    已经加进列表的监控目标不受影响 —— 四个品类是混在一张表里盯的。
-3. 选**门店**和**型号**，点「添加」。可以加多条，不同品类、不同门店混着加都行。
+3. 选**门店**和**型号**，点「添加」。iPhone 按机型、存储容量、颜色逐步选择；其他品类
+   直接选择完整型号。可以加多条，不同品类、不同门店混着加都行。
 4. 点「开始」。表格里每一行会显示状态：有货 / 无货 / 未知 / 待查询，以及最后检查时间。
 5. 某一行从非有货变成有货时，会同时：弹系统通知、播提示音、发 Bark 推送（如已配置），
    并按设置打开该地区的购物袋页面。每次「开始」到「暂停」期间最多自动打开一次购物袋，

@@ -140,10 +140,6 @@ pub struct Settings {
     pub sound_enabled: bool,
     /// 有货时是否自动打开购物袋页面。
     pub open_bag_on_hit: bool,
-    /// 有货时是否让本地浏览器扩展推进到付款前。
-    ///
-    /// 默认关闭：旧配置升级后不能在用户毫不知情时开始操作购物袋。
-    pub auto_checkout_on_hit: bool,
 }
 
 /// 内置地区表里的第一个 locale，作为兜底取值。
@@ -162,7 +158,6 @@ impl Default for Settings {
             bark_url: String::new(),
             sound_enabled: true,
             open_bag_on_hit: true,
-            auto_checkout_on_hit: false,
         }
     }
 }
@@ -506,8 +501,6 @@ struct LegacySettings {
     sound_enabled: Option<bool>,
     #[serde(default)]
     open_bag_on_hit: Option<bool>,
-    #[serde(default)]
-    auto_checkout_on_hit: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -555,9 +548,6 @@ impl LegacySettings {
             bark_url: self.bark_url.unwrap_or(fallback.bark_url),
             sound_enabled: self.sound_enabled.unwrap_or(fallback.sound_enabled),
             open_bag_on_hit: self.open_bag_on_hit.unwrap_or(fallback.open_bag_on_hit),
-            auto_checkout_on_hit: self
-                .auto_checkout_on_hit
-                .unwrap_or(fallback.auto_checkout_on_hit),
         };
         settings.normalize();
         settings
@@ -589,7 +579,6 @@ mod tests {
         assert_eq!(s.interval_seconds, DEFAULT_INTERVAL_SECONDS);
         assert!(s.sound_enabled);
         assert!(s.open_bag_on_hit);
-        assert!(!s.auto_checkout_on_hit);
         assert!(region_by_locale(&s.locale).is_some());
     }
 
@@ -733,7 +722,6 @@ mod tests {
         // 没动过设置的情况下，升级之后提示音自己关掉了。
         assert!(s.sound_enabled);
         assert!(s.open_bag_on_hit);
-        assert!(!s.auto_checkout_on_hit);
     }
 
     #[test]

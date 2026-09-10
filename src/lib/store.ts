@@ -67,7 +67,6 @@ const DEFAULT_SETTINGS: Settings = {
   barkUrl: "",
   soundEnabled: true,
   openBagOnHit: true,
-  autoCheckoutOnHit: false,
 };
 
 let state: UiState = {
@@ -244,14 +243,6 @@ export async function saveSettings(next: Settings): Promise<void> {
     }
   } catch (err) {
     pushLog(`保存设置失败：${String(err)}`);
-  }
-}
-
-export async function openExtensionFolder(): Promise<void> {
-  try {
-    await invoke("open_extension_folder");
-  } catch (err) {
-    pushLog(`打开扩展目录失败：${String(err)}`);
   }
 }
 

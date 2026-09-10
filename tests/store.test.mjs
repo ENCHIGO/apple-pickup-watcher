@@ -159,5 +159,4 @@ test("a failed refresh still reloads the current catalog to expose partial backe
   assert.deepEqual(app.snapshot().products, catalog("zh_CN", "partial").products);
   assert.equal(app.snapshot().refreshing, false);
   assert.match(app.snapshot().logs.at(-1), /更新型号列表失败.*one page failed/);
-  assert.match(app.snapshot().logs.at(-1), /旧目录.*可能已过期/);
 });

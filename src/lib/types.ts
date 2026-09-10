@@ -79,7 +79,6 @@ export interface Settings {
   barkUrl: string;
   soundEnabled: boolean;
   openBagOnHit: boolean;
-  autoCheckoutOnHit: boolean;
 }
 
 /** 监控目标的唯一键，与 Rust 侧 Target::key 的构成保持一致。 */

@@ -23,7 +23,6 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use tauri_plugin_updater::UpdaterExt;
 
-mod auto_checkout;
 mod auto_open;
 mod notification_queue;
 
@@ -275,24 +274,6 @@ async fn test_notify(app: AppHandle) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
-/// 在 Finder 中打开随应用提供的浏览器扩展目录，供 Chrome“加载已解压的扩展程序”。
-#[tauri::command]
-fn open_extension_folder(app: AppHandle) -> Result<(), String> {
-    let path = app
-        .path()
-        .resource_dir()
-        .map_err(|e| format!("定位应用资源目录失败：{e}"))?
-        .join("browser-extension");
-    if !path.join("manifest.json").is_file() {
-        return Err(format!("浏览器扩展文件不完整：{}", path.display()));
-    }
-
-    use tauri_plugin_opener::OpenerExt;
-    app.opener()
-        .open_path(path.to_string_lossy().into_owned(), None::<&str>)
-        .map_err(|e| format!("打开浏览器扩展目录失败：{e}"))
-}
-
 /// 发出一条提醒：系统通知 + 提示音 + Bark，按用户设置取舍。
 async fn dispatch_notification(
     app: &AppHandle,
@@ -365,38 +346,27 @@ async fn pump_events(app: AppHandle, mut events: tokio::sync::mpsc::Receiver<Eve
 
         if let Event::InStock { state } = &event {
             let target = &state.target;
-            let settings = app
-                .try_state::<AppState>()
-                .map(|s| s.settings_snapshot())
-                .unwrap_or_default();
-            let checkout_url = settings
-                .auto_checkout_on_hit
-                .then(|| auto_checkout::url_for(target))
-                .flatten();
-            let fallback_url = region_by_locale(&target.locale).map(|region| region.bag_url());
-            let action_url = checkout_url.as_deref().or(fallback_url.as_deref());
             let notification = Notification::new(
                 "有货了",
                 format!("{} {}", target.store_title, target.product_name),
             );
-            let notification = match action_url {
-                Some(url) => notification.with_url(url.to_owned()),
+            let notification = match region_by_locale(&target.locale) {
+                Some(region) => notification.with_url(region.bag_url()),
                 None => notification,
             };
 
-            use tauri_plugin_opener::OpenerExt;
-            let should_open = settings.auto_checkout_on_hit || settings.open_bag_on_hit;
-            if let Err(err) = auto_open_bag.open_if_needed(should_open, action_url, |url| {
-                app.opener().open_url(url, None::<&str>)
-            }) {
-                let _ = app.emit(NOTICE_CHANNEL, format!("打开购买流程失败：{err}"));
-            }
+            let settings = app
+                .try_state::<AppState>()
+                .map(|s| s.settings_snapshot())
+                .unwrap_or_default();
 
-            if settings.auto_checkout_on_hit && checkout_url.is_none() {
-                let _ = app.emit(
-                    NOTICE_CHANNEL,
-                    format!("{} 尚未支持自动结账，已退回打开购物袋", target.product_name),
-                );
+            use tauri_plugin_opener::OpenerExt;
+            if let Err(err) =
+                auto_open_bag.open_if_needed(settings.open_bag_on_hit, &target.locale, |url| {
+                    app.opener().open_url(url, None::<&str>)
+                })
+            {
+                let _ = app.emit(NOTICE_CHANNEL, format!("打开购物袋失败：{err}"));
             }
 
             // 不逐项等待网络推送，否则15个Bark超时会让快照和暂停状态迟到150秒。
@@ -592,7 +562,6 @@ pub fn run() {
             stop_watching,
             is_running,
             test_notify,
-            open_extension_folder,
             check_for_update,
             install_update,
         ])

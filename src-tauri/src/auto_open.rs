@@ -1,4 +1,6 @@
-//! 每次监控会话只自动打开一次购买流程，避免多个目标同时到货打断结账。
+//! 每次监控会话只自动打开一次购物袋，避免多个目标同时到货打断结账。
+
+use apw_core::model::region_by_locale;
 
 #[derive(Default)]
 pub(crate) struct AutoOpenBag {
@@ -17,19 +19,19 @@ impl AutoOpenBag {
     pub(crate) fn open_if_needed<E>(
         &mut self,
         enabled: bool,
-        url: Option<&str>,
+        locale: &str,
         open: impl FnOnce(&str) -> Result<(), E>,
     ) -> Result<(), E> {
         if !enabled || self.opened_this_run {
             return Ok(());
         }
-        let Some(url) = url else {
+        let Some(region) = region_by_locale(locale) else {
             return Ok(());
         };
 
         // 整个会话使用首个有效命中的地区。其他地区仍逐项提醒，但不再导航浏览器。
         // 打开失败不消耗这次机会，之后的到货事件可以重试。
-        open(url)?;
+        open(&region.bag_url())?;
         self.opened_this_run = true;
         Ok(())
     }
@@ -45,7 +47,7 @@ mod tests {
         gate.on_run_state_changed(true);
         let mut opened = Vec::new();
         for _ in 0..15 {
-            gate.open_if_needed(true, Some("https://www.apple.com.cn/shop/bag"), |url| {
+            gate.open_if_needed(true, "zh_CN", |url| {
                 opened.push(url.to_owned());
                 Ok::<_, ()>(())
             })
@@ -54,10 +56,8 @@ mod tests {
         assert_eq!(opened, vec!["https://www.apple.com.cn/shop/bag"]);
 
         // 下一轮再次有货，或者另一个地区随后到货，都不打断当前购物袋。
-        gate.open_if_needed(true, Some("https://www.apple.com/jp/shop/bag"), |_| {
-            panic!("同一会话不应再次打开")
-        })
-        .unwrap_or_else(|_: ()| unreachable!());
+        gate.open_if_needed(true, "ja_JP", |_| panic!("同一会话不应再次打开"))
+            .unwrap_or_else(|_: ()| unreachable!());
     }
 
     #[test]
@@ -66,7 +66,7 @@ mod tests {
         let mut opened = Vec::new();
         for running in [true, false, true] {
             gate.on_run_state_changed(running);
-            gate.open_if_needed(true, Some("https://www.apple.com/jp/shop/bag"), |url| {
+            gate.open_if_needed(true, "ja_JP", |url| {
                 opened.push(url.to_owned());
                 Ok::<_, ()>(())
             })
@@ -79,15 +79,12 @@ mod tests {
     fn 禁用和无效地区不会消耗会话的打开机会() {
         let mut gate = AutoOpenBag::default();
         gate.on_run_state_changed(true);
-        for (enabled, url) in [
-            (false, Some("https://www.apple.com.cn/shop/bag")),
-            (true, None),
-        ] {
-            gate.open_if_needed(enabled, url, |_| panic!("不应打开购物袋"))
+        for (enabled, locale) in [(false, "zh_CN"), (true, "invalid")] {
+            gate.open_if_needed(enabled, locale, |_| panic!("不应打开购物袋"))
                 .unwrap_or_else(|_: ()| unreachable!());
         }
         let mut opened = false;
-        gate.open_if_needed(true, Some("https://www.apple.com.cn/shop/bag"), |_| {
+        gate.open_if_needed(true, "zh_CN", |_| {
             opened = true;
             Ok::<_, ()>(())
         })
@@ -100,14 +97,12 @@ mod tests {
         let mut gate = AutoOpenBag::default();
         gate.on_run_state_changed(true);
         assert_eq!(
-            gate.open_if_needed(true, Some("https://www.apple.com.cn/shop/bag"), |_| Err(
-                "失败"
-            )),
+            gate.open_if_needed(true, "zh_CN", |_| Err("失败")),
             Err("失败")
         );
 
         let mut retried = false;
-        gate.open_if_needed(true, Some("https://www.apple.com.cn/shop/bag"), |_| {
+        gate.open_if_needed(true, "zh_CN", |_| {
             retried = true;
             Ok::<_, ()>(())
         })

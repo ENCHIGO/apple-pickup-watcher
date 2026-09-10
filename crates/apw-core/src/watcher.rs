@@ -379,7 +379,7 @@ async fn query_one_store<F: Fetcher>(client: &F, group: StoreGroup) -> StoreOutc
     {
         Err(err) => {
             // 被拦截和结构漂移分别有明确的处理建议。Apple 业务错误也要展示，
-            // 但不挂泛化建议：例如空门店列表通常表示型号已停售或尚未开售，
+            // 但不挂泛化建议：例如空门店列表可能与型号停售或尚未开售有关，
             // 此时让用户换网络或等待程序更新都会把方向带偏。
             let trouble = match &err {
                 ApiError::Blocked(_) => Some(TroubleReport {
