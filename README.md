@@ -4,7 +4,11 @@
 支持 **iPhone、iPad、Mac、Apple Watch** 四个品类，七个地区：中国大陆、中国香港、
 中国台湾、日本、Singapore、Australia、Malaysia。
 
-跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.4.0。
+跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.4.1。
+
+型号目录已包含 iPhone 18 Pro / Pro Max 与 iPhone Duo。可选的本地 Chrome 扩展会在库存
+命中后打开精确 SKU、加入购物袋并推进到付款前；登录、验证码、支付信息和最终
+下单始终由用户自己完成，扩展不会读取或保存这些敏感信息。
 
 **English** — Apple Pickup Watcher monitors in-store pickup availability at Apple Retail
 Stores and alerts you the moment a specific model becomes available at the store you

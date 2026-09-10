@@ -87,6 +87,7 @@ fn 样例设置() -> Settings {
         bark_url: "https://api.day.app/xxxx".into(),
         sound_enabled: false,
         open_bag_on_hit: true,
+        auto_checkout_on_hit: true,
     }
 }
 
@@ -248,6 +249,7 @@ fn 缺字段的文件取默认值而不是取零值() {
     // 提示音和自动开购物袋却会自己关掉。
     assert!(got.sound_enabled);
     assert!(got.open_bag_on_hit);
+    assert!(!got.auto_checkout_on_hit);
     assert_eq!(got.interval_seconds, DEFAULT_INTERVAL_SECONDS);
 }
 
@@ -403,6 +405,7 @@ fn 迁移能读出旧版格式() {
     assert_eq!(got.bark_url, "https://api.day.app/legacy");
     assert!(!got.sound_enabled);
     assert!(got.open_bag_on_hit);
+    assert!(!got.auto_checkout_on_hit);
     assert_eq!(got.targets.len(), 1);
     assert_eq!(got.targets[0].store_number, "R409");
     assert_eq!(got.targets[0].store_title, "香港-銅鑼灣");
@@ -495,11 +498,12 @@ fn 设置的线上格式是小驼峰() {
         "barkUrl",
         "soundEnabled",
         "openBagOnHit",
+        "autoCheckoutOnHit",
     ] {
         assert!(obj.contains_key(key), "缺少字段 {key}：{value}");
     }
     assert!(!obj.contains_key("interval_seconds"), "不该有蛇形字段");
-    assert_eq!(obj.len(), 6);
+    assert_eq!(obj.len(), 7);
 }
 
 #[test]

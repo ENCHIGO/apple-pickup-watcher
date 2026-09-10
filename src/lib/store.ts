@@ -67,6 +67,7 @@ const DEFAULT_SETTINGS: Settings = {
   barkUrl: "",
   soundEnabled: true,
   openBagOnHit: true,
+  autoCheckoutOnHit: false,
 };
 
 let state: UiState = {
@@ -246,6 +247,14 @@ export async function saveSettings(next: Settings): Promise<void> {
   }
 }
 
+export async function openExtensionFolder(): Promise<void> {
+  try {
+    await invoke("open_extension_folder");
+  } catch (err) {
+    pushLog(`打开扩展目录失败：${String(err)}`);
+  }
+}
+
 export function setCategory(category: Category): void {
   update({ category });
 }
@@ -297,8 +306,11 @@ export async function refreshProducts(): Promise<void> {
     // 不等于目录里真的多了或改了多少行。
     pushLog(`已从 Apple 官网抓到 ${count} 个型号。`);
   } catch (err) {
-    // 抓取失败仍可继续用内嵌的离线目录，只是可能缺最新机型。
-    pushLog(`更新型号列表失败（仍可使用内置目录）：${String(err)}`);
+    // 抓取失败仍可继续用内嵌目录，但失败页面对应的旧型号可能已经停售。
+    // 必须把这一层风险写出来；只说「仍可使用」会让旧快照显得像可信的当前目录。
+    pushLog(
+      `更新型号列表失败（失败页面继续使用内置旧目录，其中的型号可能已过期）：${String(err)}`,
+    );
   } finally {
     // 无论成败都重载一次目录。**失败时也必须重载**：后端是一页一页安装的，
     // 一个品类有八页，其中几页成功、几页失败是常事，成功那几页的新数据此刻

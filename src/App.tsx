@@ -6,6 +6,7 @@ import {
   Pause,
   Play,
   Plus,
+  Puzzle,
   RefreshCw,
   Trash2,
   X,
@@ -40,6 +41,7 @@ import {
   connect,
   dismissUpdate,
   installUpdate,
+  openExtensionFolder,
   refreshProducts,
   saveSettings,
   setCategory,
@@ -372,6 +374,30 @@ export default function App() {
             />
             <Label htmlFor="openbag">有货时打开购物袋</Label>
           </div>
+
+          <div className="flex items-center gap-2 pb-2">
+            <Switch
+              id="autocheckout"
+              checked={ui.settings.autoCheckoutOnHit}
+              onCheckedChange={(v) =>
+                void saveSettings({ ...ui.settings, autoCheckoutOnHit: v })
+              }
+            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Label htmlFor="autocheckout" className="cursor-help">
+                  自动进入付款页
+                </Label>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-80">
+                需安装随应用提供的 Chrome 扩展。自动加入购物袋并推进结账；登录、验证码、付款和最终下单始终由你确认。
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          <Button variant="ghost" className="pb-2" onClick={() => void openExtensionFolder()}>
+            <Puzzle /> 扩展安装目录
+          </Button>
 
           <Button variant="ghost" className="pb-2" onClick={() => void testNotify()}>
             <BellRing /> 测试提醒
