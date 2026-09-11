@@ -121,7 +121,7 @@ apw watch    --targets targets.json --until-in-stock --timeout 300          # ke
 - **Regions**: China mainland · Hong Kong · Taiwan · Japan · Singapore · Australia · Malaysia
 - **Platforms**: macOS (Apple Silicon / Intel) · Windows x64 · Linux x86_64
 
-The exact models and stores depend on the built-in catalog and the regional Apple online store; models on newly added buy pages require an app update. Region support does not guarantee that every query succeeds.
+The exact models and stores depend on the built-in catalog and the regional Apple online store; models on newly added buy pages require an app update. Region support does not guarantee that every query succeeds. **Apple Watch queries currently return no result** (the catalog holds case part numbers, which the pickup endpoint does not recognize); see [#24](https://github.com/ENCHIGO/apple-pickup-watcher/issues/24).
 
 ## FAQ
 
