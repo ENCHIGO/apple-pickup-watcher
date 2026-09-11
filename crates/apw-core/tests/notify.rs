@@ -4,6 +4,8 @@
 //! 断言它收到的**原始**请求行；提示音只测不需要声卡的那几条路径，真的要响一声
 //! 的用例挂了 `#[ignore]`，手动跑。
 
+#![cfg(feature = "notifications")]
+
 use std::io::{BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicUsize, Ordering};

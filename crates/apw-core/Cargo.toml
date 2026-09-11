@@ -14,13 +14,16 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 rand.workspace = true
-rodio.workspace = true
+rodio = { workspace = true, optional = true }
 dirs.workspace = true
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "test-util"] }
 
 [features]
+default = ["notifications"]
+# CLI 只消费库存事件，不需要推送或音频设备依赖。
+notifications = ["dep:rodio"]
 # live 打开后才会跑针对 Apple 真实接口的契约测试：
 #   cargo test -p apw-core --features live -- --ignored --nocapture
 # 默认关闭，免得每次 cargo test 都去打扰 Apple 的服务。

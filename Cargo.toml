@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/apw-core", "src-tauri"]
+members = ["crates/apw-core", "crates/apw-cli", "src-tauri"]
 
 [workspace.package]
 version = "0.4.0"

@@ -1,0 +1,58 @@
+name: CLI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cli-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cli:
+    name: CLI (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            binary: apw
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            binary: apw
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            binary: apw
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary: apw.exe
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      # No GTK, WebKit or ALSA installation: prove the CLI is headless.
+      - run: cargo fmt --all --check
+      - run: cargo test --locked -p apw-cli
+      - run: cargo test --locked -p apw-core --no-default-features
+      - run: cargo clippy --locked -p apw-cli --all-targets -- -D warnings
+      - run: cargo build --release --locked -p apw-cli --target ${{ matrix.target }}
+      - run: python3 scripts/package-cli.py --binary target/${{ matrix.target }}/release/${{ matrix.binary }} --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: apw-cli-${{ matrix.target }}
+          path: target/cli-dist/*
+          if-no-files-found: error
