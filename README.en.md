@@ -123,7 +123,7 @@ apw watch    --targets targets.json --until-in-stock --timeout 300          # ke
 
 ## What’s covered
 
-- **Products**: iPhone (18 Pro / 18 Pro Max, Duo, 17, 17 Pro, Air) · iPad (Pro, Air, iPad, mini) · Mac (MacBook Air / Pro / Neo, iMac, Mac mini, Mac Studio, Studio Display) · Apple Watch (Series, SE, Ultra, Hermès)
+- **Products**: iPhone (18 Pro / 18 Pro Max, Duo, 17, Air) · iPad (Pro, Air, iPad, mini) · Mac (MacBook Air / Pro / Neo, iMac, Mac mini, Mac Studio, Studio Display) · Apple Watch (Series, SE, Ultra, Hermès)
 - **Regions**: China mainland · Hong Kong · Taiwan · Japan · Singapore · Australia · Malaysia
 - **Platforms**: macOS (Apple Silicon / Intel) · Windows x64 · Linux x86_64
 

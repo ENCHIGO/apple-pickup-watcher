@@ -123,7 +123,7 @@ apw watch    --targets targets.json --until-in-stock --timeout 300          # �
 
 ## 支持范围
 
-- **品类**：iPhone（18 Pro / 18 Pro Max、Duo、17、17 Pro、Air）· iPad（Pro、Air、iPad、mini）· Mac（MacBook Air / Pro / Neo、iMac、Mac mini、Mac Studio、Studio Display）· Apple Watch（Series、SE、Ultra、Hermès）
+- **品类**：iPhone（18 Pro / 18 Pro Max、Duo、17、Air）· iPad（Pro、Air、iPad、mini）· Mac（MacBook Air / Pro / Neo、iMac、Mac mini、Mac Studio、Studio Display）· Apple Watch（Series、SE、Ultra、Hermès）
 - **地区**：中国大陆 · 中国香港 · 中国台湾 · 日本 · 新加坡 · 澳大利亚 · 马来西亚
 - **平台**：macOS（Apple Silicon / Intel）· Windows x64 · Linux x86_64
 
