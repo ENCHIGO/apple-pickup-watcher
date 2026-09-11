@@ -23,5 +23,6 @@ pub mod apple_catalog;
 pub mod catalog;
 pub mod config;
 pub mod model;
+#[cfg(feature = "notifications")]
 pub mod notify;
 pub mod watcher;

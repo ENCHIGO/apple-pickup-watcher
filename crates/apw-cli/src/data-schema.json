@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "APW CLI v1 data contract",
+  "$defs": {
+    "inputTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["locale", "storeNumber", "partNumber"],
+      "properties": {
+        "locale": {"type": "string"},
+        "storeNumber": {"type": "string", "pattern": "^R[0-9]+$", "maxLength": 12},
+        "partNumber": {"type": "string", "pattern": "^[A-Za-z0-9]+(/[A-Za-z0-9]+)?$", "maxLength": 64},
+        "storeTitle": {"type": "string"},
+        "productName": {"type": "string"}
+      }
+    },
+    "targets": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"$ref": "#/$defs/inputTarget"}},
+    "availability": {
+      "oneOf": [
+        {"type": "object", "required": ["kind"], "properties": {"kind": {"enum": ["in_stock", "out_of_stock"]}}},
+        {
+          "type": "object", "required": ["kind", "reason"], "properties": {"kind": {"const": "unknown"}},
+          "oneOf": [
+            {"properties": {"reason": {"enum": ["not_yet_checked", "rate_limited"]}}},
+            {"required": ["detail"], "properties": {"reason": {"enum": ["blocked", "transport"]}, "detail": {"type": "string"}}},
+            {"required": ["field", "raw"], "properties": {"reason": {"const": "schema_drift"}, "field": {"type": "string"}, "raw": {"type": "string"}}},
+            {"required": ["message"], "properties": {"reason": {"const": "apple_error"}, "message": {"type": "string"}}}
+          ]
+        }
+      ]
+    },
+    "targetState": {
+      "type": "object", "required": ["target", "availability", "lastCheckedMs", "consecutiveFailures"],
+      "properties": {
+        "target": {"$ref": "#/$defs/inputTarget"},
+        "availability": {"$ref": "#/$defs/availability"},
+        "lastCheckedMs": {"type": ["integer", "null"], "minimum": 0},
+        "consecutiveFailures": {"type": "integer", "minimum": 0}
+      }
+    },
+    "event": {
+      "type": "object", "required": ["type"],
+      "oneOf": [
+        {"required": ["state"], "properties": {"type": {"enum": ["stateChanged", "inStock"]}, "state": {"$ref": "#/$defs/targetState"}}},
+        {"required": ["healthy", "snapshot"], "properties": {"type": {"const": "cycleComplete"}, "healthy": {"type": "boolean"}, "snapshot": {"type": "array", "items": {"$ref": "#/$defs/targetState"}}}},
+        {"required": ["reason", "advice"], "properties": {"type": {"const": "trouble"}, "reason": {"type": "string"}, "advice": {"enum": [null, "try_another_network", "wait_for_update"]}}},
+        {"required": ["running"], "properties": {"type": {"const": "runStateChanged"}, "running": {"type": "boolean"}}}
+      ]
+    },
+    "check": {
+      "type": "object", "required": ["schemaVersion", "command", "healthy", "anyInStock", "snapshot"],
+      "properties": {
+        "schemaVersion": {"const": 1}, "command": {"const": "check"},
+        "healthy": {"type": "boolean"}, "anyInStock": {"type": "boolean"},
+        "snapshot": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/targetState"}}
+      }
+    },
+    "watch": {
+      "type": "object", "required": ["schemaVersion", "command", "event"],
+      "properties": {"schemaVersion": {"const": 1}, "command": {"const": "watch"}, "event": {"$ref": "#/$defs/event"}}
+    },
+    "error": {
+      "type": "object", "required": ["schemaVersion", "error"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "error": {"type": "object", "required": ["kind", "message", "exitCode"], "properties": {
+          "kind": {"type": "string"}, "message": {"type": "string"}, "exitCode": {"type": "integer"}
+        }}
+      }
+    }
+  }
+}

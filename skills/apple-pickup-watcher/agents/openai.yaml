@@ -1,0 +1,4 @@
+interface:
+  display_name: "Apple Pickup Watcher"
+  short_description: "Query Apple pickup stock and run bounded watches"
+  default_prompt: "Use $apple-pickup-watcher to check pickup availability for my chosen Apple product and stores."
