@@ -52,10 +52,10 @@ jobs:
       - run: cargo test --locked -p apw-cli
       - run: cargo test --locked -p apw-core --no-default-features
       - run: cargo clippy --locked -p apw-cli --all-targets -- -D warnings
-      - run: python3 -m unittest discover -s scripts -p 'test_package_cli.py'
+      - run: python -m unittest discover -s scripts -p 'test_package_cli.py'
       - run: cargo build --release --locked -p apw-cli --target ${{ matrix.target }}
       - run: target/${{ matrix.target }}/release/${{ matrix.binary }} schema > target/cli-schema.json
-      - run: python3 scripts/package-cli.py --binary target/${{ matrix.target }}/release/${{ matrix.binary }} --target ${{ matrix.target }}
+      - run: python scripts/package-cli.py --binary target/${{ matrix.target }}/release/${{ matrix.binary }} --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v7
         with:
           name: apw-cli-${{ matrix.target }}
