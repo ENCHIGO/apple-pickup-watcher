@@ -42,9 +42,14 @@ cargo install --path crates/apw-cli --locked
 
 ### Agent skill
 
-将仓库中的 [`skills/apple-pickup-watcher`](skills/apple-pickup-watcher/SKILL.md) 目录复制到 agent 的技能目录，并确保 agent 能运行 `apw`。
-Codex 的默认技能目录为 `~/.codex/skills`；配置了 `CODEX_HOME` 时使用其中的 `skills` 目录。
-已有同名 skill 时先比较内容，安装后在新会话中使用 `$apple-pickup-watcher`。
+安装 Node.js LTS 后，可通过 [Skills CLI](https://github.com/vercel-labs/skills) 一条命令安装到 Codex：
+
+```bash
+npx skills add ENCHIGO/apple-pickup-watcher --skill apple-pickup-watcher --agent codex --global
+```
+
+Claude Code 将 `codex` 换成 `claude-code`；去掉 `--global` 则安装到当前项目。
+此命令只安装 skill，`apw` 仍需按上节安装并加入 PATH。[手动安装与管理](docs/cli.md#安装-skill)。
 
 ## 怎么用
 
