@@ -24,7 +24,7 @@ def main():
     if not args.binary.is_file():
         parser.error(f"binary not found: {args.binary}")
     root = Path(__file__).resolve().parents[1]
-    version = tomllib.loads((root / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+    version = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))["workspace"]["package"]["version"]
     name = f"apw-cli-v{version}-{args.target}"
     args.output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="apw-cli-package-") as temporary:
@@ -39,7 +39,7 @@ def main():
         shutil.copytree(root / "skills/apple-pickup-watcher", package / "skills/apple-pickup-watcher")
         manifest = {"version": version, "target": args.target, "binary": binary_name,
                     "sha256": hashlib.sha256(args.binary.read_bytes()).hexdigest(), "schemaVersion": 1}
-        (package / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+        (package / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         if "windows" in args.target:
             archive = args.output / f"{name}.zip"
             with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
@@ -51,7 +51,7 @@ def main():
             with tarfile.open(archive, "w:gz") as bundle:
                 bundle.add(package, arcname=name)
     checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
-    archive.with_name(archive.name + ".sha256").write_text(f"{checksum}  {archive.name}\n")
+    archive.with_name(archive.name + ".sha256").write_text(f"{checksum}  {archive.name}\n", encoding="utf-8")
     print(archive.resolve())
 
 

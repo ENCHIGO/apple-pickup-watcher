@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cli-${{ github.event_name }}-${{ github.ref }}
+  group: cli-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -44,12 +44,17 @@ jobs:
           components: rustfmt, clippy
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
       # No GTK, WebKit or ALSA installation: prove the CLI is headless.
       - run: cargo fmt --all --check
       - run: cargo test --locked -p apw-cli
       - run: cargo test --locked -p apw-core --no-default-features
       - run: cargo clippy --locked -p apw-cli --all-targets -- -D warnings
+      - run: python3 -m unittest discover -s scripts -p 'test_package_cli.py'
       - run: cargo build --release --locked -p apw-cli --target ${{ matrix.target }}
+      - run: target/${{ matrix.target }}/release/${{ matrix.binary }} schema > target/cli-schema.json
       - run: python3 scripts/package-cli.py --binary target/${{ matrix.target }}/release/${{ matrix.binary }} --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v7
         with:
