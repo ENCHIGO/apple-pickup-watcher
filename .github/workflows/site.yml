@@ -1,0 +1,52 @@
+name: Website
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", "scripts/build-site.mjs", "scripts/check-site.py", ".github/workflows/site.yml"]
+  pull_request:
+    paths: ["site/**", "scripts/build-site.mjs", "scripts/check-site.py", ".github/workflows/site.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 静态站点检查
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+      - name: 构建与校验中英文页面
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          node scripts/build-site.mjs
+          python3 scripts/check-site.py
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - uses: actions/deploy-pages@v4
+        id: deployment

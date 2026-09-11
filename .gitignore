@@ -5,6 +5,7 @@
 # 前端
 node_modules
 /dist
+/_site/
 dist-ssr
 *.local
 
