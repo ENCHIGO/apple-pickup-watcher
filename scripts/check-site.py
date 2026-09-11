@@ -101,7 +101,7 @@ def check():
     assert {n.text for n in sitemap.findall("s:url/s:loc", ns)} == set(by_url)
     for entry in sitemap.findall("s:url", ns):
         assert {n.attrib["hreflang"]: n.attrib["href"] for n in entry.findall("x:link", ns)} == expected
-    png = (ROOT / "assets/social-plain.png").read_bytes()
+    png = (ROOT / "assets/social.png").read_bytes()
     assert png[:8] == b"\x89PNG\r\n\x1a\n"
     assert int.from_bytes(png[16:20], "big") == 1200 and int.from_bytes(png[20:24], "big") == 630
     assert (ROOT / ".nojekyll").exists()

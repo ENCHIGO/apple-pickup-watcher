@@ -30,8 +30,14 @@ export const locales = [
       [
         "到货提醒",
         "支持系统通知、提示音和可选的 Bark 推送。持续有货不会每轮重复提醒；离开有货状态后再次有货，会重新提醒。"
+      ],
+      [
+        "CLI 与 agent skill",
+        "独立命令行 apw 输出 JSON，watch 逐行输出 NDJSON，无需桌面环境；配套 skill 让 Codex 等 agent 直接查询库存或等待到货。CLI 本身不弹窗、不推送、不下单。"
       ]
     ],
+    "screenshotAlt": "Apple Pickup Watcher 桌面版截图：监控列表逐行显示门店、型号、有货 / 无货 / 未知状态与最后检查时间",
+    "keywords": "苹果直营店库存监控, Apple Store 到店取货, iPhone 到货提醒, iPhone 库存查询, Apple Store 库存提醒, apple-store-helper 替代, Bark 推送",
     "coverageHeading": "支持范围",
     "categoriesLabel": "产品",
     "regionsLabel": "地区",
@@ -138,8 +144,14 @@ export const locales = [
       [
         "Notifications",
         "Desktop notifications, sound and optional Bark push are supported. Continuous availability does not trigger an alert every cycle. A target that leaves and re-enters the available state triggers a new alert."
+      ],
+      [
+        "CLI and agent skill",
+        "The standalone apw command prints JSON and its watch mode streams NDJSON, with no desktop environment required. A bundled skill lets Codex-style agents query stock or wait for a restock. The CLI itself shows no popups, sends no pushes and places no orders."
       ]
     ],
+    "screenshotAlt": "Screenshot of the Apple Pickup Watcher desktop app: a watch list showing store, model, in-stock / out-of-stock / unknown state and last-checked time per row",
+    "keywords": "Apple Store stock checker, Apple Store pickup availability, iPhone restock alert, iPhone in-store stock monitor, Apple Store stock notifier, apple-store-helper alternative, Bark push",
     "coverageHeading": "Supported products and regions",
     "categoriesLabel": "Products",
     "regionsLabel": "Regions",
