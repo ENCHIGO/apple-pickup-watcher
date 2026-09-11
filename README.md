@@ -127,7 +127,7 @@ apw watch    --targets targets.json --until-in-stock --timeout 300          # �
 - **地区**：中国大陆 · 中国香港 · 中国台湾 · 日本 · 新加坡 · 澳大利亚 · 马来西亚
 - **平台**：macOS（Apple Silicon / Intel）· Windows x64 · Linux x86_64
 
-具体型号和门店取决于内置目录与当地 Apple 在线商店；新增购买页的机型需要更新程序。支持某地区不代表每次查询都能成功。**Apple Watch 目前无法查出结果**（目录里是表壳零件号，取货接口不认），进展见 [#24](https://github.com/ENCHIGO/apple-pickup-watcher/issues/24)。
+具体型号和门店取决于内置目录与当地 Apple 在线商店；新增购买页的机型需要更新程序。支持某地区不代表每次查询都能成功。Apple Watch 按表壳监控，查询时会自动附带同页的一条表带零件号，因为 Apple 的取货接口只把「表壳 + 表带」当作可售组合（[说明](docs/desktop.md#apple-watch-按表壳监控)）。
 
 ## 常见问题
 

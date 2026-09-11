@@ -75,7 +75,13 @@ All you need is stable Rust; no Node, desktop environment, or audio device. Preb
 
 ### Agent skill
 
-Copy the [`skills/apple-pickup-watcher`](skills/apple-pickup-watcher/SKILL.md) directory into your agent’s skills directory (Codex uses `~/.codex/skills` by default, or the `skills` directory under `CODEX_HOME` when that is set), make sure the agent can run `apw`, then just ask in a new session:
+With Node.js LTS installed, one [Skills CLI](https://github.com/vercel-labs/skills) command installs it into Codex:
+
+```bash
+npx skills add ENCHIGO/apple-pickup-watcher --skill apple-pickup-watcher --agent codex --global
+```
+
+For Claude Code replace `codex` with `claude-code`; drop `--global` to install into the current project. This installs only the skill, so `apw` still needs to be installed and on your PATH as described above; manual installation is covered in the [CLI docs](docs/cli.md#安装-skill). Then just ask in a new session:
 
 > Use $apple-pickup-watcher to check iPhone 512GB pickup stock at Apple Stores in Shanghai, and list the available models first so I can pick one.
 
@@ -121,7 +127,7 @@ apw watch    --targets targets.json --until-in-stock --timeout 300          # ke
 - **Regions**: China mainland · Hong Kong · Taiwan · Japan · Singapore · Australia · Malaysia
 - **Platforms**: macOS (Apple Silicon / Intel) · Windows x64 · Linux x86_64
 
-The exact models and stores depend on the built-in catalog and the regional Apple online store; models on newly added buy pages require an app update. Region support does not guarantee that every query succeeds. **Apple Watch queries currently return no result** (the catalog holds case part numbers, which the pickup endpoint does not recognize); see [#24](https://github.com/ENCHIGO/apple-pickup-watcher/issues/24).
+The exact models and stores depend on the built-in catalog and the regional Apple online store; models on newly added buy pages require an app update. Region support does not guarantee that every query succeeds. Apple Watch is monitored by case: each query automatically includes one band part number from the same buy page, because Apple’s pickup endpoint only treats “case + band” as a sellable kit ([details](docs/desktop.md#apple-watch-按表壳监控)).
 
 ## FAQ
 
