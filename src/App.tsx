@@ -150,6 +150,7 @@ export default function App() {
       storeTitle: store.title,
       partNumber: product.partNumber,
       productName: product.title,
+      ...(product.companionPart ? { companionPart: product.companionPart } : {}),
     };
     if (targets.some((t) => targetKey(t) === targetKey(next))) return;
     await setTargets([...targets, next]);

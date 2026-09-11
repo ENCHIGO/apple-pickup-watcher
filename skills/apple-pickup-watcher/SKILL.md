@@ -43,6 +43,8 @@ apw watch --locale zh_CN --store R359 --part 'MWUC3CH/A' \
 
 Up to 256 targets / 1 MiB are accepted. Repeated `--store` and `--part` flags query every store/part combination; use the JSON array when only particular pairs are intended. `--targets` is exclusive with those flags and `--locale`.
 
+Apple Watch entries in `apw products` carry a `companionPart` (a band part number from the same buy page). Apple's pickup endpoint only answers truthfully for a watch case when a band is in the same query, so `check` and `watch` add it automatically for SKUs found in the embedded catalog. When a watch SKU came from `--refresh` output, pass its `companionPart` in the targets JSON (`{"locale":…,"storeNumber":…,"partNumber":…,"companionPart":…}`); a watch case queried without a band may come back empty or as a false negative.
+
 Prefer one bounded `watch` process for repeated checks so the engine can share connections, apply backoff, and deduplicate arrival events. The default interval is 30 seconds (minimum 5). Keep the host tool's execution deadline longer than the CLI's deadline. An unlimited `--timeout 0` watch requires a host that can retain the process and a user request for ongoing monitoring. Ending a foreground command or receiving a timeout ends monitoring; do not claim it will continue or notify later.
 
 ## Interpret results

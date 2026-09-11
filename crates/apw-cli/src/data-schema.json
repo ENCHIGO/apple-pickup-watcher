@@ -11,7 +11,9 @@
         "storeNumber": {"type": "string", "pattern": "^R[0-9]+$", "maxLength": 12},
         "partNumber": {"type": "string", "pattern": "^[A-Za-z0-9]+(/[A-Za-z0-9]+)?$", "maxLength": 64},
         "storeTitle": {"type": "string"},
-        "productName": {"type": "string"}
+        "productName": {"type": "string"},
+        "companionPart": {"type": "string", "pattern": "^[A-Za-z0-9]+(/[A-Za-z0-9]+)?$", "maxLength": 64,
+          "description": "Apple Watch only: band part number sent with the case so the pickup endpoint treats the query as a valid kit. Filled from the catalog when omitted."}
       }
     },
     "targets": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"$ref": "#/$defs/inputTarget"}},

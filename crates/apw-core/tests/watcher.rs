@@ -126,6 +126,7 @@ fn target(store: &str, part: &str) -> Target {
         store_title: format!("上海-{store}"),
         part_number: part.into(),
         product_name: format!("型号 {part}"),
+        companion_part: None,
     }
 }
 
@@ -164,6 +165,58 @@ fn count_in_stock(events: &[Event]) -> usize {
         .iter()
         .filter(|e| matches!(e, Event::InStock { .. }))
         .count()
+}
+
+#[tokio::test]
+async fn 搭档表带随请求一起发但不占状态行() {
+    // Apple Watch 的表壳单独查不出真话，必须和同页一条表带一起发；但那条表带
+    // 不是用户盯的东西：它不能出现在状态列表里，响应里缺了它也不算故障。
+    let fake = FakeFetcher::new(|_, store, parts| {
+        // 只回答表壳，故意不回答表带，模拟接口只认得其中一个。
+        let case_only: Vec<String> = parts
+            .iter()
+            .filter(|p| *p == "MEHW4CH/B")
+            .cloned()
+            .collect();
+        Ok(ok_response(store, &case_only, Availability::InStock))
+    });
+    let (w, mut rx) = Watcher::spawn(fake.clone(), fast_config());
+    let mut watch = target("R359", "MEHW4CH/B");
+    watch.companion_part = Some("MJUA4FE/A".into());
+    // 同店再盯一台 iPad，验证搭档排在全部目标之后、且整店仍然只发一次请求。
+    w.set_targets(vec![watch, target("R359", "ME6E4CH/A")])
+        .await;
+    w.start().await;
+
+    let events = wait_cycle(&mut rx).await;
+    w.stop().await;
+
+    let seen = fake.seen_parts.lock().await.clone();
+    assert_eq!(seen.len(), 1, "同一门店应当只发一次请求：{seen:?}");
+    assert_eq!(
+        seen[0],
+        vec![
+            "MEHW4CH/B".to_string(),
+            "ME6E4CH/A".to_string(),
+            "MJUA4FE/A".to_string()
+        ],
+        "搭档表带必须附在同一请求里，排在目标之后"
+    );
+
+    let snap = w.snapshot().await;
+    assert_eq!(
+        snap.len(),
+        2,
+        "表带不是监控目标，不该有自己的状态行：{snap:?}"
+    );
+    let case = snap
+        .iter()
+        .find(|s| s.target.part_number == "MEHW4CH/B")
+        .expect("表壳应当有状态");
+    assert_eq!(case.availability, Availability::InStock);
+    // 表带没在响应里出现，但那不是表壳的问题；iPad 那行没被回答才是（本轮里
+    // 它会被标成「响应中没有型号」），所以健康与否只看目标本身。
+    assert_eq!(count_in_stock(&events), 1);
 }
 
 #[tokio::test]

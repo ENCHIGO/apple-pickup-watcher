@@ -109,6 +109,10 @@ pub struct InputTarget {
     pub store_title: String,
     #[serde(default)]
     pub product_name: String,
+    /// Apple Watch 表壳的搭档表带零件号（见 `apw_core::model::Product::companion_part`）。
+    /// 缺省时按零件号回查目录补齐；目录里没有就不带。
+    #[serde(default)]
+    pub companion_part: Option<String>,
 }
 
 pub async fn read_targets<R: AsyncRead + Unpin>(reader: R) -> Result<Vec<InputTarget>, CliError> {
@@ -145,15 +149,22 @@ pub fn resolve_targets(
             )));
         }
         let part = &input.part_number;
-        if part.is_empty()
-            || part.len() > 64
-            || !part.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'/')
-            || !part.as_bytes()[0].is_ascii_alphanumeric()
-            || !part.as_bytes()[part.len() - 1].is_ascii_alphanumeric()
-            || part.bytes().filter(|b| *b == b'/').count() > 1
-        {
+        if !valid_part_number(part) {
             return Err(CliError::invalid(format!(
                 "Invalid part number {part:?}; use the SKU returned by apw products"
+            )));
+        }
+        let companion_input = input
+            .companion_part
+            .as_deref()
+            .map(str::trim)
+            .filter(|c| !c.is_empty())
+            .map(str::to_string);
+        if let Some(companion) = &companion_input
+            && !valid_part_number(companion)
+        {
+            return Err(CliError::invalid(format!(
+                "Invalid companionPart {companion:?}; use the value returned by apw products"
             )));
         }
         // Catalog absence is not proof of an invalid SKU/store: embedded data can lag.
@@ -164,19 +175,25 @@ pub fn resolve_targets(
         } else {
             input.store_title
         };
+        let known = catalog.product_by_part(&input.locale, part);
         let product_name = if input.product_name.is_empty() {
-            catalog
-                .product_by_part(&input.locale, part)
-                .map_or_else(|| part.clone(), |p| p.title)
+            known
+                .as_ref()
+                .map_or_else(|| part.clone(), |p| p.title.clone())
         } else {
             input.product_name
         };
+        // Apple Watch cases only answer truthfully when queried together with a
+        // band from the same buy page; the catalog knows which one.
+        let companion_part =
+            companion_input.or_else(|| known.as_ref().and_then(|p| p.companion_part.clone()));
         let target = Target {
             locale: input.locale,
             store_number: input.store_number,
             part_number: input.part_number,
             store_title,
             product_name,
+            companion_part,
         };
         if seen.insert(target.key()) {
             targets.push(target);
@@ -213,11 +230,22 @@ async fn load_targets(args: TargetArgs, catalog: &Catalog) -> Result<Vec<Target>
                     part_number: part.clone(),
                     store_title: String::new(),
                     product_name: String::new(),
+                    companion_part: None,
                 })
             })
             .collect()
     };
     resolve_targets(inputs, catalog)
+}
+
+/// Apple part numbers look like `MJTF4CH/A`: alphanumerics with at most one slash.
+fn valid_part_number(part: &str) -> bool {
+    !part.is_empty()
+        && part.len() <= 64
+        && part.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'/')
+        && part.as_bytes()[0].is_ascii_alphanumeric()
+        && part.as_bytes()[part.len() - 1].is_ascii_alphanumeric()
+        && part.bytes().filter(|b| *b == b'/').count() <= 1
 }
 
 fn matches_search(search: &Option<String>, values: &[&str]) -> bool {

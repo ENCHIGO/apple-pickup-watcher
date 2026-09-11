@@ -253,10 +253,9 @@ const DEFAULT_FAMILIES: &[Family] = &[
         category: Category::Iphone,
         slug: "iphone-17",
     },
-    Family {
-        category: Category::Iphone,
-        slug: "iphone-17-pro",
-    },
+    // iphone-17-pro 已于 2026-09 下架：七个站点的购买页都 301 到 iPhone 总览页，
+    // 那一页没有商品数据。留着它只会让每次刷新都报「部分失败」，也会卡住
+    // 离线快照的重新生成（缺一页就整个地区不写）。
     Family {
         category: Category::Iphone,
         slug: "iphone-air",
@@ -408,6 +407,17 @@ pub struct Product {
     pub color: String,
     /// 界面展示名，如「iPhone 17 512GB 黑色」。
     pub title: String,
+    /// 查库存时必须随同一请求一起带上的「搭档」零件号；目前只有 Apple Watch 用得到。
+    ///
+    /// Apple 的取货接口把 Apple Watch 当作「表壳 + 表带」的套件。单独查表壳
+    /// 零件号，要么整个响应是空的（老款），要么把表壳报成「不支持到店取货」
+    /// （SE）—— 后者会被如实显示成「无货」，而那是假的。带上同一购买页里
+    /// 任意一条表带的零件号，表壳返回的才是真实状态；实测同一只表壳搭配同页
+    /// 不同表带，表壳的状态都一样，表带只是让接口把这次查询当作合法套件。
+    ///
+    /// iPhone / iPad / Mac 为 `None`。序列化时省略，旧快照与旧配置照常读入。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub companion_part: Option<String>,
 }
 
 /// 一家 Apple 直营店。
@@ -431,6 +441,10 @@ pub struct Target {
     pub store_title: String,
     pub part_number: String,
     pub product_name: String,
+    /// 见 [`Product::companion_part`]。添加目标时从商品上带过来，查询时附在
+    /// 同一请求里；它不参与目标的身份（[`Target::key`]），也没有自己的状态行。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub companion_part: Option<String>,
 }
 
 impl Target {
@@ -541,6 +555,7 @@ mod tests {
             store_title: "上海-环球港".into(),
             part_number: part.into(),
             product_name: "x".into(),
+            companion_part: None,
         };
         assert_ne!(mk("MG724CH/A").key(), mk("MG0A4CH/A").key());
         assert_eq!(mk("MG724CH/A").key(), mk("MG724CH/A").key());

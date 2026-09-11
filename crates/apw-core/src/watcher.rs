@@ -256,6 +256,10 @@ struct StoreGroup {
     locale: String,
     store_number: String,
     parts: Vec<String>,
+    /// 随请求一起发、但本身不是监控目标的零件号：Apple Watch 表壳的搭档表带
+    /// （见 [`crate::model::Product::companion_part`]）。只参与请求，不参与对账 ——
+    /// 响应里有没有它、它是什么状态，都不影响任何目标。
+    companions: Vec<String>,
 }
 
 /// 单个门店查询完的结果。
@@ -373,8 +377,13 @@ async fn query_one_store<F: Fetcher>(client: &F, group: StoreGroup) -> StoreOutc
         };
     };
 
+    // 搭档零件号排在目标之后一起发出去。它们不在 `group.parts` 里，下面对账时
+    // 自然不会给它们造状态行；请求成功与否的判定也只看目标本身。
+    let mut requested = group.parts.clone();
+    requested.extend(group.companions.iter().cloned());
+
     match client
-        .pickup_message(region, &group.store_number, &group.parts)
+        .pickup_message(region, &group.store_number, &requested)
         .await
     {
         Err(err) => {
@@ -696,24 +705,42 @@ impl<F: Fetcher> Engine<F> {
     /// 把目标按 (地区, 门店) 聚合，使每个门店每轮只发一次请求。
     fn group_targets(&self) -> Vec<StoreGroup> {
         let mut order: Vec<(String, String)> = Vec::new();
-        let mut index: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
+        let mut index: BTreeMap<(String, String), (Vec<String>, Vec<String>)> = BTreeMap::new();
 
         for t in &self.targets {
             let k = (t.locale.clone(), t.store_number.clone());
             if !index.contains_key(&k) {
                 order.push(k.clone());
             }
-            index.entry(k).or_default().push(t.part_number.clone());
+            let (parts, companions) = index.entry(k).or_default();
+            parts.push(t.part_number.clone());
+            if let Some(companion) = t
+                .companion_part
+                .as_deref()
+                .map(str::trim)
+                .filter(|c| !c.is_empty())
+                && !companions.iter().any(|c| c == companion)
+            {
+                companions.push(companion.to_string());
+            }
         }
 
         order
             .into_iter()
             .map(|(locale, store_number)| {
-                let parts = index.remove(&(locale.clone(), store_number.clone()));
+                let (parts, companions) = index
+                    .remove(&(locale.clone(), store_number.clone()))
+                    .unwrap_or_default();
+                // 搭档恰好也是同一门店的监控目标时，它已经在请求里了，不必重复。
+                let companions = companions
+                    .into_iter()
+                    .filter(|c| !parts.contains(c))
+                    .collect();
                 StoreGroup {
                     locale,
                     store_number,
-                    parts: parts.unwrap_or_default(),
+                    parts,
+                    companions,
                 }
             })
             .collect()
