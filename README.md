@@ -1,22 +1,37 @@
-# Apple Pickup Watcher
+# Apple Pickup Watcher · 苹果直营店库存监控与到货提醒
 
-盯着 Apple 直营店的「到店取货」库存，某个型号在你选的门店可取货时立刻提醒你。
-支持 **iPhone、iPad、Mac、Apple Watch** 四个品类，七个地区：中国大陆、中国香港、
-中国台湾、日本、Singapore、Australia、Malaysia。
+**免费开源的 Apple Store 到店取货库存监控工具**。选择 Apple 直营店和商品型号，
+在查询确认有货时接收系统通知、提示音或可选的 Bark 手机推送。
+适合个人关注 **iPhone、iPad、Mac、Apple Watch** 的门店补货。
 
-跨平台桌面应用，macOS / Windows / Linux。Rust + Tauri，v0.4.0。
+[项目介绍](https://enchigo.github.io/apple-pickup-watcher/) ·
+[English](https://enchigo.github.io/apple-pickup-watcher/en/) ·
+[下载最新正式版](https://github.com/ENCHIGO/apple-pickup-watcher/releases/latest) ·
+[安装说明](#安装) · [使用方法](#怎么用) · [常见问题](#常见问题--faq)
 
-**English** — Apple Pickup Watcher monitors in-store pickup availability at Apple Retail
-Stores and alerts you the moment a specific model becomes available at the store you
-picked. It covers iPhone, iPad, Mac and Apple Watch. It is a cross-platform desktop app
-(macOS / Windows / Linux) built with Rust and Tauri, covering seven regions: China
-mainland, Hong Kong, Taiwan, Japan, Singapore, Australia and Malaysia.
+| 项目 | 支持范围 |
+| --- | --- |
+| 操作系统 | macOS（Apple Silicon / Intel）、Windows x64、Linux x86_64 |
+| 产品 | iPhone、iPad、Mac、Apple Watch；具体型号以应用目录为准 |
+| 地区 | 中国大陆、中国香港、中国台湾、日本、新加坡、澳大利亚、马来西亚 |
+| 通知 | 系统通知、提示音、可选 Bark 推送；窗口收进托盘后继续监控 |
+| 库存状态 | 有货 / 无货 / 未知，界面另行区分待查询；查询失败显示原因 |
+| 购买方式 | 可按设置打开购物袋；添加商品、选择取货门店、结账及付款由用户在 Apple 官网完成 |
+| 技术与许可 | Rust + Tauri v2 + React / TypeScript；GPL-3.0-or-later |
 
-It is a rewrite of [hteen/apple-store-helper](https://github.com/hteen/apple-store-helper)
-(GPL-3.0, unmaintained). That project's stock endpoint now returns **HTTP 541** for every
-request, and because it reported failed lookups as “out of stock”, it kept looking healthy
-while showing no stock forever. See [常见问题 / FAQ](#常见问题--faq) for the diagnosis and
-the endpoint that still works.
+需要保持应用运行、电脑联网且处于唤醒状态。程序不预留库存，也不保证购得；
+最终取货信息以 Apple 官网为准。具体版本及安装包见 [Releases](https://github.com/ENCHIGO/apple-pickup-watcher/releases)。
+
+**English — Apple Store pickup stock monitor and restock alerts.** Apple Pickup Watcher
+is a free, open-source desktop application for macOS, Windows and Linux. It monitors
+in-store pickup availability for iPhone, iPad, Mac and Apple Watch in China mainland,
+Hong Kong, Taiwan, Japan, Singapore, Australia and Malaysia. It offers desktop, sound
+and optional Bark alerts, and reports failed queries as **unknown**, not out of stock.
+Purchases are completed manually on Apple's website. This independent project is not
+affiliated with or endorsed by Apple Inc.
+
+It is a Rust + Tauri rewrite of [hteen/apple-store-helper](https://github.com/hteen/apple-store-helper).
+See [NOTICE](NOTICE) for attribution and [the FAQ](#常见问题--faq) for query-failure behavior.
 
 ---
 
@@ -40,28 +55,18 @@ the endpoint that still works.
 
 ## 为什么会有这个项目
 
-原项目依赖 Apple 的 `/shop/fulfillment-messages` 接口。这个接口现在对**任意**请求都恒定
-返回 HTTP 541 加一个 128002 字节的拦截页 —— 中国大陆站与美国站的响应完全一致，同一时刻
-`apple.com.cn` 首页正常返回 200，可以排除是 IP 被封。也就是说，接口对所有人都已经不通了。
+在排查原项目时，我们观察到它使用的 `/shop/fulfillment-messages` 请求返回 HTTP 541，
+但程序仍然把查不到的结果显示成「无货」。这些观察来自当时的请求和网络环境，
+不能推断接口在所有地区、所有网络或未来都不可用。
 
-真正致命的不是接口失效，而是失效的**表现方式**：原项目把请求失败当作「无货」处理。于是
-程序看上去一切正常 —— 界面在刷新、时间戳在跳、日志在滚 —— 只是永远显示无货。它就这样
-静默失效了大半年。一个直接报错的程序你会立刻去修；一个永远说「无货」的程序，你只会以为
-今天没货，然后错过购买时机。
+真正需要避免的是**查询失败却被显示成无货**：程序看似还在刷新，用户却无法知道库存查询
+实际上没有成功。本项目改用 `/shop/retail/pickup-message`，并在核心类型中明确区分
+「有货 / 无货 / 未知」。未知必须带原因，包括网络失败、拦截、限流、无法识别的响应等。
 
-本项目做了两件事：
-
-1. **换接口。** 改用 `/shop/retail/pickup-message`，重写了全部的请求构造与响应解析。
-2. **把「未知」提升为一等状态。** 库存状态是「有货 / 无货 / 未知」三态，`未知` 必须携带
-   一个具体原因（被拦截、被限流、响应结构不符、Apple 返回业务错误、网络失败、尚未查询），
-   在界面上和「无货」分开展示。
-
-   > 猜错成「无货」会让你错过机会，猜错成「未知」只是让你多看一眼。
-   > 这两种错误的代价完全不对等，所以代码在所有拿不准的地方一律倒向「未知」。
-
-这条不变量是用类型系统守的，不是靠自觉：`Unknown` 构造时必须给出原因，`Availability`
-刻意不实现 `Default`（有了默认值，迟早有人在解析失败时 `unwrap_or_default()`），
-而所有 API 错误到状态的转换是单向且全覆盖的 —— **没有任何一条错误路径能通向「无货」**。
+`Unknown` 构造时必须给出原因，`Availability` 不实现 `Default`，错误路径不能生成
+「无货」。实现和回归证据见 [库存类型](crates/apw-core/src/model.rs)、
+[Apple 客户端](crates/apw-core/src/apple.rs) 和 [响应解析测试](crates/apw-core/tests/parse.rs)。
+新接口也可能失败；显示失败原因是监控可靠性的一部分。
 
 ---
 
@@ -155,9 +160,8 @@ xattr -cr "/Applications/Apple Pickup Watcher.app"
 
 默认 **30 秒**，下限 **5 秒**。
 
-原项目写死 500 毫秒一轮，即每个门店每秒两次请求。这个频率对一个公开的商品查询接口来说
-过高，是触发风控的直接原因，也是它的 issue 里 503 / 541 反复出现的背景。30 秒足够应付
-发售抢购，同时不至于把自己送进黑名单。
+查询间隔越短，请求负担越高，也可能增加限流或拦截风险。默认 30 秒是在提醒及时性与
+请求频率之间的取舍，不代表这个频率一定不会被拦截。
 
 填了小于 5 秒的值会被退回默认的 30 秒，而不是夹到 5 秒 —— 手抖填了 1 秒的人想要的是快，
 但 5 秒同样会被风控盯上，退回 30 秒才是安全的那一侧。
@@ -378,107 +382,62 @@ macOS 的 Intel 构建用 `macos-15-intel` runner，arm64 用 `macos-latest`。
 
 ## 常见问题 / FAQ
 
-这一节回答的是几个真实被反复问到的问题（上游 issue #127 #126 #124 #122 #118 都是同一件事）。
+### 如何监控 iPhone 或其他 Apple 产品的门店到货？
 
-### 为什么 apple-store-helper 一直显示「无货」，但官网明明有货？
+下载并安装对应系统的版本，选择地区、品类、门店和型号，添加监控目标后点击「开始」。
+默认每 30 秒查询一次；发现目标从非有货变为有货时发送通知。完整步骤见[怎么用](#怎么用)。
 
-因为它使用的库存接口已经失效了，而失效的表现不是报错，是「永远无货」。
+### 可以自动下单、预留库存或保证买到吗？
 
-`/shop/fulfillment-messages` 现在对任意请求恒定返回 **HTTP 541**，响应体是一个 128002 字节
-的「Page Not Found」拦截页。可复现：
+不可以。程序可以按设置打开购物袋，但添加商品、选择取货门店、结账和付款均由用户
+在 Apple 官网完成。提醒后库存仍可能变化，工具不预留库存，也不保证购得。
 
-```shell
-curl -sS -o /dev/null -w 'HTTP %{http_code}  size=%{size_download}\n' \
-  'https://www.apple.com.cn/shop/fulfillment-messages?little=true&mt=regular&parts.0=MG724CH%2FA&store=R683'
-# HTTP 541  size=128002
-```
+### 为什么有些库存工具一直显示「无货」，但官网明明有货？
 
-中国大陆站与美国站返回的字节数完全相同，同一时刻 apple.com.cn 首页正常返回 200 ——
-可以排除偶发故障和 IP 被封。换 UA、补请求头、先取 cookie 再请求，都仍然 541。
-
-真正让它「看起来正常」的是另一半：那个项目在请求失败时返回空结果，上层把查不到的型号
-一律标成无货（`services/listen.go:226-230` 与 `:147`）。所以接口没了之后，界面一切正常，
-只是永远显示无货 —— 这比直接报错更容易让人错过购买时机。
+需要先确认工具是否真正成功查询。我们在排查上游 `apple-store-helper` 时发现，
+请求失败后返回的空结果会在上层被当成无货，这会掩盖网络或接口问题。
+Apple Pickup Watcher 把查询失败显示为带原因的「未知」，与有效响应中的「无货」分开。
+门店、型号、地区或查询时间不同，也可能造成与官网结果不一致。
 
 ### HTTP 541 是什么意思？
 
-541 不是标准 HTTP 状态码，是 Apple 边缘节点自定义的拦截响应。看到它基本可以确定请求被
-挡下了，而不是「没有库存」。降低查询频率、更换 User-Agent、加重试都无法绕过 —— 问题不在
-频率或伪装，在于那个接口本身已经不在了。
+在本项目的 Apple 请求中，HTTP 541 被作为拦截类查询失败处理，不表示无货。
+仅凭这个状态码，不能确定是 Cookie、网络环境还是 Apple 侧策略导致，也不能证明
+某个接口已对所有人永久停用。请结合应用日志、版本、地区与请求环境排查。
 
-### 程序报「请求被 Apple 拦截：HTTP 541」，可浏览器打开官网一切正常？
+### 程序被拦截，但浏览器打开 Apple 官网正常，怎么办？
 
-**先别去调查询间隔，那多半没用。** 这个问题（[issue #3](https://github.com/ENCHIGO/apple-pickup-watcher/issues/3)）
-的报告者把间隔从 5 秒改到 120 秒，照样被拦 —— 一个门店两分钟一次请求，换算下来每秒 0.025 次，
-没有任何以流量为判准的风控会对这个数字有反应。
+浏览器和应用的 Cookie、请求上下文及网络路径可能不同。针对
+[issue #3](https://github.com/ENCHIGO/apple-pickup-watcher/issues/3) 中的报告，
+v0.3.2 起客户端会先访问购买页建立 Cookie 会话，再查询库存；被拦截时会重建会话。
+这是对已观察问题的修复，不能保证所有环境都不再遇到 HTTP 541。
 
-真正的原因是**没带 cookie**。报告者在同一个浏览器里做了十轮成对对照，唯一的变量就是带不带 cookie：
+先升级到最新正式版；仍然失败时，请在 [Issues](https://github.com/ENCHIGO/apple-pickup-watcher/issues)
+附上应用版本、地区和脱敏后的日志。不要提交 Bark Key、Cookie 或其他凭据。
+降低查询频率可能减轻请求负担，但不保证解决拦截问题。
 
-```
-带 cookie   10/10 全部 200
-不带 cookie  8/10  返回 541
-```
+### 项目使用哪个库存接口？
 
-而这件事**只在被风控盯上的网络上才看得出来**：在没被盯上的网络里，带不带 cookie 都是 200，
-怎么对照都测不出差别。我们自己就因此误判过一次 —— 拿「本机两种都正常」当反证，把正确的
-假设枪毙了，转头去追 TLS 指纹，绕了一大圈。**在复现不了问题的环境里得到的阴性结果，
-什么都不能证明。**
+当前客户端使用 `/shop/retail/pickup-message`。请求构造和状态解释以
+[Apple 客户端源码](crates/apw-core/src/apple.rs) 为准，离线响应契约见
+[解析测试](crates/apw-core/tests/parse.rs)。项目另有每天运行的真实接口测试，
+结果可在 [GitHub Actions](https://github.com/ENCHIGO/apple-pickup-watcher/actions/workflows/ci.yml)
+查看；一次成功不代表所有用户网络都可用。
 
-v0.3.2 起客户端会先取一次购买页把 cookie 攒上再查询，被拦时丢掉重攒。如果你装的是更早的
-版本，升级即可；升级后仍被拦的话，请开一个 issue 并附上日志。
+### What is the difference between unknown and out of stock?
 
-### 现在还能用的接口是哪个？
+Out of stock means a successful query returned a recognized unavailable pickup result.
+Unknown means the query could not determine availability, for example because of a
+network failure, a block, a rate limit or an unrecognized response. HTTP 541 is treated
+as a failed query, not proof that a device is out of stock. A successful check in one
+network does not guarantee success in another.
 
-`/shop/retail/pickup-message`：
+### 这个项目与 Apple 官方、上游项目是什么关系？
 
-```shell
-curl -sS 'https://www.apple.com.cn/shop/retail/pickup-message?pl=true&mts.0=regular&parts.0=MG724CH%2FA&store=R683'
-# HTTP 200，返回 JSON
-```
-
-响应结构与旧接口不同：门店在 `body.stores[]`（不再是 `body.content.pickupMessage.stores`），
-状态在 `partsAvailability.<零件号>.pickupDisplay`（取值 `available` / `unavailable` /
-`ineligible`），`messageTypes` 下只有 `regular` 而没有 `compact`。一次请求可以带多个零件号，
-所以每个门店每轮只需发一次请求。七个地区都实测可用。
-
-### Why does apple-store-helper always show “out of stock”?
-
-Its stock endpoint `/shop/fulfillment-messages` now returns **HTTP 541** with a 128002-byte
-“Page Not Found” interception page for every request, regardless of part number or store.
-Worse, that project treated a failed lookup as “out of stock”, so the UI kept looking healthy
-while never actually querying anything. Lowering the polling interval or changing the
-User-Agent does not help — the endpoint is simply gone.
-
-The endpoint that still works is `/shop/retail/pickup-message`, with a different response
-shape (`body.stores[]`, `partsAvailability.<part>.pickupDisplay`, and only `regular` under
-`messageTypes`). All seven regions verified.
-
-### 这个项目和上游、以及其他 fork 有什么不同？
-
-最主要的一条不是换了接口，而是**「查不到」和「无货」被当成两件事**。状态有三种：有货、
-无货、未知；未知必须携带原因（被拦截 / 限流 / 接口结构变了 / 网络失败），界面上用完全
-不同的配色显示，并把「查不到多少项」单独标出来。接口哪天再变，你会立刻看到告警，而不是
-对着一屏看起来正常的「无货」空等。
-
-另外有一个每天自动跑的契约测试，直接请求 Apple 的真实接口。上游正是因为没有这道防线，
-接口失效后半年多没人发现。
-
----
-
-## 版本分支
-
-`main` 用于日常开发；每个已发布版本保留对应的 `release/vX.Y.Z` 分支，
-例如 `release/v0.4.0`。分支创建时指向该版本标签的实际提交，标签保留安装包对应的发布点。
-
-发布 GitHub Release 后，`Release branches` 工作流会自动创建对应分支。
-维护者也可以在 Actions 中手动运行它：指定标签只处理一个版本，留空则补齐所有已发布版本
-（含预发布版本，跳过草稿）。已有分支始终保留，不会被重置，方便后续维护旧版补丁。
-流程使用仓库的 `GITHUB_TOKEN` 创建分支，补齐历史版本不会重复触发这些分支的 CI。
-如果以后改为用 `GITHUB_TOKEN` 自动发布 Release，需要显式调用此工作流，
-因为该令牌产生的发布事件不会再次触发其他工作流。
-
-临时功能或修复分支在 PR 合并后可以删除；仍在使用的工作目录、未合并提交和未完成 PR
-需要先检查。版本标签和 `release/*` 分支长期保留。
+这是独立开源项目，与 Apple Inc. 无关联，也未获其授权或认可。
+它是 `hteen/apple-store-helper` 的 Rust + Tauri 重写版本，保留 GPL 许可及来源声明，
+详见 [NOTICE](NOTICE) 与 [LICENSE](LICENSE)。核心差异包括失败状态可见、后台托盘监控、
+多品类支持与到货通知。具体能力以正式发布版本为准。
 
 ---
 
