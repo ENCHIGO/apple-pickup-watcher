@@ -4,6 +4,8 @@
 在查询确认有货时接收系统通知、提示音或可选的 Bark 手机推送。
 适合个人关注 **iPhone、iPad、Mac、Apple Watch** 的门店补货。
 
+[项目介绍](https://enchigo.github.io/apple-pickup-watcher/) ·
+[English](https://enchigo.github.io/apple-pickup-watcher/en/) ·
 [下载最新正式版](https://github.com/ENCHIGO/apple-pickup-watcher/releases/latest) ·
 [安装说明](#安装) · [使用方法](#怎么用) · [常见问题](#常见问题--faq)
 
