@@ -387,18 +387,24 @@ async fn query_one_store<F: Fetcher>(client: &F, group: StoreGroup) -> StoreOutc
         .await
     {
         Err(err) => {
-            // 只有这两类值得打断用户：被拦截是他能动手解决的，结构漂移是他
-            // 必须知道「现在看到的一切都不作数」的。网络超时之类的过一会儿
-            // 自己就好了，弹出来只是噪音。
-            let advice = match &err {
-                ApiError::Blocked(_) => Some(TroubleAdvice::TryAnotherNetwork),
-                ApiError::SchemaDrift { .. } => Some(TroubleAdvice::WaitForUpdate),
-                _ => None,
+            // 被拦截和结构漂移分别有明确的处理建议。Apple 业务错误也要展示，
+            // 但不挂泛化建议：例如空门店列表可能与型号停售或尚未开售有关，
+            // 此时让用户换网络或等待程序更新都会把方向带偏。
+            let trouble = match &err {
+                ApiError::Blocked(_) => Some(TroubleReport {
+                    reason: format!("门店 {} 查询失败：{err}", group.store_number),
+                    advice: Some(TroubleAdvice::TryAnotherNetwork),
+                }),
+                ApiError::SchemaDrift { .. } => Some(TroubleReport {
+                    reason: format!("门店 {} 查询失败：{err}", group.store_number),
+                    advice: Some(TroubleAdvice::WaitForUpdate),
+                }),
+                ApiError::Apple(_) => Some(TroubleReport {
+                    reason: format!("门店 {} 查询失败：{err}", group.store_number),
+                    advice: None,
+                }),
+                ApiError::RateLimited(_) | ApiError::Transport(_) => None,
             };
-            let trouble = advice.map(|advice| TroubleReport {
-                reason: format!("门店 {} 查询失败：{err}", group.store_number),
-                advice: Some(advice),
-            });
 
             let reason = err.into_unknown_reason();
             let n = group.parts.len();
