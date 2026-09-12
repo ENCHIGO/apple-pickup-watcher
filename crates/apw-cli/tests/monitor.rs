@@ -66,6 +66,7 @@ fn target(part: &str) -> Target {
         store_title: "上海-南京东路".into(),
         part_number: part.into(),
         product_name: part.into(),
+        companion_part: None,
     }
 }
 fn config() -> WatcherConfig {

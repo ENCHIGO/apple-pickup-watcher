@@ -153,6 +153,7 @@ async fn save_settings(
 ) -> Result<Settings, String> {
     let mut next = settings;
     next.normalize();
+    state.catalog.attach_companions(&mut next.targets);
 
     // 设置里的目标列表和查询间隔要同步给引擎，否则改完设置监控还按旧的跑。
     state.watcher.set_targets(next.targets.clone()).await;
@@ -172,6 +173,8 @@ async fn set_targets(
     state: tauri::State<'_, AppState>,
     targets: Vec<Target>,
 ) -> Result<Vec<TargetState>, String> {
+    let mut targets = targets;
+    state.catalog.attach_companions(&mut targets);
     state.watcher.set_targets(targets.clone()).await;
     let mut next = state.settings_snapshot();
     next.targets = targets;
@@ -489,7 +492,12 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let mut notices = Vec::new();
-            let (settings, store) = load_settings(&mut notices);
+            let (mut settings, store) = load_settings(&mut notices);
+
+            // 旧版本保存的 Apple Watch 目标没有搭档表带，查出来会是假的
+            // 「无货」；启动时按目录补齐，下次写盘就带上了。
+            let catalog = Catalog::new();
+            catalog.attach_companions(&mut settings.targets);
 
             let client = AppleClient::new(ClientConfig::default())
                 .map_err(|e| format!("构造 Apple 客户端失败：{e}"))?;
@@ -513,7 +521,7 @@ pub fn run() {
 
             app.manage(AppState {
                 watcher,
-                catalog: Catalog::new(),
+                catalog,
                 http: reqwest::Client::new(),
                 settings: RwLock::new(settings),
                 store,

@@ -24,7 +24,7 @@ use std::sync::{PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use serde::Deserialize;
 
 use crate::apple::ApiError;
-use crate::model::{Category, Family, Product, Region, Store};
+use crate::model::{Category, Family, Product, Region, Store, Target};
 
 /// 目录相关的失败。
 ///
@@ -271,6 +271,37 @@ impl Catalog {
             .ok()?
             .into_iter()
             .find(|p| p.part_number == part)
+    }
+
+    /// 给监控目标补上搭档零件号（见 [`Product::companion_part`]）。
+    ///
+    /// 旧版本保存的 Apple Watch 目标没有这个字段，CLI 用 `--part` 直接给零件号
+    /// 时也没有；两种情况都按零件号回查目录，查得到就补上。已经带着搭档的
+    /// 目标原样保留，目录里没有的零件号也原样保留 —— 目录可能过期，不能因此
+    /// 把目标删掉或改掉，那样用户盯了半天的那一行会凭空消失。
+    pub fn attach_companions(&self, targets: &mut [Target]) {
+        let mut by_locale: HashMap<String, Option<Vec<Product>>> = HashMap::new();
+        for target in targets.iter_mut() {
+            if target
+                .companion_part
+                .as_deref()
+                .is_some_and(|c| !c.trim().is_empty())
+            {
+                continue;
+            }
+            let products = by_locale
+                .entry(target.locale.clone())
+                .or_insert_with(|| self.products(&target.locale).ok());
+            let Some(products) = products else {
+                continue;
+            };
+            if let Some(product) = products
+                .iter()
+                .find(|p| p.part_number == target.part_number)
+            {
+                target.companion_part = product.companion_part.clone();
+            }
+        }
     }
 
     /// 按门店编号查门店，语义同 [`Catalog::product_by_part`]。
@@ -617,6 +648,7 @@ mod tests {
             capacity: "256GB".to_string(),
             color: "黑色".to_string(),
             title: title.to_string(),
+            companion_part: None,
         }
     }
 

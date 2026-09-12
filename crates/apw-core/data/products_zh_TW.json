@@ -446,196 +446,6 @@
   },
   {
     "category": "iphone",
-    "family": "iphone-17-pro",
-    "data": {
-      "products": [
-        {
-          "partNumber": "MFYM4ZP/A",
-          "familyType": "iphone17promax",
-          "dimensionCapacity": "256gb",
-          "dimensionScreensize": "6_9inch",
-          "dimensionColor": "silver"
-        },
-        {
-          "partNumber": "MFYN4ZP/A",
-          "familyType": "iphone17promax",
-          "dimensionCapacity": "256gb",
-          "dimensionScreensize": "6_9inch",
-          "dimensionColor": "cosmicorange"
-        },
-        {
-          "partNumber": "MFYP4ZP/A",
-          "familyType": "iphone17promax",
-          "dimensionCapacity": "256gb",
-          "dimensionScreensize": "6_9inch",
-          "dimensionColor": "deepblue"
-        },
-        {
-          "partNumber": "MFYQ4ZP/A",
-          "familyType": "iphone17promax",
-          "dimensionCapacity": "512gb",
-          "dimensionScreensize": "6_9inch",
-          "dimensionColor": "silver"
-        },
-        {
-          "partNumber": "MFYT4ZP/A",
-          "familyType": "iphone17promax",
-          "dimensionCapacity": "512gb",
-          "dimensionScreensize": "6_9inch",
-          "dimensionColor": "cosmicorange"
-        },
-        {
-          "partNumber": "MFYU4ZP/A",
-          "familyType": "iphone17promax",
-          "dimensionCapacity": "512gb",
-          "dimensionScreensize": "6_9inch",
-          "dimensionColor": "deepblue"
-        },
-        {
-          "partNumber": "MFYV4ZP/A",
-          "familyType": "iphone17promax",
-          "dimensionCapacity": "1tb",
-          "dimensionScreensize": "6_9inch",
-          "dimensionColor": "silver"
-        },
-        {
-          "partNumber": "MFYW4ZP/A",
-          "familyType": "iphone17promax",
-          "dimensionCapacity": "1tb",
-          "dimensionScreensize": "6_9inch",
-          "dimensionColor": "cosmicorange"
-        },
-        {
-          "partNumber": "MFYX4ZP/A",
-          "familyType": "iphone17promax",
-          "dimensionCapacity": "1tb",
-          "dimensionScreensize": "6_9inch",
-          "dimensionColor": "deepblue"
-        },
-        {
-          "partNumber": "MFYY4ZP/A",
-          "familyType": "iphone17promax",
-          "dimensionCapacity": "2tb",
-          "dimensionScreensize": "6_9inch",
-          "dimensionColor": "silver"
-        },
-        {
-          "partNumber": "MG004ZP/A",
-          "familyType": "iphone17promax",
-          "dimensionCapacity": "2tb",
-          "dimensionScreensize": "6_9inch",
-          "dimensionColor": "cosmicorange"
-        },
-        {
-          "partNumber": "MG014ZP/A",
-          "familyType": "iphone17promax",
-          "dimensionCapacity": "2tb",
-          "dimensionScreensize": "6_9inch",
-          "dimensionColor": "deepblue"
-        },
-        {
-          "partNumber": "MG8G4ZP/A",
-          "familyType": "iphone17pro",
-          "dimensionCapacity": "256gb",
-          "dimensionScreensize": "6_3inch",
-          "dimensionColor": "silver"
-        },
-        {
-          "partNumber": "MG8H4ZP/A",
-          "familyType": "iphone17pro",
-          "dimensionCapacity": "256gb",
-          "dimensionScreensize": "6_3inch",
-          "dimensionColor": "cosmicorange"
-        },
-        {
-          "partNumber": "MG8J4ZP/A",
-          "familyType": "iphone17pro",
-          "dimensionCapacity": "256gb",
-          "dimensionScreensize": "6_3inch",
-          "dimensionColor": "deepblue"
-        },
-        {
-          "partNumber": "MG8K4ZP/A",
-          "familyType": "iphone17pro",
-          "dimensionCapacity": "512gb",
-          "dimensionScreensize": "6_3inch",
-          "dimensionColor": "silver"
-        },
-        {
-          "partNumber": "MG8M4ZP/A",
-          "familyType": "iphone17pro",
-          "dimensionCapacity": "512gb",
-          "dimensionScreensize": "6_3inch",
-          "dimensionColor": "cosmicorange"
-        },
-        {
-          "partNumber": "MG8N4ZP/A",
-          "familyType": "iphone17pro",
-          "dimensionCapacity": "512gb",
-          "dimensionScreensize": "6_3inch",
-          "dimensionColor": "deepblue"
-        },
-        {
-          "partNumber": "MG8P4ZP/A",
-          "familyType": "iphone17pro",
-          "dimensionCapacity": "1tb",
-          "dimensionScreensize": "6_3inch",
-          "dimensionColor": "silver"
-        },
-        {
-          "partNumber": "MG8Q4ZP/A",
-          "familyType": "iphone17pro",
-          "dimensionCapacity": "1tb",
-          "dimensionScreensize": "6_3inch",
-          "dimensionColor": "cosmicorange"
-        },
-        {
-          "partNumber": "MG8R4ZP/A",
-          "familyType": "iphone17pro",
-          "dimensionCapacity": "1tb",
-          "dimensionScreensize": "6_3inch",
-          "dimensionColor": "deepblue"
-        }
-      ],
-      "displayValues": {
-        "dimensionScreensize": {
-          "6_3inch": {
-            "value": "iPhone&nbsp;17&nbsp;Pro\n<span class=\"form-label-small\">6.3 吋顯示器<as-footnote data-id=\"8054edc379d142293eb3940b1a8ea8d1\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;註腳&nbsp;</span>2</sup></as-footnote></span>"
-          },
-          "6_9inch": {
-            "value": "iPhone&nbsp;17&nbsp;Pro&nbsp;Max\n<span class=\"form-label-small\">6.9 吋顯示器<as-footnote data-id=\"8054edc379d142293eb3940b1a8ea8d1\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;註腳&nbsp;</span>2</sup></as-footnote></span>"
-          }
-        },
-        "dimensionColor": {
-          "cosmicorange": {
-            "value": "宇宙橙色"
-          },
-          "deepblue": {
-            "value": "藏藍色"
-          },
-          "silver": {
-            "value": "銀色"
-          }
-        },
-        "dimensionCapacity": {
-          "1tb": {
-            "value": "1<small>TB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;註腳&nbsp;</span>1</sup></as-footnote>"
-          },
-          "256gb": {
-            "value": "256<small>GB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;註腳&nbsp;</span>1</sup></as-footnote>"
-          },
-          "2tb": {
-            "value": "2<small>TB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;註腳&nbsp;</span>1</sup></as-footnote>"
-          },
-          "512gb": {
-            "value": "512<small>GB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;註腳&nbsp;</span>1</sup></as-footnote>"
-          }
-        }
-      }
-    }
-  },
-  {
-    "category": "iphone",
     "family": "iphone-air",
     "data": {
       "products": [
@@ -2892,16 +2702,7 @@
     "data": {
       "products": [
         {
-          "part": "MEW04TA/A",
-          "dimensions": {
-            "watch_cases-dimensionCaseSize": "42mm",
-            "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "jet_black",
-            "watch_cases-dimensionConnection": "gps"
-          }
-        },
-        {
-          "part": "MEW14TA/A",
+          "part": "MJFN4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "42mm",
             "watch_cases-dimensionCaseMaterial": "aluminum",
@@ -2910,34 +2711,34 @@
           }
         },
         {
-          "part": "MEW24TA/A",
+          "part": "MJFP4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "42mm",
             "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "rosegold",
+            "watch_cases-dimensionColor": "black",
             "watch_cases-dimensionConnection": "gps"
           }
         },
         {
-          "part": "MEW34TA/A",
+          "part": "MJFQ4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "42mm",
             "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "silver",
+            "watch_cases-dimensionColor": "lightgold",
             "watch_cases-dimensionConnection": "gps"
           }
         },
         {
-          "part": "MEW84TA/A",
+          "part": "MJFR4TA/A",
           "dimensions": {
-            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseSize": "42mm",
             "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "jet_black",
+            "watch_cases-dimensionColor": "darkbronze",
             "watch_cases-dimensionConnection": "gps"
           }
         },
         {
-          "part": "MEW94TA/A",
+          "part": "MJFT4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "46mm",
             "watch_cases-dimensionCaseMaterial": "aluminum",
@@ -2946,34 +2747,34 @@
           }
         },
         {
-          "part": "MEWA4TA/A",
+          "part": "MJFU4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "46mm",
             "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "rosegold",
+            "watch_cases-dimensionColor": "black",
             "watch_cases-dimensionConnection": "gps"
           }
         },
         {
-          "part": "MEWC4TA/A",
+          "part": "MJFV4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "46mm",
             "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "silver",
+            "watch_cases-dimensionColor": "lightgold",
             "watch_cases-dimensionConnection": "gps"
           }
         },
         {
-          "part": "MF994TA/A",
+          "part": "MJFW4TA/A",
           "dimensions": {
-            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseSize": "46mm",
             "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "jet_black",
-            "watch_cases-dimensionConnection": "gpscell"
+            "watch_cases-dimensionColor": "darkbronze",
+            "watch_cases-dimensionConnection": "gps"
           }
         },
         {
-          "part": "MF9C4TA/A",
+          "part": "MJJD4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "42mm",
             "watch_cases-dimensionCaseMaterial": "aluminum",
@@ -2982,25 +2783,70 @@
           }
         },
         {
-          "part": "MF9E4TA/A",
+          "part": "MJJE4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "42mm",
             "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "rosegold",
+            "watch_cases-dimensionColor": "black",
             "watch_cases-dimensionConnection": "gpscell"
           }
         },
         {
-          "part": "MF9F4TA/A",
+          "part": "MJJF4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "42mm",
             "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "silver",
+            "watch_cases-dimensionColor": "lightgold",
             "watch_cases-dimensionConnection": "gpscell"
           }
         },
         {
-          "part": "MF9H4TA/A",
+          "part": "MJJG4TA/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "darkbronze",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJH4TA/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "space_gray",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJJ4TA/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "black",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJK4TA/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "lightgold",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJL4TA/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "darkbronze",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJM4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "42mm",
             "watch_cases-dimensionCaseMaterial": "titanium",
@@ -3009,61 +2855,16 @@
           }
         },
         {
-          "part": "MF9K4TA/A",
+          "part": "MJJN4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "42mm",
             "watch_cases-dimensionCaseMaterial": "titanium",
-            "watch_cases-dimensionColor": "slate",
+            "watch_cases-dimensionColor": "radiantgold",
             "watch_cases-dimensionConnection": "gpscell"
           }
         },
         {
-          "part": "MF9M4TA/A",
-          "dimensions": {
-            "watch_cases-dimensionCaseSize": "42mm",
-            "watch_cases-dimensionCaseMaterial": "titanium",
-            "watch_cases-dimensionColor": "gold",
-            "watch_cases-dimensionConnection": "gpscell"
-          }
-        },
-        {
-          "part": "MFAA4TA/A",
-          "dimensions": {
-            "watch_cases-dimensionCaseSize": "46mm",
-            "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "jet_black",
-            "watch_cases-dimensionConnection": "gpscell"
-          }
-        },
-        {
-          "part": "MFAE4TA/A",
-          "dimensions": {
-            "watch_cases-dimensionCaseSize": "46mm",
-            "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "space_gray",
-            "watch_cases-dimensionConnection": "gpscell"
-          }
-        },
-        {
-          "part": "MFAF4TA/A",
-          "dimensions": {
-            "watch_cases-dimensionCaseSize": "46mm",
-            "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "rosegold",
-            "watch_cases-dimensionConnection": "gpscell"
-          }
-        },
-        {
-          "part": "MFAJ4TA/A",
-          "dimensions": {
-            "watch_cases-dimensionCaseSize": "46mm",
-            "watch_cases-dimensionCaseMaterial": "aluminum",
-            "watch_cases-dimensionColor": "silver",
-            "watch_cases-dimensionConnection": "gpscell"
-          }
-        },
-        {
-          "part": "MFAY4TA/A",
+          "part": "MJJP4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "46mm",
             "watch_cases-dimensionCaseMaterial": "titanium",
@@ -3072,20 +2873,47 @@
           }
         },
         {
-          "part": "MFC14TA/A",
+          "part": "MJJQ4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "46mm",
             "watch_cases-dimensionCaseMaterial": "titanium",
-            "watch_cases-dimensionColor": "slate",
+            "watch_cases-dimensionColor": "radiantgold",
             "watch_cases-dimensionConnection": "gpscell"
           }
         },
         {
-          "part": "MFC34TA/A",
+          "part": "MJJT4TA/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "ceramic",
+            "watch_cases-dimensionColor": "pearlwhite",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJU4TA/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "ceramic",
+            "watch_cases-dimensionColor": "nightblue",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJV4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "46mm",
-            "watch_cases-dimensionCaseMaterial": "titanium",
-            "watch_cases-dimensionColor": "gold",
+            "watch_cases-dimensionCaseMaterial": "ceramic",
+            "watch_cases-dimensionColor": "pearlwhite",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJW4TA/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "ceramic",
+            "watch_cases-dimensionColor": "nightblue",
             "watch_cases-dimensionConnection": "gpscell"
           }
         }
@@ -3101,30 +2929,36 @@
         },
         "watch_cases-dimensionCaseMaterial": {
           "aluminum": {
-            "header": "\n<div>鋁金屬</div>\n<span class=\"form-label-small\">可選擇 GPS 或 GPS + 行動網路</span>"
+            "header": "<span class=\"badge badge-no-scrim badge-tiny\">全新外觀</span>\n<div>鋁金屬</div>\n<span class=\"form-label-small\">可選擇 GPS 或 GPS + 行動網路</span>"
+          },
+          "ceramic": {
+            "header": "<span class=\"badge badge-no-scrim badge-tiny\">全新</span>\n<div>精密陶瓷</div>\n<span class=\"form-label-small\">具備 GPS + 行動網路</span>"
           },
           "titanium": {
-            "header": "鈦金屬<div class=\"form-label-small\">具備 GPS + 行動網路</div>"
+            "header": "<span class=\"badge badge-no-scrim badge-tiny\">全新外觀</span>\n<div>鈦金屬</div>\n<span class=\"form-label-small\">具備 GPS + 行動網路</span>"
           }
         },
         "watch_cases-dimensionColor": {
-          "gold": {
-            "text": "金色"
+          "black": {
+            "text": "黑色"
           },
-          "jet_black": {
-            "text": "曜石黑色"
+          "darkbronze": {
+            "text": "深古銅色"
+          },
+          "lightgold": {
+            "text": "淺金色"
           },
           "natural": {
             "text": "原色"
           },
-          "rosegold": {
-            "text": "玫瑰金色"
+          "nightblue": {
+            "text": "夜藍色"
           },
-          "silver": {
-            "text": "銀色"
+          "pearlwhite": {
+            "text": "珍珠白色"
           },
-          "slate": {
-            "text": "石瓦色"
+          "radiantgold": {
+            "text": "燦金色"
           },
           "space_gray": {
             "text": "太空灰色"
@@ -3135,10 +2969,11 @@
             "header": "GPS<div class=\"form-label-small\">可藉由你的 iPhone 在附近範圍內撥接電話和發簡訊。</div>"
           },
           "gpscell": {
-            "header": "GPS + 行動網路<div class=\"form-label-small\">只需 Apple&nbsp;Watch 就能打電話和發簡訊。「Apple&nbsp;Watch 親子設定」功能須使用 GPS&nbsp;+&nbsp;行動網路錶<span class=\"nowrap\">款<as-footnote data-id=\"d147341b8b9c64e2c751b340cce2f9d4\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;註腳&nbsp;</span>②</sup></as-footnote>。</span></div>"
+            "header": "GPS + 行動網路<div class=\"form-label-small\">只需 Apple Watch 就能打電話和傳簡訊。「Apple Watch 親子設定」須搭配 GPS + 行動網路錶款使用<as-footnote data-id=\"d147341b8b9c64e2c751b340cce2f9d4\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;註腳&nbsp;</span>※</sup></as-footnote>。</div>"
           }
         }
-      }
+      },
+      "companionPart": "MJVK4FE/A"
     }
   },
   {
@@ -3241,10 +3076,11 @@
             "header": "GPS<div class=\"form-label-small\">可藉由你的 iPhone 在附近範圍內撥接電話和發簡訊。</div>"
           },
           "gpscell": {
-            "header": "GPS + 行動網路<div class=\"form-label-small\">只需 Apple&nbsp;Watch 就能打電話和發簡訊。「Apple&nbsp;Watch 親子設定」功能須使用 GPS&nbsp;+&nbsp;行動網路錶<span class=\"nowrap\">款<as-footnote data-id=\"d147341b8b9c64e2c751b340cce2f9d4\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;註腳&nbsp;</span>②</sup></as-footnote>。</span></div>"
+            "header": "GPS + 行動網路<div class=\"form-label-small\">只需 Apple Watch 就能打電話和傳簡訊。「Apple Watch 親子設定」須搭配 GPS + 行動網路錶款使用<as-footnote data-id=\"d147341b8b9c64e2c751b340cce2f9d4\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;註腳&nbsp;</span>②</sup></as-footnote>。</div>"
           }
         }
-      }
+      },
+      "companionPart": "MJUA4FE/A"
     }
   },
   {
@@ -3253,14 +3089,14 @@
     "data": {
       "products": [
         {
-          "part": "MF1V4TA/A",
+          "part": "MJCR4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "49mm",
             "watch_cases-dimensionColor": "natural"
           }
         },
         {
-          "part": "MF254TA/A",
+          "part": "MJCT4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "49mm",
             "watch_cases-dimensionColor": "black"
@@ -3276,7 +3112,8 @@
             "text": "原色"
           }
         }
-      }
+      },
+      "companionPart": "MK7C4FE/A"
     }
   },
   {
@@ -3285,16 +3122,34 @@
     "data": {
       "products": [
         {
-          "part": "MF9P4TA/A",
+          "part": "MJJX4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "titanium",
+            "watch_cases-dimensionColor": "radiantgold"
+          }
+        },
+        {
+          "part": "MJJY4TA/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "titanium",
             "watch_cases-dimensionColor": "silver"
           }
         },
         {
-          "part": "MFC64TA/A",
+          "part": "MJK04TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "titanium",
+            "watch_cases-dimensionColor": "radiantgold"
+          }
+        },
+        {
+          "part": "MJK14TA/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "titanium",
             "watch_cases-dimensionColor": "silver"
           }
         }
@@ -3309,11 +3164,15 @@
           }
         },
         "watch_cases-dimensionColor": {
+          "radiantgold": {
+            "text": "燦金色"
+          },
           "silver": {
             "text": "銀色"
           }
         }
-      }
+      },
+      "companionPart": "MJN94FE/A"
     }
   },
   {
@@ -3322,7 +3181,7 @@
     "data": {
       "products": [
         {
-          "part": "MF2A4TA/A",
+          "part": "MJCY4TA/A",
           "dimensions": {
             "watch_cases-dimensionCaseSize": "49mm",
             "watch_cases-dimensionColor": "natural"
@@ -3335,7 +3194,8 @@
             "text": "原色"
           }
         }
-      }
+      },
+      "companionPart": "ML414FE/A"
     }
   }
 ]

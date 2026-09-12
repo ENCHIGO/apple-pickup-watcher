@@ -48,7 +48,6 @@ FAMILIES = [
     ("iphone", "iphone-18-pro"),
     ("iphone", "iphone-duo"),
     ("iphone", "iphone-17"),
-    ("iphone", "iphone-17-pro"),
     ("iphone", "iphone-air"),
     ("ipad", "ipad-pro"),
     ("ipad", "ipad-air"),
@@ -73,6 +72,8 @@ BUY_PATH = {"iphone": "buy-iphone", "ipad": "buy-ipad", "mac": "buy-mac", "watch
 
 MARKER = b"PRODUCT_SELECTION_BOOTSTRAP"
 KEY = b"productSelectionData"
+# Apple Watch 页里表带数据的变量名，见 Rust 侧 parse_watch_companion。
+BAND_MARKER = b"bandSelectionBootstrap"
 
 # 请求之间的最小间隔。抓的是公开页面，但没有理由把自己送进风控。
 DELAY_SECONDS = 1.5
@@ -142,29 +143,104 @@ def extract(page: bytes):
         if search[pos : pos + 1] != b"{":
             continue
 
-        depth, in_string, quote, escaped = 0, False, b"", False
-        for i in range(pos, len(search)):
-            ch = search[i : i + 1]
-            if in_string:
-                if escaped:
-                    escaped = False
-                elif ch == b"\\":
-                    escaped = True
-                elif ch == quote:
-                    in_string = False
-                continue
-            if ch in (b'"', b"'"):
-                in_string, quote = True, ch
-            elif ch == b"{":
-                depth += 1
-            elif ch == b"}":
-                depth -= 1
-                if depth == 0:
-                    try:
-                        return json.loads(search[pos : i + 1])
-                    except ValueError:
-                        break
-        continue
+        end = match_object(search, pos)
+        if end is None:
+            continue
+        try:
+            return json.loads(search[pos:end])
+        except ValueError:
+            continue
+
+
+def match_object(buf: bytes, start: int):
+    """从 buf[start] 处的 `{` 起做花括号配对，返回配对的 `}` 之后一位的下标。
+
+    跳过字符串字面量，否则商品数据里含 `{` 的 HTML 片段会把配对算错。与 Rust 侧
+    match_object 同一套做法。配不平返回 None。
+    """
+    depth, in_string, quote, escaped = 0, False, b"", False
+    for i in range(start, len(buf)):
+        ch = buf[i : i + 1]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == b"\\":
+                escaped = True
+            elif ch == quote:
+                in_string = False
+            continue
+        if ch in (b'"', b"'"):
+            in_string, quote = True, ch
+        elif ch == b"{":
+            depth += 1
+        elif ch == b"}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return None
+
+
+def looks_like_part_number(value) -> bool:
+    return (
+        isinstance(value, str)
+        and value.count("/") == 1
+        and value.replace("/", "").isalnum()
+        and value[0].isalnum()
+        and value[-1].isalnum()
+    )
+
+
+def watch_companion(page: bytes):
+    """从 Apple Watch 购买页挑一条能陪表壳一起查库存的表带零件号。
+
+    Apple 的取货接口把 Apple Watch 当作「表壳 + 表带」的套件，单独查表壳零件号
+    要么返回空内容、要么把表壳报成「不支持到店取货」（会被显示成假的无货）。
+    带上同页任意一条表带，表壳的状态才是真的。挑选规则必须与 Rust 侧
+    parse_watch_companion 一致：优先 sport，否则按 sortOrder 取最前的款式，
+    款式里取第一个带零件号的颜色。找不到返回 None。
+    """
+    frm = 0
+    while True:
+        at = page.find(BAND_MARKER, frm)
+        if at < 0:
+            return None
+        frm = at + len(BAND_MARKER)
+        if at > 0 and is_ident_byte(page[at - 1 : at]):
+            continue
+        pos = at + len(BAND_MARKER)
+        while page[pos : pos + 1] in b" \t\r\n":
+            pos += 1
+        if page[pos : pos + 1] not in (b"=", b":"):
+            continue
+        pos += 1
+        while page[pos : pos + 1] in b" \t\r\n":
+            pos += 1
+        if page[pos : pos + 1] != b"{":
+            continue
+        end = match_object(page, pos)
+        if end is None:
+            continue
+        try:
+            data = json.loads(page[pos:end])
+        except ValueError:
+            continue
+        items = ((data.get("bandSelectionData") or {}) if isinstance(data, dict) else {}).get("items")
+        if not isinstance(items, dict):
+            continue
+
+        def rank(entry):
+            name, style = entry
+            order = style.get("sortOrder") if isinstance(style, dict) else None
+            if not isinstance(order, (int, float)) or isinstance(order, bool):
+                order = float("inf")
+            return (name != "sport", order, name)
+
+        for _, style in sorted(items.items(), key=rank):
+            colours = style.get("subDimensionValue") if isinstance(style, dict) else None
+            for colour in colours or []:
+                part = ((colour.get("image") or {}) if isinstance(colour, dict) else {}).get("baseIdentifier")
+                if looks_like_part_number(part):
+                    return part.strip()
 
 
 def trim(data: dict):
@@ -301,6 +377,25 @@ def self_test() -> int:
     )
     assert trimmed["displayValues"] == {"dimensionColor": {"black": {"value": "黑色"}}}, trimmed
 
+    # 表带挑选：优先 sport，否则按 sortOrder；不像零件号的取值要跳过。
+    def band_page(items: dict) -> bytes:
+        bootstrap = json.dumps({"bandSelectionData": {"items": items}})
+        return f"<script>window.pageLevelData.bandSelectionBootstrap = {bootstrap};</script>".encode()
+
+    def colour(part):
+        return {"dimensionValue": "x", "image": {"baseIdentifier": part}}
+
+    assert watch_companion(band_page({
+        "link": {"sortOrder": 110, "subDimensionValue": [colour("MJNW4FE/A")]},
+        "sport": {"sortOrder": 25, "subDimensionValue": [colour("bad value"), colour("MJUY4FE/A")]},
+    })) == "MJUY4FE/A"
+    assert watch_companion(band_page({
+        "trailloop": {"sortOrder": 320, "subDimensionValue": [colour("MK8K4FE/A")]},
+        "alpineloop": {"sortOrder": 310, "subDimensionValue": [colour("MK7C4FE/A")]},
+    })) == "MK7C4FE/A"
+    assert watch_companion(band_page({"sport": {"subDimensionValue": [{"image": {}}]}})) is None
+    assert watch_companion(b"<script>var bandSelectionBootstrapV2 = {};</script>") is None
+
     print("自检通过")
     return 0
 
@@ -314,10 +409,11 @@ def main() -> int:
         broken = False
         for category, slug in FAMILIES:
             url = f"{base}/shop/{BUY_PATH[category]}/{slug}"
-            data = None
+            data, page = None, b""
             for attempt in range(RETRIES):
                 try:
-                    data = extract(fetch(url, accept_language))
+                    page = fetch(url, accept_language)
+                    data = extract(page)
                 except (urllib.error.URLError, OSError) as err:
                     print(f"  {slug}: {err}", file=sys.stderr)
                 if data is not None:
@@ -336,6 +432,16 @@ def main() -> int:
                 broken = True
                 print(f"  !! {locale} {slug} 没有解析出商品", file=sys.stderr)
                 continue
+
+            if category == "watch":
+                # 表壳没有搭档表带就等于「查了也白查」，这一页宁可不写。
+                companion = watch_companion(page)
+                if companion is None:
+                    failed.append(f"{locale} {slug}（无表带零件号）")
+                    broken = True
+                    print(f"  !! {locale} {slug} 没有找到表带零件号", file=sys.stderr)
+                    continue
+                trimmed["companionPart"] = companion
 
             pages.append({"category": category, "family": slug, "data": trimmed})
             print(f"  {locale} {slug}: {len(trimmed['products'])} 个型号")
