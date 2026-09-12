@@ -297,6 +297,188 @@ fn 正常页面能抓出商品() {
     assert_eq!(products[1].title, "iPhone 17 256GB 鼠尾草绿色");
 }
 
+/// 一段最小的 Apple Watch 购买页：维度表形状的表壳，外加表带数据。
+///
+/// `band` 为 `None` 时不带 `bandSelectionBootstrap`，模拟 Apple 把表带数据挪走了。
+fn watch_page(band: Option<&str>) -> String {
+    let cases = r#"{
+        "products": [
+            {"part":"MEHW4CH/B","dimensions":{"watch_cases-dimensionCaseSize":"40mm",
+             "watch_cases-dimensionColor":"starlight","watch_cases-dimensionConnection":"gps"}},
+            {"part":"MEP54CH/B","dimensions":{"watch_cases-dimensionCaseSize":"44mm",
+             "watch_cases-dimensionColor":"midnight","watch_cases-dimensionConnection":"gps"}}
+        ],
+        "displayValues": {
+            "watch_cases-dimensionColor": {"starlight":{"text":"星光色"},"midnight":{"text":"午夜色"}},
+            "watch_cases-dimensionCaseSize": {"40mm":{"text":"40 毫米"},"44mm":{"text":"44 毫米"}},
+            "watch_cases-dimensionConnection": {"gps":{"text":"GPS"}}
+        }
+    }"#;
+    let band_script = band.map_or(String::new(), |b| {
+        format!("<script>window.pageLevelData.bandSelectionBootstrap = {b};</script>")
+    });
+    format!(
+        r#"<!DOCTYPE html><html><head><script>
+        window.PRODUCT_SELECTION_BOOTSTRAP = {{
+        productSelectionData: {cases}
+        }};
+        </script>{band_script}</head><body></body></html>"#
+    )
+}
+
+const BANDS: &str = r#"{"selectionUrls":{"bandSelection":"/shop/api/band-selection?product=z0yq"},
+    "bandSelectionData":{"groupDimensionKey":"watch_bands-dimensionBandStyle","groups":[],
+    "items":{
+        "link":{"sortOrder":110,"subDimensionValue":[{"dimensionValue":"gold","image":{"baseIdentifier":"MJNW4FE/A"}}]},
+        "sport":{"sortOrder":25,"subDimensionValue":[
+            {"dimensionValue":"broken","image":{"baseIdentifier":"not a part"}},
+            {"dimensionValue":"burgundy","image":{"imageName":"MJUX4ref_SW_COLOR","baseIdentifier":"MJUY4FE/A"}}]},
+        "sololoop":{"sortOrder":20,"subDimensionValue":[{"dimensionValue":"burgundy","image":{"baseIdentifier":"MKJU4FE/A"}}]}
+    }}}"#;
+
+#[test]
+fn apple_watch_的表壳会配上同页的一条表带() {
+    // 取货接口只把「表壳 + 表带」当作合法套件，单独查表壳要么是空响应、要么被
+    // 报成假的无货（#24）。所以每只表壳都得带着同页的一条表带零件号。
+    let html = watch_page(Some(BANDS));
+    let products =
+        apple_catalog::parse_buy_page(html.as_bytes(), Category::Watch, "apple-watch-se")
+            .expect("应当解析成功");
+    assert_eq!(products.len(), 2);
+    for p in &products {
+        // 优先运动型表带（跳过那个不像零件号的取值），而不是 sortOrder 更小的单圈表带。
+        assert_eq!(
+            p.companion_part.as_deref(),
+            Some("MJUY4FE/A"),
+            "{} 的搭档表带不对",
+            p.title
+        );
+    }
+    assert_eq!(products[0].title, "Apple Watch SE 40 毫米 GPS 星光色");
+}
+
+#[test]
+fn 没有运动型表带时按页面排序取第一种() {
+    let bands = r#"{"bandSelectionData":{"items":{
+        "trailloop":{"sortOrder":320,"subDimensionValue":[{"image":{"baseIdentifier":"MK8K4FE/A"}}]},
+        "alpineloop":{"sortOrder":310,"subDimensionValue":[{"image":{"baseIdentifier":"MK7C4FE/A"}}]},
+        "oceanband":{"subDimensionValue":[{"image":{"baseIdentifier":"MK7P4FE/A"}}]}
+    }}}"#;
+    let html = watch_page(Some(bands));
+    let products =
+        apple_catalog::parse_buy_page(html.as_bytes(), Category::Watch, "apple-watch-ultra")
+            .expect("应当解析成功");
+    assert!(
+        products
+            .iter()
+            .all(|p| p.companion_part.as_deref() == Some("MK7C4FE/A")),
+        "没有 sortOrder 的款式应当排在最后：{products:?}"
+    );
+}
+
+#[test]
+fn apple_watch_页找不到表带时整页报错() {
+    // 表壳没有搭档就等于「查了也白查」，宁可让这一页刷新失败、保留旧数据，
+    // 也不能把一批注定查不出真话的表壳装进目录。
+    let html = watch_page(None);
+    match apple_catalog::parse_buy_page(html.as_bytes(), Category::Watch, "apple-watch-se") {
+        Err(CatalogError::PageSchema { detail }) => {
+            assert!(
+                detail.contains("bandSelectionBootstrap"),
+                "错误说明太含糊：{detail}"
+            );
+        }
+        other => panic!("应当报结构不符，实际是 {other:?}"),
+    }
+    // 表带数据在、但里面一条零件号都没有，同样报错。
+    let html = watch_page(Some(
+        r#"{"bandSelectionData":{"items":{"sport":{"subDimensionValue":[{"image":{}}]}}}}"#,
+    ));
+    assert!(matches!(
+        apple_catalog::parse_buy_page(html.as_bytes(), Category::Watch, "apple-watch-se"),
+        Err(CatalogError::PageSchema { .. })
+    ));
+}
+
+#[test]
+fn 其他品类不需要也不会带搭档() {
+    let html = page(&format!("productSelectionData: {SELECTION}"));
+    let products = apple_catalog::parse_buy_page(html.as_bytes(), Category::Iphone, "iphone-17")
+        .expect("应当解析成功");
+    assert!(products.iter().all(|p| p.companion_part.is_none()));
+}
+
+#[test]
+fn 内嵌快照里每只_apple_watch_都带着搭档表带() {
+    // 快照由 data/generate.py 生成，它和 Rust 侧各有一份挑选规则；这条测试守的是
+    // 「生成脚本真的把表带写进去了」—— 少了它，离线兜底目录里的表全都查不出真话。
+    let catalog = Catalog::new();
+    for region in REGIONS {
+        let products = catalog.products(region.locale).expect("内嵌目录应当可用");
+        let watches: Vec<_> = products
+            .iter()
+            .filter(|p| p.category == Category::Watch)
+            .collect();
+        assert!(!watches.is_empty(), "{} 没有 Apple Watch", region.locale);
+        for p in watches {
+            assert!(
+                p.companion_part.as_deref().is_some_and(|c| c.contains('/')),
+                "{} 的 {} 没有搭档表带",
+                region.locale,
+                p.part_number
+            );
+        }
+        assert!(
+            products
+                .iter()
+                .filter(|p| p.category != Category::Watch)
+                .all(|p| p.companion_part.is_none()),
+            "{} 有非 Apple Watch 商品带着搭档",
+            region.locale
+        );
+    }
+}
+
+#[test]
+fn 给旧目标补搭档只动查得到的那些() {
+    use apw_core::model::Target;
+    let catalog = Catalog::new();
+    let watch = catalog
+        .products("zh_CN")
+        .expect("内嵌目录应当可用")
+        .into_iter()
+        .find(|p| p.category == Category::Watch)
+        .expect("应当有 Apple Watch");
+    let mk = |part: &str, companion: Option<&str>| Target {
+        locale: "zh_CN".into(),
+        store_number: "R359".into(),
+        store_title: "上海-南京东路".into(),
+        part_number: part.into(),
+        product_name: part.into(),
+        companion_part: companion.map(str::to_string),
+    };
+    let mut targets = vec![
+        mk(&watch.part_number, None),
+        mk(&watch.part_number, Some("KEEP0FE/A")),
+        mk("NOSUCHPART/A", None),
+    ];
+    catalog.attach_companions(&mut targets);
+    assert_eq!(
+        targets[0].companion_part, watch.companion_part,
+        "旧的 Watch 目标应当补上"
+    );
+    assert_eq!(
+        targets[1].companion_part.as_deref(),
+        Some("KEEP0FE/A"),
+        "已有的搭档不该被改写"
+    );
+    assert_eq!(
+        targets[2].companion_part, None,
+        "目录里没有的零件号保持原样"
+    );
+    assert_eq!(targets.len(), 3, "补搭档不能增删目标");
+}
+
 #[test]
 fn 先出现的同名字符串不会让整页失败() {
     // 页面里先有一段含同名文本的字符串字面量（埋点参数、提示文案里再正常不过）。
@@ -460,9 +642,13 @@ fn 缺字段的商品条目不会拖垮整段数据() {
 #[test]
 fn 取不到本地化颜色名时退回色值() {
     // 留空会让同机型同容量的几个颜色在界面上长得一模一样，用户根本分不清。
+    // 前提是这一页真的有得选：全页只有一种取值的维度没有文案时不进展示名
+    // （SE 页所有表壳都是 aluminum，塞进每个标题只是噪音）。
     let selection = r#"{
         "products":[{"partNumber":"MG724CH/A","familyType":"iphone17",
-                     "dimensionCapacity":"512gb","dimensionColor":"cosmicorange"}],
+                     "dimensionCapacity":"512gb","dimensionColor":"cosmicorange"},
+                    {"partNumber":"MG734CH/A","familyType":"iphone17",
+                     "dimensionCapacity":"512gb","dimensionColor":"lavender"}],
         "displayValues":{"dimensionColor":{"title":{"singleVariantDisplayTitle":"颜色:"}}}
     }"#;
     let products =
@@ -470,6 +656,7 @@ fn 取不到本地化颜色名时退回色值() {
             .expect("应当解析成功");
     assert_eq!(products[0].color, "cosmicorange");
     assert_eq!(products[0].title, "iPhone 17 512GB cosmicorange");
+    assert_eq!(products[1].title, "iPhone 17 512GB lavender");
 }
 
 #[test]

@@ -112,6 +112,8 @@ apw check --targets - < targets.json
 
 最多 256 个输入目标、1 MiB；同一 `locale / storeNumber / partNumber` 去重。`storeTitle` 与 `productName` 可选，缺省时由目录补齐，目录找不到则显示编号。未知字段和错误的编号格式会报错。`--targets` 与 `--locale / --store / --part` 互斥。CLI 不读取或修改桌面版设置，不执行配置迁移。
 
+`companionPart` 可选，只对 Apple Watch 有意义：Apple 的取货接口只把「表壳 + 表带」当作可售组合，单独查表壳零件号会得到空响应或假的「不支持取货」。`apw products` 返回的 Apple Watch 商品带有 `companionPart`（同购买页的一条表带零件号）；`check` / `watch` 会把它附在同一请求里，状态仍取表壳自己的结果。缺省时按 `partNumber` 回查内置目录补齐，目录里没有的零件号不会补。输出的 `target` 只在有值时包含该字段。
+
 ### 持续监控
 
 ```bash

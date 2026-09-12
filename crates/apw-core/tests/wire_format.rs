@@ -86,6 +86,7 @@ fn 跨边界的结构统一用小驼峰() {
         store_title: "上海-环球港".into(),
         part_number: "MG724CH/A".into(),
         product_name: "iPhone 17 512GB 黑色".into(),
+        companion_part: None,
     };
     assert_eq!(
         to_value(&target),
@@ -105,6 +106,7 @@ fn 跨边界的结构统一用小驼峰() {
         capacity: "512GB".into(),
         color: "黑色".into(),
         title: "iPhone 17 512GB 黑色".into(),
+        companion_part: None,
     };
     let v = to_value(&product);
     assert!(v.get("partNumber").is_some(), "Product 应当用小驼峰：{v}");
@@ -168,8 +170,43 @@ fn 监控目标能原样往返() {
         store_title: "東京-渋谷".into(),
         part_number: "MG6A4J/A".into(),
         product_name: "iPhone 17 256GB ラベンダー".into(),
+        companion_part: None,
     };
     let json = serde_json::to_string(&target).unwrap();
     let back: Target = serde_json::from_str(&json).expect("反序列化失败");
     assert_eq!(target, back);
+}
+
+#[test]
+fn 搭档零件号只在存在时出现且能往返() {
+    // 旧配置和 iPhone 目标没有这个字段：序列化时不能凭空多出一个 null，
+    // 否则每份旧设置一读一写就会被改写；反序列化时缺了也必须能读。
+    let plain: Target = serde_json::from_str(
+        r#"{"locale":"zh_CN","storeNumber":"R683","storeTitle":"上海-环球港","partNumber":"MG724CH/A","productName":"iPhone 17"}"#,
+    )
+    .expect("没有 companionPart 的旧目标应当能读入");
+    assert_eq!(plain.companion_part, None);
+    assert!(to_value(&plain).get("companionPart").is_none());
+
+    let watch = Target {
+        locale: "zh_CN".into(),
+        store_number: "R359".into(),
+        store_title: "上海-南京东路".into(),
+        part_number: "MEHW4CH/B".into(),
+        product_name: "Apple Watch SE 40 毫米 星光色".into(),
+        companion_part: Some("MJUA4FE/A".into()),
+    };
+    let v = to_value(&watch);
+    assert_eq!(v.get("companionPart"), Some(&json!("MJUA4FE/A")));
+    let back: Target = serde_json::from_value(v).expect("反序列化失败");
+    assert_eq!(watch, back);
+    // 搭档不参与身份：同一表壳带不带表带都是同一条目标。
+    assert_eq!(watch.key(), plain_with_part(&watch, None).key());
+}
+
+fn plain_with_part(t: &Target, companion: Option<&str>) -> Target {
+    Target {
+        companion_part: companion.map(str::to_string),
+        ..t.clone()
+    }
 }

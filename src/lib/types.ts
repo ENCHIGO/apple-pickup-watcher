@@ -29,6 +29,8 @@ export interface Target {
   storeTitle: string;
   partNumber: string;
   productName: string;
+  /** Apple Watch 表壳的搭档表带零件号，随查询一起发；其他品类没有。 */
+  companionPart?: string;
 }
 
 export interface TargetState {
@@ -64,6 +66,8 @@ export interface Product {
   capacity: string;
   color: string;
   title: string;
+  /** 见 Rust 侧 `Product::companion_part`；只有 Apple Watch 有。 */
+  companionPart?: string;
 }
 
 export interface Store {

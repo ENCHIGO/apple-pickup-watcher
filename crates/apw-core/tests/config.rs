@@ -76,6 +76,7 @@ fn 目标(store: &str, part: &str) -> Target {
         store_title: "上海-环球港".into(),
         part_number: part.into(),
         product_name: "iPhone 17 512GB 黑色".into(),
+        companion_part: None,
     }
 }
 

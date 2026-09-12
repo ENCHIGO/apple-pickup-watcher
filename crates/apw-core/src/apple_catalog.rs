@@ -45,6 +45,14 @@ const BOOTSTRAP_MARKER: &[u8] = b"PRODUCT_SELECTION_BOOTSTRAP";
 const SELECTION_KEY_STR: &str = "productSelectionData";
 const SELECTION_KEY: &[u8] = SELECTION_KEY_STR.as_bytes();
 
+/// Apple Watch 购买页里承载表带数据的全局变量名。
+///
+/// 页面中的原文形如 `window.pageLevelData.bandSelectionBootstrap = {"selectionUrls":…`。
+/// 它的值是一段合法 JSON（不像 `productSelectionData` 那样嵌在不带引号的 JS
+/// 对象里），截出来就能直接反序列化。
+const BAND_MARKER_STR: &str = "bandSelectionBootstrap";
+const BAND_MARKER: &[u8] = BAND_MARKER_STR.as_bytes();
+
 /// 购买页 HTML 的读取上限。购买页本身在 2 MB 量级，留一倍余量。
 ///
 /// 设上限的目的和 `apple.rs` 一样：万一被换成了别的巨大页面（比如拦截页），
@@ -108,7 +116,161 @@ pub fn parse_buy_page(
     slug: &str,
 ) -> Result<Vec<Product>, CatalogError> {
     let raw = extract_product_selection_data(page)?;
-    parse_product_selection(raw, category, slug)
+    let mut products = parse_product_selection(raw, category, slug)?;
+
+    if category == Category::Watch {
+        // 表壳零件号单独查不出真话（见 `Product::companion_part`），必须配一条
+        // 同页的表带。页里找不到表带就整页报错，让上层保留旧数据 —— 一页
+        // 「查了也白查」的表壳混进目录，比目录里暂时没有这一页糟得多。
+        let companion = parse_watch_companion(page)?;
+        for product in &mut products {
+            product.companion_part = Some(companion.clone());
+        }
+    }
+    Ok(products)
+}
+
+/// 从 Apple Watch 购买页里挑出一条能陪表壳一起查库存的表带零件号。
+///
+/// 为什么需要它，见 [`Product::companion_part`]。挑选规则：优先运动型表带
+/// （`sport`：每个尺寸都有、常年在售），否则按页面自己的 `sortOrder` 取排最
+/// 前的款式；款式里取第一个带零件号的颜色。挑哪一条不影响表壳的判定，它只是
+/// 让接口把这次查询当作一个合法的套件。
+///
+/// 生成离线快照的 `data/generate.py` 里有同一套规则，两边必须一致，否则同一只
+/// 表会「在线能查、离线查不动」。
+pub fn parse_watch_companion(page: &[u8]) -> Result<String, CatalogError> {
+    let raw = extract_band_selection(page)?;
+    let data: BandSelectionBootstrap =
+        serde_json::from_slice(raw).map_err(|e| CatalogError::PageSchema {
+            detail: format!("{BAND_MARKER_STR} 结构与预期不符：{e}"),
+        })?;
+    data.companion().ok_or_else(|| CatalogError::PageSchema {
+        detail: format!("{BAND_MARKER_STR} 里没有任何表带零件号"),
+    })
+}
+
+/// 从购买页 HTML 中截出 `bandSelectionBootstrap` 的值。
+///
+/// 和 [`extract_product_selection_data`] 一样把每个同名位置都试一遍：只要哪段
+/// 文案里先出现了这个词，只认第一个就会停在错的地方。
+fn extract_band_selection(page: &[u8]) -> Result<&[u8], CatalogError> {
+    let mut last_err = None;
+    let mut from = 0usize;
+
+    while from < page.len() {
+        let Some(rel) = find(&page[from..], BAND_MARKER) else {
+            break;
+        };
+        let at = from + rel;
+        from = at + BAND_MARKER.len();
+
+        if at > 0 && page.get(at - 1).copied().is_some_and(is_ident_byte) {
+            continue;
+        }
+        let mut pos = skip_space(page, at + BAND_MARKER.len());
+        // 赋值语句（`= {`）和对象属性（`: {`）都认。
+        if !matches!(page.get(pos), Some(b'=' | b':')) {
+            last_err = Some(CatalogError::PageSchema {
+                detail: format!("偏移 {at} 处的 {BAND_MARKER_STR} 之后不是赋值"),
+            });
+            continue;
+        }
+        pos = skip_space(page, pos + 1);
+        if page.get(pos) != Some(&b'{') {
+            last_err = Some(CatalogError::PageSchema {
+                detail: format!("偏移 {at} 处的 {BAND_MARKER_STR} 的值不是对象"),
+            });
+            continue;
+        }
+        let end = match match_object(page, pos) {
+            Ok(end) => end,
+            Err(detail) => {
+                last_err = Some(CatalogError::PageSchema {
+                    detail: format!("截取 {BAND_MARKER_STR} 失败（起始偏移 {pos}）：{detail}"),
+                });
+                continue;
+            }
+        };
+        let raw = page.get(pos..end).unwrap_or_default();
+        match serde_json::from_slice::<serde::de::IgnoredAny>(raw) {
+            Ok(_) => return Ok(raw),
+            Err(e) => {
+                last_err = Some(CatalogError::PageSchema {
+                    detail: format!("{BAND_MARKER_STR} 的值不是合法 JSON：{e}"),
+                });
+            }
+        }
+    }
+
+    Err(last_err.unwrap_or_else(|| CatalogError::PageSchema {
+        detail: format!("页面里找不到 {BAND_MARKER_STR}"),
+    }))
+}
+
+/// `bandSelectionBootstrap` 里用得到的那部分。
+///
+/// 款式与颜色都用 `Value` 承接：这份数据同样来自线上，某一款结构不对时，
+/// 退化的只该是那一款，不该让整页表带数据报废。
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BandSelectionBootstrap {
+    #[serde(default)]
+    band_selection_data: Option<BandSelectionData>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BandSelectionData {
+    /// 键是款式标识（`sport`、`sololoop`、`alpineloop`……），值里有 `sortOrder`
+    /// 和按颜色排列的 `subDimensionValue`，每个颜色的 `image.baseIdentifier`
+    /// 就是那条表带的零件号。
+    #[serde(default)]
+    items: Option<BTreeMap<String, serde_json::Value>>,
+}
+
+impl BandSelectionBootstrap {
+    fn companion(&self) -> Option<String> {
+        let items = self.band_selection_data.as_ref()?.items.as_ref()?;
+        let mut styles: Vec<(&String, &serde_json::Value)> = items.iter().collect();
+        styles.sort_by_key(|(name, style)| {
+            (
+                name.as_str() != "sport",
+                style
+                    .get("sortOrder")
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(i64::MAX),
+                (*name).clone(),
+            )
+        });
+        styles
+            .into_iter()
+            .find_map(|(_, style)| first_band_part(style))
+    }
+}
+
+/// 一种款式里第一个带零件号的颜色。
+fn first_band_part(style: &serde_json::Value) -> Option<String> {
+    style
+        .get("subDimensionValue")?
+        .as_array()?
+        .iter()
+        .find_map(|colour| {
+            let part = colour.get("image")?.get("baseIdentifier")?.as_str()?.trim();
+            looks_like_part_number(part).then(|| part.to_string())
+        })
+}
+
+/// Apple 的零件号一律形如 `MJUY4FE/A`：字母数字加一条斜杠。
+fn looks_like_part_number(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    !value.is_empty()
+        && value.bytes().filter(|b| *b == b'/').count() == 1
+        && bytes
+            .iter()
+            .all(|b| b.is_ascii_alphanumeric() || *b == b'/')
+        && bytes[0].is_ascii_alphanumeric()
+        && bytes[bytes.len() - 1].is_ascii_alphanumeric()
 }
 
 /// 取一个 HTML 页面，失败按 [`ApiError`] 的口径分类。
@@ -350,6 +512,11 @@ pub(crate) struct ProductSelection {
     /// Mac 页把同一份文案挂在这个键下。
     #[serde(default)]
     main_display_values: Option<DisplayGroups>,
+    /// 内嵌快照里由 `data/generate.py` 补上的搭档零件号（见
+    /// [`Product::companion_part`]）。在线抓下来的 `productSelectionData` 里
+    /// 没有这个键，那条路由 [`parse_buy_page`] 从页面别处补。
+    #[serde(default)]
+    companion_part: Option<String>,
 }
 
 /// 维度键 → 取值 → 展示条目。
@@ -511,6 +678,16 @@ impl ProductSelection {
     pub(crate) fn to_products(&self, category: Category, slug: &str) -> Vec<Product> {
         let raw = self.products.as_deref().unwrap_or_default();
 
+        // 每个维度在这一页上出现过多少种取值。取不到文案时，只有真正有得选的
+        // 维度才值得拿原始取值顶替：SE 页所有表壳都是 aluminum，Apple 索性
+        // 没给这个维度配文案，这时在每个标题里都塞一个英文 aluminum 只是噪音。
+        let mut variants: BTreeMap<&str, HashSet<&str>> = BTreeMap::new();
+        for item in raw {
+            for dim in item.dimensions() {
+                variants.entry(dim.key).or_default().insert(dim.value);
+            }
+        }
+
         let mut products = Vec::with_capacity(raw.len());
         let mut seen = HashSet::with_capacity(raw.len());
 
@@ -565,7 +742,8 @@ impl ProductSelection {
                         //
                         // 整个略去之后万一因此重名，下面的 disambiguate_titles
                         // 会补上零件号，不会出现两个一字不差的选项。
-                        (!dim.value.contains(|c: char| c.is_ascii_digit()))
+                        let varies = variants.get(dim.key).is_some_and(|v| v.len() > 1);
+                        (varies && !dim.value.contains(|c: char| c.is_ascii_digit()))
                             .then(|| dim.value.to_string())
                     }) else {
                         continue;
@@ -588,6 +766,12 @@ impl ProductSelection {
             products.push(Product {
                 title: join_non_empty(&parts),
                 part_number: part_number.to_string(),
+                companion_part: self
+                    .companion_part
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|c| !c.is_empty())
+                    .map(str::to_string),
                 category,
                 // family 只用来分组和排序。iPhone / iPad 用 familyType，
                 // Mac / Apple Watch 没有这个字段，退回 slug。
@@ -705,6 +889,13 @@ const INLINE_TAGS: &[&str] = &[
 /// 行内（见上），只好再认一次类名。
 const EXPLAINER_CLASSES: &[&str] = &["form-label-small", "as-subheading"];
 
+/// 带这个类名的标签是促销角标（「新款」「新外观」），连同里面的文字一起丢掉。
+///
+/// 它排在正文前面：`<span class="badge …">新外观</span>\n<div>铝金属</div>`。
+/// 不丢的话，「第一段非空文本」取到的就是「新外观」，下拉框里每只新款表壳都叫
+/// 「新外观」，材质反而没了。
+const BADGE_CLASS: &str = "badge";
+
 /// 把购买页里的一段展示文案压成一行纯文本。
 ///
 /// Apple 在这些字段里塞的是 HTML，而且几乎每一条都是「一句正文 + 一段补充说明」：
@@ -741,7 +932,13 @@ fn plain_text(html: &str) -> String {
 
         match tail.find('>') {
             Some(end) => {
-                if !is_inline_tag(&tail[1..end]) {
+                let raw = &tail[1..end];
+                if let Some(skip) = badge_end(raw, &tail[end + 1..]) {
+                    // 角标整个跳过，正文从它的闭合标签之后继续。
+                    rest = &tail[end + 1 + skip..];
+                    continue;
+                }
+                if !is_inline_tag(raw) {
                     segments.push(std::mem::take(&mut current));
                 }
                 rest = &tail[end + 1..];
@@ -763,6 +960,42 @@ fn plain_text(html: &str) -> String {
         .into_iter()
         .map(|s| collapse_whitespace(&decode_entities(&s)))
         .find(|s| !s.is_empty())
+        .unwrap_or_default()
+}
+
+/// `raw` 是一个角标的开始标签时，返回它的闭合标签在 `after` 里结束的位置。
+///
+/// 只认 `class="…badge…"` 这种写法，且必须能找到同名闭合标签；找不到就当普通
+/// 标签处理，宁可标题里多个「新款」，也不能把整条文案吞掉。
+fn badge_end(raw: &str, after: &str) -> Option<usize> {
+    if raw.starts_with('/') || !raw.contains(BADGE_CLASS) {
+        return None;
+    }
+    let class_at = raw.find("class")?;
+    let quoted = raw[class_at..]
+        .split(['"', '\''])
+        .nth(1)
+        .unwrap_or_default();
+    if !quoted
+        .split_whitespace()
+        .any(|c| c.starts_with(BADGE_CLASS))
+    {
+        return None;
+    }
+    let name = tag_name(raw);
+    if name.is_empty() {
+        return None;
+    }
+    let lower = after.to_ascii_lowercase();
+    let close = format!("</{}>", name.to_ascii_lowercase());
+    lower.find(&close).map(|at| at + close.len())
+}
+
+/// `<` 与 `>` 之间这段内容的标签名（小写不敏感，调用方自己处理）。
+fn tag_name(raw: &str) -> &str {
+    let name = raw.trim().trim_start_matches('/').trim_start();
+    name.split(|c: char| c.is_whitespace() || c == '/')
+        .next()
         .unwrap_or_default()
 }
 
@@ -1315,8 +1548,9 @@ mod tests {
         let products = parse_product_selection(raw.as_bytes(), Category::Mac, "macbook-pro")
             .expect("应当解析成功");
         assert_eq!(products.len(), 2);
-        assert_eq!(products[0].title, "MacBook Pro spaceblack MGED4CH/A");
-        assert_eq!(products[1].title, "MacBook Pro spaceblack MGEE4CH/A");
+        // 颜色在这一页只有一种取值又没有文案，不进展示名；剩下的就是靠零件号区分。
+        assert_eq!(products[0].title, "MacBook Pro MGED4CH/A");
+        assert_eq!(products[1].title, "MacBook Pro MGEE4CH/A");
         assert_ne!(products[0].title, products[1].title);
     }
 
@@ -1343,5 +1577,44 @@ mod tests {
         let products = parse_product_selection(raw.as_bytes(), Category::Iphone, "iphone-17-pro")
             .expect("应当解析成功");
         assert_eq!(products[0].title, "iPhone 17 Pro Max 1TB 宇宙橙色");
+    }
+
+    #[test]
+    fn 角标文字不进展示名() {
+        // Series 12 的材质文案前面挂着一个「新外观」角标，它排在正文之前；
+        // 不跳过的话每只新款表壳都会叫「新外观」。
+        assert_eq!(
+            plain_text(
+                "<span class=\"badge badge-no-scrim badge-tiny\">新外观</span>\n<div>铝金属</div>\n\
+                 <span class=\"form-label-small\">可选 GPS 或 GPS + 蜂窝网络</span>"
+            ),
+            "铝金属"
+        );
+        // 角标没有闭合标签时按普通标签处理，不能把整条文案吞掉。
+        assert_eq!(
+            plain_text("<span class=\"badge\">新款 钛金属"),
+            "新款 钛金属"
+        );
+        // 别的类名里恰好含有 badge 一词（`nobadge`）不算角标。
+        assert_eq!(
+            plain_text("<span class=\"nobadge\">钛金属</span>"),
+            "钛金属"
+        );
+    }
+
+    #[test]
+    fn 全页只有一种取值且没有文案的维度不进展示名() {
+        // SE 页所有表壳都是 aluminum，Apple 没给材质配文案；这时把英文原值塞进
+        // 每个标题只是噪音。颜色有两种取值、同样没文案，就仍然用原值顶替。
+        let raw = r#"{"products":[
+            {"part":"MEHW4CH/B","dimensions":{"watch_cases-dimensionCaseSize":"40mm",
+             "watch_cases-dimensionCaseMaterial":"aluminum","watch_cases-dimensionColor":"starlight"}},
+            {"part":"MEHY4CH/B","dimensions":{"watch_cases-dimensionCaseSize":"40mm",
+             "watch_cases-dimensionCaseMaterial":"aluminum","watch_cases-dimensionColor":"midnight"}}],
+            "displayValues":{"watch_cases-dimensionCaseSize":{"40mm":{"header":"40 毫米"}}}}"#;
+        let products = parse_product_selection(raw.as_bytes(), Category::Watch, "apple-watch-se")
+            .expect("应当解析成功");
+        assert_eq!(products[0].title, "Apple Watch SE 40 毫米 starlight");
+        assert_eq!(products[1].title, "Apple Watch SE 40 毫米 midnight");
     }
 }

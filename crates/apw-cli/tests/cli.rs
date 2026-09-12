@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use apw_cli::args::Cli;
 use apw_cli::{InputTarget, MAX_INPUT_BYTES, read_targets, resolve_targets};
 use apw_core::catalog::Catalog;
+use apw_core::model::Category;
 use clap::Parser;
 use serde_json::{Value, json};
 
@@ -161,6 +162,65 @@ fn exact_ids_are_validated_but_new_skus_are_not_rejected_by_stale_catalog() {
     }
     assert!(resolve_targets(Vec::new(), &catalog).is_err());
     assert!(resolve_targets((0..257).map(|_| new()).collect(), &catalog).is_err());
+}
+
+#[test]
+fn companion_part_is_accepted_validated_and_filled_from_the_catalog() {
+    let catalog = Catalog::new();
+    // Explicit companion survives resolution untouched.
+    let explicit = input(
+        json!({"locale":"zh_CN", "storeNumber":"R359", "partNumber":"MEHW4CH/B",
+        "companionPart":"MJUA4FE/A"}),
+    );
+    let targets = resolve_targets(vec![explicit], &catalog).unwrap();
+    assert_eq!(targets[0].companion_part.as_deref(), Some("MJUA4FE/A"));
+    // A malformed companion is an input error, like a malformed part number.
+    let bad = input(
+        json!({"locale":"zh_CN", "storeNumber":"R359", "partNumber":"MEHW4CH/B",
+        "companionPart":"a|b"}),
+    );
+    assert_eq!(
+        resolve_targets(vec![bad], &catalog).unwrap_err().exit_code,
+        2
+    );
+    // Apple Watch cases from the embedded catalog get their band automatically;
+    // other categories never do, and unknown SKUs are left alone.
+    let watch = catalog
+        .products("zh_CN")
+        .unwrap()
+        .into_iter()
+        .find(|p| p.category == Category::Watch)
+        .expect("embedded catalog has Apple Watch");
+    let iphone = catalog
+        .products("zh_CN")
+        .unwrap()
+        .into_iter()
+        .find(|p| p.category == Category::Iphone)
+        .expect("embedded catalog has iPhone");
+    let targets = resolve_targets(
+        vec![
+            input(json!({"locale":"zh_CN", "storeNumber":"R359", "partNumber": watch.part_number})),
+            input(
+                json!({"locale":"zh_CN", "storeNumber":"R359", "partNumber": iphone.part_number}),
+            ),
+            input(json!({"locale":"zh_CN", "storeNumber":"R359", "partNumber":"NEW123CH/B"})),
+        ],
+        &catalog,
+    )
+    .unwrap();
+    assert!(
+        targets[0].companion_part.is_some(),
+        "watch case needs its band: {:?}",
+        targets[0]
+    );
+    assert_eq!(targets[0].companion_part, watch.companion_part);
+    assert_eq!(targets[1].companion_part, None);
+    assert_eq!(targets[2].companion_part, None);
+    // The wire format only carries the field when it is set.
+    let v = serde_json::to_value(&targets[1]).unwrap();
+    assert!(v.get("companionPart").is_none(), "{v}");
+    let v = serde_json::to_value(&targets[0]).unwrap();
+    assert!(v.get("companionPart").is_some(), "{v}");
 }
 
 #[tokio::test]

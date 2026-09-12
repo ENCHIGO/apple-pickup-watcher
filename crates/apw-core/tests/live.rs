@@ -199,7 +199,9 @@ async fn 四个品类的零件号接口都认() {
             .iter()
             .find(|p| p.category == *category)
             .unwrap_or_else(|| panic!("内嵌目录里没有 {} 商品", category.title()));
-        let parts = vec![product.part_number.clone()];
+        // Apple Watch 的表壳必须和同页一条表带一起查（#24）；引擎就是这么发的。
+        let mut parts = vec![product.part_number.clone()];
+        parts.extend(product.companion_part.clone());
 
         let result = client
             .pickup_message(region, "R683", &parts)
@@ -238,6 +240,47 @@ async fn 四个品类的零件号接口都认() {
             product.title
         );
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn apple_watch_表壳配上表带才能拿到明确答复() {
+    // #24：单独查表壳，Apple 要么返回空响应，要么把表壳报成「不支持到店取货」——
+    // 后者会被如实显示成假的「无货」。配上同页任意一条表带，表壳才给真话。
+    // 这条测试守的是这个关于 Apple 的假设；它哪天不成立了，Watch 会整品类失效。
+    let client = client();
+    let region = region_by_locale("zh_CN").expect("地区表里应当有中国大陆");
+    let catalog = Catalog::new();
+    let products = catalog.products("zh_CN").expect("内嵌目录应当可用");
+    let watch = products
+        .iter()
+        .find(|p| p.category == Category::Watch && p.family == "apple-watch-se")
+        .or_else(|| products.iter().find(|p| p.category == Category::Watch))
+        .expect("内嵌目录里应当有 Apple Watch");
+    let band = watch
+        .companion_part
+        .clone()
+        .expect("内嵌目录里的 Apple Watch 应当带着搭档表带");
+
+    let parts = vec![watch.part_number.clone(), band.clone()];
+    let result = client
+        .pickup_message(region, "R359", &parts)
+        .await
+        .unwrap_or_else(|e| panic!("表壳 + 表带查询失败：{e}"));
+    let status = result
+        .parts
+        .get(&watch.part_number)
+        .unwrap_or_else(|| panic!("响应里没有表壳 {}（配了表带 {band}）", watch.part_number));
+    assert!(
+        !status.availability.is_unknown(),
+        "配了表带的表壳仍然没有明确答复：{:?}",
+        status.availability
+    );
+    println!(
+        "{} + {band} -> {} (pickupDisplay={})",
+        watch.part_number,
+        status.availability.label(),
+        status.pickup_display
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]

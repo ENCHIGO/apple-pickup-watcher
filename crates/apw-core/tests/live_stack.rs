@@ -46,6 +46,7 @@ async fn 全栈跑通一轮真实监控() {
                 store_title: store.title.clone(),
                 part_number: product.part_number.clone(),
                 product_name: product.title.clone(),
+                companion_part: product.companion_part.clone(),
             });
         }
     }
