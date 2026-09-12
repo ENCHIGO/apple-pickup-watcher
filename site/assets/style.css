@@ -36,6 +36,7 @@ h1 { margin-bottom: 12px; font-size: 42px; font-weight: 650; letter-spacing: -1.
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; font-size: 14px; }
 .download-button { padding: 10px 17px; border: 1px solid #25282c; border-radius: 4px; background: #25282c; color: white; text-decoration: none; font-weight: 550; }
 .download-button:hover { color: #fff; background: #44494f; }
+.screenshot { display: block; width: 100%; max-width: 900px; height: auto; margin-top: 36px; border: 1px solid #e6e7e9; border-radius: 10px; }
 
 .section {
   display: grid;
