@@ -30,6 +30,9 @@ function render(c) {
         sameAs: repo, author: { "@type": "Person", name: "ENCHIGO", url: "https://github.com/ENCHIGO" },
         offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
         featureList: c.features.map((f) => f[1]),
+        image: url("assets/social.png"), screenshot: url("assets/screenshot.png"),
+        keywords: c.keywords, inLanguage: locales.map((l) => l.lang),
+        softwareHelp: { "@type": "CreativeWork", url: `${repo}/blob/main/docs/desktop.md` },
       },
       { "@type": "WebPage", "@id": `${canonical}#page`, url: canonical, name: c.title,
         description: c.description, inLanguage: c.lang, isPartOf: { "@id": `${url()}#website` },
@@ -64,14 +67,14 @@ function render(c) {
   <meta property="og:url" content="${canonical}">
   <meta property="og:locale" content="${c.ogLocale}">
   ${locales.filter((l) => l !== c).map((l) => `<meta property="og:locale:alternate" content="${l.ogLocale}">`).join("\n  ")}
-  <meta property="og:image" content="${url("assets/social-plain.png")}">
+  <meta property="og:image" content="${url("assets/social.png")}">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Apple Pickup Watcher — Apple Store pickup stock alerts for macOS, Windows and Linux">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${escape(c.title)}">
   <meta name="twitter:description" content="${escape(c.description)}">
-  <meta name="twitter:image" content="${url("assets/social-plain.png")}">
+  <meta name="twitter:image" content="${url("assets/social.png")}">
   <meta name="twitter:image:alt" content="Apple Pickup Watcher — Apple Store pickup stock alerts for macOS, Windows and Linux">
   <script type="application/ld+json">${json(structuredData)}</script>
 </head>
@@ -90,6 +93,7 @@ function render(c) {
         <a class="download-button" href="${releases}">${c.download}</a>
         <a href="${repo}">${c.source}</a>
       </div>
+      <img class="screenshot" src="${asset("assets/screenshot.png")}" alt="${escape(c.screenshotAlt)}" width="1080" height="820">
     </section>
     <section id="download" class="section">
       <h2>${c.downloadHeading}</h2>
@@ -138,6 +142,8 @@ function render(c) {
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 await cp(new URL("site/assets/", root), new URL("assets/", output), { recursive: true });
+// The README and the site share one screenshot; keep a single copy at assets/.
+await cp(new URL("assets/screenshot.png", root), new URL("assets/screenshot.png", output));
 for (const c of locales) {
   const dir = new URL(c.path, output);
   await mkdir(dir, { recursive: true });
@@ -162,7 +168,9 @@ await writeFile(new URL("llms.txt", output), `# Apple Pickup Watcher
 
 - [简体中文介绍与常见问题](${url()}): 支持范围、安装入口、使用方式和限制。
 - [English overview and FAQ](${url("en/")}): Supported products, regions, platforms, notifications and limitations.
-- [Source and README](${repo}): Implementation and full setup instructions.
+- [Source and README](${repo}): Implementation and full setup instructions (Chinese).
+- [English README](${repo}/blob/main/README.en.md): Same content in English.
+- [CLI and agent skill](${repo}/blob/main/docs/cli.md): The apw command, JSON/NDJSON output, batch targets and exit codes.
 - [Latest stable release](${releases}): Current published version and platform installers; check release notes for changes.
 - [Issues](${repo}/issues): Reported problems and unresolved environment-specific behavior.
 - [Attribution](${repo}/blob/main/NOTICE): Rewrite of hteen/apple-store-helper.
@@ -175,7 +183,9 @@ await writeFile(new URL("llms.txt", output), `# Apple Pickup Watcher
 - Platforms: macOS (Apple Silicon and Intel), Windows x64 and Linux x86_64.
 - Alerts: desktop notification, sound and optional Bark push. The app must stay running; the computer must stay awake and online.
 - Unknown or failed queries are not out-of-stock results. HTTP 541 alone does not establish its cause or inventory status.
-- Default polling interval: 30 seconds. Region support does not guarantee successful queries.
+- Default polling interval: 30 seconds (minimum 5). Region support does not guarantee successful queries.
+- Stock states: in_stock, out_of_stock, unknown (always with a reason: blocked, rate_limited, schema_drift, apple_error or transport) and not_yet_checked.
+- CLI: apw (Rust) prints JSON; apw watch streams NDJSON events; exit code 0 means the query succeeded, not that stock was found. A skill in skills/apple-pickup-watcher wraps it for Codex-style agents. The CLI sends no notifications and places no orders.
 - The app can open a shopping bag, but users add items, select pickup stores, check out and pay manually on Apple's website. No reservation or purchase guarantee.
 - Independent project, not affiliated with or endorsed by Apple Inc.
 
