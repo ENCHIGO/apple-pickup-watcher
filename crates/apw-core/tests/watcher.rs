@@ -283,6 +283,34 @@ async fn 有货提醒是边沿触发的() {
 }
 
 #[tokio::test]
+async fn 型号不可购买时告警但不建议换网络或等更新() {
+    let fake = FakeFetcher::new(|_, _, _| {
+        Err(ApiError::Apple(
+            "Apple 没有返回任何门店；所选型号可能已停售".into(),
+        ))
+    });
+    let (w, mut rx) = Watcher::spawn(fake, fast_config());
+    w.set_targets(vec![target("R532", "MG064CH/A")]).await;
+    w.start().await;
+    let events = wait_cycle(&mut rx).await;
+    w.stop().await;
+
+    let snap = w.snapshot().await;
+    assert!(matches!(
+        &snap[0].availability,
+        Availability::Unknown(UnknownReason::AppleError { message })
+            if message.contains("已停售")
+    ));
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::Trouble {
+            reason,
+            advice: None,
+        } if reason.contains("型号可能已停售")
+    )));
+}
+
+#[tokio::test]
 async fn 命中后仍继续查询所有目标但持续有货只提醒一次() {
     let fake =
         FakeFetcher::new(|_, store, parts| Ok(ok_response(store, parts, Availability::InStock)));

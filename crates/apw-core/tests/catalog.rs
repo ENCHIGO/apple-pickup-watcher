@@ -90,6 +90,24 @@ fn 七个地区都能从内嵌数据读出商品与门店() {
     }
 }
 
+#[test]
+fn 国行目录包含全部三十二款iphone18pro配置() {
+    let products = Catalog::new().products("zh_CN").expect("国行目录应当可用");
+    let iphone18: Vec<_> = products
+        .iter()
+        .filter(|product| product.family.starts_with("iphone18pro"))
+        .collect();
+
+    assert_eq!(iphone18.len(), 32);
+    let burgundy = iphone18
+        .iter()
+        .find(|product| product.part_number == "MJYH4CH/A")
+        .expect("应包含官网公布的 Pro Max 1TB 酒红色 SKU");
+    assert_eq!(burgundy.title, "iPhone 18 Pro Max 1TB 勃艮第酒红色");
+    assert_eq!(burgundy.capacity, "1TB");
+    assert_eq!(burgundy.color, "勃艮第酒红色");
+}
+
 /// 每个品类的展示名都该以什么开头。
 ///
 /// Mac 与 Apple Watch 的商品数据里没有机型字段，展示名只能从购买页 slug 来 ——

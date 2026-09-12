@@ -21,6 +21,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import {
+  capacityOptions,
+  colorOptions,
+  familyOptions,
+  productForSelection,
+} from "@/lib/product-selection";
+import {
   Table,
   TableBody,
   TableCell,
@@ -101,6 +107,9 @@ export default function App() {
 
   const [storeNumber, setStoreNumber] = useState("");
   const [partNumber, setPartNumber] = useState("");
+  const [productFamily, setProductFamily] = useState("");
+  const [capacity, setCapacity] = useState("");
+  const [color, setColor] = useState("");
   const [barkDraft, setBarkDraft] = useState<string | null>(null);
   const [intervalDraft, setIntervalDraft] = useState<number | null>(null);
 
@@ -121,6 +130,25 @@ export default function App() {
         .map((p) => ({ value: p.partNumber, label: p.title })),
     [ui.products, ui.category],
   );
+  const iphoneFamilyOptions = useMemo(
+    () => familyOptions(ui.products, ui.category),
+    [ui.products, ui.category],
+  );
+  const iphoneCapacityOptions = useMemo(
+    () => capacityOptions(ui.products, ui.category, productFamily),
+    [ui.products, ui.category, productFamily],
+  );
+  const iphoneColorOptions = useMemo(
+    () => colorOptions(ui.products, ui.category, productFamily, capacity),
+    [ui.products, ui.category, productFamily, capacity],
+  );
+
+  function resetProductSelection() {
+    setPartNumber("");
+    setProductFamily("");
+    setCapacity("");
+    setColor("");
+  }
 
   const targets = useMemo(() => ui.rows.map((r) => r.target), [ui.rows]);
 
@@ -154,7 +182,7 @@ export default function App() {
     };
     if (targets.some((t) => targetKey(t) === targetKey(next))) return;
     await setTargets([...targets, next]);
-    setPartNumber("");
+    resetProductSelection();
   }
 
   async function onRemove(t: Target) {
@@ -163,7 +191,7 @@ export default function App() {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="mx-auto flex h-screen max-w-5xl flex-col gap-4 p-6">
+      <div className="mx-auto flex h-screen max-w-6xl flex-col gap-4 p-6">
         <header className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Apple Pickup Watcher</h1>
@@ -241,7 +269,7 @@ export default function App() {
               onChange={(locale) => {
                 // 换地区后旧的门店和型号都不再适用，清掉待添加的选择。
                 setStoreNumber("");
-                setPartNumber("");
+                resetProductSelection();
                 void changeLocale(locale);
               }}
               placeholder="选择地区"
@@ -259,7 +287,7 @@ export default function App() {
               onChange={(value) => {
                 // 换品类后旧的型号不再在下拉框里，清掉待添加的选择。门店不用清，
                 // 它跟品类无关。
-                setPartNumber("");
+                resetProductSelection();
                 setCategory(value as Category);
               }}
               placeholder="选择品类"
@@ -283,19 +311,84 @@ export default function App() {
             />
           </div>
 
-          <div className="grid gap-1.5">
-            <Label>型号</Label>
-            <Combobox
-              className="w-80"
-              options={productOptions}
-              value={partNumber}
-              onChange={setPartNumber}
-              placeholder="选择型号"
-              searchPlaceholder="搜索型号…"
-              emptyText="没有匹配的型号"
-              disabled={productOptions.length === 0}
-            />
-          </div>
+          {ui.category === "iphone" ? (
+            <>
+              <div className="grid gap-1.5">
+                <Label>机型</Label>
+                <Combobox
+                  className="w-48"
+                  options={iphoneFamilyOptions}
+                  value={productFamily}
+                  onChange={(value) => {
+                    setProductFamily(value);
+                    setCapacity("");
+                    setColor("");
+                    setPartNumber("");
+                  }}
+                  placeholder="选择机型"
+                  searchPlaceholder="搜索机型…"
+                  emptyText="没有匹配的机型"
+                  disabled={iphoneFamilyOptions.length === 0}
+                />
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label>容量（存储）</Label>
+                <Combobox
+                  className="w-36"
+                  options={iphoneCapacityOptions}
+                  value={capacity}
+                  onChange={(value) => {
+                    setCapacity(value);
+                    setColor("");
+                    setPartNumber("");
+                  }}
+                  placeholder="选择容量"
+                  searchPlaceholder="搜索容量…"
+                  emptyText="没有匹配的容量"
+                  disabled={productFamily === "" || iphoneCapacityOptions.length === 0}
+                />
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label>颜色</Label>
+                <Combobox
+                  className="w-40"
+                  options={iphoneColorOptions}
+                  value={color}
+                  onChange={(value) => {
+                    setColor(value);
+                    const product = productForSelection(
+                      ui.products,
+                      ui.category,
+                      productFamily,
+                      capacity,
+                      value,
+                    );
+                    setPartNumber(product?.partNumber ?? "");
+                  }}
+                  placeholder="选择颜色"
+                  searchPlaceholder="搜索颜色…"
+                  emptyText="没有匹配的颜色"
+                  disabled={capacity === "" || iphoneColorOptions.length === 0}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="grid gap-1.5">
+              <Label>型号</Label>
+              <Combobox
+                className="w-80"
+                options={productOptions}
+                value={partNumber}
+                onChange={setPartNumber}
+                placeholder="选择型号"
+                searchPlaceholder="搜索型号…"
+                emptyText="没有匹配的型号"
+                disabled={productOptions.length === 0}
+              />
+            </div>
+          )}
 
           <Button variant="secondary" onClick={() => void onAdd()} disabled={!canAdd}>
             <Plus /> 添加

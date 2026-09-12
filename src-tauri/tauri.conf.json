@@ -13,9 +13,9 @@
     "windows": [
       {
         "title": "Apple Pickup Watcher",
-        "width": 1080,
+        "width": 1280,
         "height": 820,
-        "minWidth": 900,
+        "minWidth": 1000,
         "minHeight": 640
       }
     ],

@@ -154,6 +154,18 @@ fn 门店号对不上时不冒充() {
 }
 
 #[test]
+fn 成功信封里的空门店列表提示核对型号而不是怪门店() {
+    let raw = br#"{"head":{"status":"200"},"body":{"stores":[]}}"#;
+    match parse_pickup_message(raw, "R532") {
+        Err(ApiError::Apple(message)) => {
+            assert!(message.contains("型号"), "错误应指向型号状态：{message}");
+            assert!(!message.contains("R532"), "空响应不能断言目标门店不存在");
+        }
+        other => panic!("空门店列表应提示核对型号，实际为 {other:?}"),
+    }
+}
+
+#[test]
 fn 空的型号表报错而不是当成无货() {
     let raw = r#"{"head":{"status":"200"},
         "body":{"stores":[{"storeNumber":"R683","storeName":"环球港","partsAvailability":{}}]}}"#;

@@ -567,6 +567,16 @@ pub fn parse_pickup_message(raw: &[u8], want_store: &str) -> Result<StoreAvailab
         &resp.body.stores
     };
 
+    // Apple 对已经停售、尚未开售或当前不可购买的零件号，可能返回一个成功信封
+    // （head.status=200）和空门店列表。它没有说目标门店不存在，更不代表门店无货。
+    // 把这种结果报成结构漂移会误导用户等待程序更新；明确指向商品状态，用户才知道
+    // 应先核对官网和型号目录。
+    if stores.is_empty() {
+        return Err(ApiError::Apple(
+            "Apple 没有返回任何门店；所选型号可能已停售、尚未开售或当前无法购买".into(),
+        ));
+    }
+
     // 指定了 store 参数时 Apple 只返回该门店，但仍按编号核对，
     // 避免把别的门店的库存错认成目标门店的。
     let matched = stores
