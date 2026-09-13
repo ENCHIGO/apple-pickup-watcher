@@ -1,6 +1,7 @@
 //! CLI transport and input validation. Inventory decisions remain in apw-core.
 
 pub mod args;
+pub mod doctor;
 mod schema;
 
 use std::collections::BTreeSet;
@@ -94,7 +95,7 @@ where
     }
 }
 
-fn region(locale: &str) -> Result<&'static Region, CliError> {
+pub(crate) fn region(locale: &str) -> Result<&'static Region, CliError> {
     region_by_locale(locale)
         .ok_or_else(|| CliError::invalid(format!("Unsupported locale {locale:?}; run apw regions")))
 }
@@ -239,7 +240,7 @@ async fn load_targets(args: TargetArgs, catalog: &Catalog) -> Result<Vec<Target>
 }
 
 /// Apple part numbers look like `MJTF4CH/A`: alphanumerics with at most one slash.
-fn valid_part_number(part: &str) -> bool {
+pub(crate) fn valid_part_number(part: &str) -> bool {
     !part.is_empty()
         && part.len() <= 64
         && part.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'/')
@@ -345,6 +346,14 @@ pub async fn execute<W: AsyncWrite + Unpin>(cli: Cli, out: &mut W) -> Result<u8,
             return monitor(client, targets, config, Mode::Watch { until_in_stock }, out).await;
         }
         Command::Schema => json_line(out, &schema::document()).await?,
+        Command::Doctor {
+            locale,
+            store,
+            part,
+            interval,
+            json,
+            ..
+        } => return doctor::run(locale, store, part, interval, json, out).await,
     }
     Ok(0)
 }
