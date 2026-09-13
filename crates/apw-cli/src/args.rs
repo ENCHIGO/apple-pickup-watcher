@@ -66,6 +66,27 @@ pub enum Command {
     },
     /// Describe commands, exit codes and the versioned JSON data contract (offline).
     Schema,
+    /// Diagnose HTTP 541 on this network: query one store with several request profiles
+    /// and warm-up strategies, paced and never retried, then print a redacted report.
+    Doctor {
+        #[arg(long)]
+        locale: String,
+        /// Store number, e.g. R359.
+        #[arg(long)]
+        store: String,
+        /// Apple part number (SKU). Apple Watch cases get their band from the catalog.
+        #[arg(long, value_delimiter = ',', required = true)]
+        part: Vec<String>,
+        /// Seconds between variants (minimum 10). This is a diagnosis, not a load test.
+        #[arg(long, default_value_t = 15, value_parser = clap::value_parser!(u64).range(10..=600))]
+        interval: u64,
+        /// Emit one NDJSON line per variant instead of the Markdown report.
+        #[arg(long)]
+        json: bool,
+        /// Overall deadline in seconds.
+        #[arg(long, default_value_t = 900, value_parser = clap::value_parser!(u64).range(1..=86400))]
+        timeout: u64,
+    },
 }
 
 impl Cli {
@@ -73,7 +94,8 @@ impl Cli {
         match &self.command {
             Command::Products { timeout, .. }
             | Command::Check { timeout, .. }
-            | Command::Watch { timeout, .. } => *timeout,
+            | Command::Watch { timeout, .. }
+            | Command::Doctor { timeout, .. } => *timeout,
             _ => 60,
         }
     }

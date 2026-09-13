@@ -220,7 +220,8 @@ fn 任何请求错误都只能变成未知() {
 
 #[test]
 fn 只有被拦截和限流值得重试() {
-    assert!(ApiError::Blocked(String::new()).is_retryable());
+    // 被拦截不再重试：几秒后再打一次只会把风控评分推得更高，处置是冷却。
+    assert!(!ApiError::Blocked(String::new()).is_retryable());
     assert!(ApiError::RateLimited(String::new()).is_retryable());
     assert!(ApiError::Transport(String::new()).is_retryable());
     // 结构不符和业务错误重试多少次结果都一样。

@@ -149,11 +149,30 @@ async fn 查询时必须带上cookie() {
         .cookies_for(region)
         .expect("查过一次之后，cookie 罐不该还是空的 —— 暖场或响应里的 Set-Cookie 没生效");
 
-    println!("攒到的 cookie：{cookies}");
+    // 只打印名字，值是会话凭证，不能进 CI 日志。
+    let names = client.cookie_names_for(&region.pickup_message_url());
+    println!("攒到的 cookie：{}", names.join(", "));
     // Apple 的 shop 会话 cookie。名字变了要来更新这里，而不是删掉断言。
     assert!(
         cookies.contains("dssid2") || cookies.contains("as_dc"),
-        "攒到的 cookie 里没有 shop 的会话项：{cookies}"
+        "攒到的 cookie 里没有 shop 的会话项：{names:?}"
+    );
+
+    // 顺手核对真正的取货请求走的是 HTTP/2，而不只是暖场页。
+    let pickup = client
+        .recent_requests()
+        .await
+        .into_iter()
+        .rev()
+        .find(|r| r.kind == "pickup")
+        .expect("应当留下取货请求的记录");
+    assert!(
+        pickup
+            .http_version
+            .as_deref()
+            .is_some_and(|v| v.contains('2')),
+        "取货请求协商出来的是 {:?}，不是 HTTP/2",
+        pickup.http_version
     );
 }
 

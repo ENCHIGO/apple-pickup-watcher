@@ -3,11 +3,12 @@
 //! 这里只做「发请求 + 解析响应 + 分类错误」三件事，不含调度或界面逻辑，
 //! 因此可以脱离应用单独测试。
 
-use std::collections::HashSet;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 
-use serde::Deserialize;
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 
@@ -62,24 +63,133 @@ impl ApiError {
         }
     }
 
-    /// 是否值得重试。结构不符和业务错误重试多少次结果都一样。
+    /// 是否值得立刻重试。
+    ///
+    /// 结构不符和业务错误重试多少次结果都一样；**被拦截也不重试**：拦截是风控
+    /// 评分的结果，几秒后再打一次只会把评分推得更高，issue #3 里六家门店一轮
+    /// 就能发出十八次请求，正是这么来的。被拦后的处置是冷却，见
+    /// [`AppleClient::pickup_message`]。
     pub fn is_retryable(&self) -> bool {
-        matches!(
-            self,
-            Self::Blocked(_) | Self::RateLimited(_) | Self::Transport(_)
-        )
+        matches!(self, Self::RateLimited(_) | Self::Transport(_))
     }
 }
 
-/// 一个当前主流浏览器的 UA。
+/// 与 Apple 说话时的一整套请求特征。
 ///
-/// 上游写死的是 Chrome/94（2021 年），这种年代久远的 UA 本身就是明显的机器人
-/// 特征。UA 不是被拦的唯一原因，但没有理由主动留下这个特征。
-const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
-     AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+/// 这些头必须彼此一致：自称 Chrome 153 却不带任何 Chrome 必发的 `sec-ch-ua`，
+/// 或者带着 jQuery 时代的 `X-Requested-With`，都是边缘风控一眼可辨的脚本特征。
+/// 所以它们收在一个带名字的档案里整体切换，而不是散落各处各改各的；诊断输出
+/// 也能写清「用的是哪一套」。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequestProfile {
+    /// 档案名，带采集日期，出现在诊断输出里。
+    pub name: &'static str,
+    pub user_agent: String,
+    /// `sec-ch-ua` 三件套；`None` 表示不发。
+    pub client_hints: Option<ClientHints>,
+    /// 是否发送 `sec-fetch-*`（Fetch Metadata）。
+    pub fetch_metadata: bool,
+    /// 取货接口请求的 `Accept`。
+    pub api_accept: String,
+    /// 是否发送 `X-Requested-With: XMLHttpRequest`。
+    pub x_requested_with: bool,
+    /// 是否附带 Apple 商店前端自己加的 `x-skip-redirect` 与 `x-aos-ui-fetch-call-1`。
+    /// 后者的生成规则未经证实，只是仿照样例格式，因此默认不发。
+    pub apple_extras: bool,
+}
 
-/// 响应体读取上限，避免异常情况下把整个拦截页甚至更大的内容读进内存。
+/// Chrome 每个请求都会带的低熵 client hints。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClientHints {
+    pub ua: String,
+    pub mobile: String,
+    pub platform: String,
+}
+
+impl RequestProfile {
+    /// 默认档案：2026-09-13 在 macOS 上从真实 Chrome 153 的购买页抓到的取货请求特征。
+    ///
+    /// 更新时整套一起换（UA 主版本与 `sec-ch-ua` 的品牌列表必须一致），并改档案名。
+    /// 不要每次请求随机换 UA，那本身就是特征。
+    pub fn chrome() -> Self {
+        Self {
+            name: "chrome-153-macos-20260913",
+            user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
+                         (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+                .into(),
+            client_hints: Some(ClientHints {
+                ua: r#""Google Chrome";v="153", "Not_A Brand";v="8", "Chromium";v="153""#.into(),
+                mobile: "?0".into(),
+                platform: r#""macOS""#.into(),
+            }),
+            fetch_metadata: true,
+            api_accept: "*/*".into(),
+            x_requested_with: false,
+            apple_extras: false,
+        }
+    }
+
+    /// v0.4.1 及以前的请求特征。只用于诊断对照，不要用作默认。
+    pub fn legacy() -> Self {
+        Self {
+            name: "legacy-0.4.1",
+            user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
+                         (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+                .into(),
+            client_hints: None,
+            fetch_metadata: false,
+            api_accept: "application/json, text/javascript, */*; q=0.01".into(),
+            x_requested_with: true,
+            apple_extras: false,
+        }
+    }
+}
+
+impl Default for RequestProfile {
+    fn default() -> Self {
+        Self::chrome()
+    }
+}
+
+/// 暖场取哪个页面。
+///
+/// 默认取购物袋页：它是动态页面，一次就把 `dssid2`、`as_dc`、`dssf` 等商店会话
+/// cookie 全发下来。购买页走 CDN 缓存（`cache-control: public, max-age=120`），
+/// 只发一个 `geo`，攒不到会话 —— 2026-09-13 用 `apw doctor` 对照过：购物袋页暖场后
+/// 罐里六个 cookie，购买页暖场后只有一个。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WarmPage {
+    /// 购物袋页（默认）。
+    Bag,
+    /// 该地区的默认购买页。只发 `geo`，留给诊断对照。
+    BuyPage,
+    /// 不暖场。诊断用：验证「不带 cookie」这一变量。
+    None,
+}
+
+/// 库存接口响应体的读取上限。一次查询的正常响应只有几 KB，拦截页也不过 128 KB，
+/// 4 MB 足够；再大就不是我们要的东西了。
 const MAX_RESPONSE_BYTES: usize = 4 << 20;
+
+/// 暖场页的读取上限。读掉响应体是为了让连接能被复用；超过上限直接停下。
+const MAX_WARM_BYTES: usize = 8 << 20;
+
+/// 暖场失败后的最小重试间隔。每个门店任务都各自再试一遍暖场，只会把突发放大。
+const WARM_RETRY_INTERVAL: Duration = Duration::from_secs(60);
+
+/// 被拦后的冷却时长：首次 5 分钟，冷却结束后的探测再次被拦，依次延长到 10、20、30 分钟。
+///
+/// 这是保守的客户端策略，不是 Apple 已知的封禁时长。被拦之后继续以原频率发请求，
+/// 只会让风控评分越来越高；issue #3 里「一旦 541 就一直 541」正是这个样子。
+const BLOCK_COOLDOWNS: [Duration; 4] = [
+    Duration::from_secs(5 * 60),
+    Duration::from_secs(10 * 60),
+    Duration::from_secs(20 * 60),
+    Duration::from_secs(30 * 60),
+];
+
+/// 保留最近多少条出站请求记录，供诊断命令和日志使用。
+const RECENT_RECORDS: usize = 256;
 
 /// 客户端配置。
 #[derive(Debug, Clone)]
@@ -87,10 +197,16 @@ pub struct ClientConfig {
     /// 任意两次出站请求之间的最小间隔，用于全局限速。
     pub min_interval: Duration,
     /// 单次调用内部的最大重试次数（不含首次请求）。
+    ///
+    /// 只对网络失败和限流生效；被拦截（HTTP 541 / 403）一律不重试，
+    /// 见 [`ApiError::is_retryable`]。
     pub max_retries: u32,
     /// 单次请求的总超时。
     pub timeout: Duration,
-    pub user_agent: String,
+    /// 请求特征档案。
+    pub profile: RequestProfile,
+    /// 暖场策略。
+    pub warm_page: WarmPage,
 }
 
 impl Default for ClientConfig {
@@ -99,9 +215,55 @@ impl Default for ClientConfig {
             min_interval: Duration::from_millis(500),
             max_retries: 2,
             timeout: Duration::from_secs(15),
-            user_agent: DEFAULT_USER_AGENT.to_string(),
+            profile: RequestProfile::chrome(),
+            warm_page: WarmPage::Bag,
         }
     }
+}
+
+/// 一次真实出站请求的记录，供诊断命令与日志使用。只记 cookie 的名字，不记值。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RequestRecord {
+    /// Unix 毫秒。
+    pub at_ms: u64,
+    /// `warm`（暖场）或 `pickup`（取货查询）。
+    pub kind: &'static str,
+    pub locale: String,
+    pub store: Option<String>,
+    /// 这次请求携带的零件号数量（含搭档表带）。
+    pub parts: usize,
+    pub status: Option<u16>,
+    /// 实际协商出的 HTTP 版本，如 `HTTP/2.0`。
+    pub http_version: Option<String>,
+    pub duration_ms: u64,
+    /// `ok` / `blocked` / `rate_limited` / `http_error` / `not_json` / `no_cookie` / `transport`。
+    pub outcome: String,
+    /// 发送前 cookie 罐里对该地址生效的 cookie 名。
+    pub cookies_sent: Vec<String>,
+    /// 响应处理后对取货接口生效的 cookie 名。
+    pub cookies_after: Vec<String>,
+    /// 跟随重定向后的最终地址。
+    pub final_url: Option<String>,
+}
+
+/// 某地区的暖场状态。
+#[derive(Debug, Default)]
+struct WarmState {
+    /// 暖场页取回来了、而且罐里真的有对取货接口生效的 cookie。
+    warmed: bool,
+    last_attempt: Option<Instant>,
+    failures: u32,
+}
+
+/// 某地区被拦后的冷却状态。
+#[derive(Debug)]
+struct BlockState {
+    until: Instant,
+    /// 已用到 [`BLOCK_COOLDOWNS`] 的第几档。
+    level: usize,
+    /// 冷却结束后是否已有一次探测在飞。同一时刻只放一个探测出去。
+    probing: bool,
 }
 
 /// Apple 商店接口客户端，可跨任务共享。
@@ -118,12 +280,20 @@ pub struct AppleClient {
     /// Cookie 罐。
     ///
     /// 自己持有一份而不是用 `cookie_store(true)` 那个隐藏的内部罐，是为了能
-    /// 查得到里面到底有没有东西 —— 契约测试要断言「暖场之后真的攒到了 cookie」。
+    /// 查得到里面到底有没有东西 —— 暖场之后要确认真的攒到了 cookie。
     /// 一个「以为自己在带 cookie、其实罐是空的」的客户端，功能上和现在一模一样，
     /// 没有任何迹象。
     jar: Arc<reqwest::cookie::Jar>,
-    /// 已经暖过场的地区 locale。
-    warmed: Arc<Mutex<HashSet<String>>>,
+    /// 各地区的暖场状态。
+    ///
+    /// 锁在整个暖场请求期间持有，所以同一时刻只会有一次暖场：第一轮的几个门店
+    /// 任务同时发现「还没暖过」时，只有一个去取页面，其余等它的结果。此前每个
+    /// 任务各取一次，启动瞬间就是一波突发请求。
+    warm: Arc<Mutex<HashMap<String, WarmState>>>,
+    /// 各地区被拦后的冷却状态。
+    blocks: Arc<Mutex<HashMap<String, BlockState>>>,
+    /// 最近的出站请求记录。
+    recent: Arc<Mutex<VecDeque<RequestRecord>>>,
 }
 
 impl AppleClient {
@@ -143,8 +313,56 @@ impl AppleClient {
             config,
             last_sent: Arc::new(Mutex::new(None)),
             jar,
-            warmed: Arc::new(Mutex::new(HashSet::new())),
+            warm: Arc::new(Mutex::new(HashMap::new())),
+            blocks: Arc::new(Mutex::new(HashMap::new())),
+            recent: Arc::new(Mutex::new(VecDeque::with_capacity(RECENT_RECORDS))),
         })
+    }
+
+    /// 当前使用的请求特征档案。
+    pub fn profile(&self) -> &RequestProfile {
+        &self.config.profile
+    }
+
+    /// 最近的出站请求记录，按时间先后排列。
+    pub async fn recent_requests(&self) -> Vec<RequestRecord> {
+        self.recent.lock().await.iter().cloned().collect()
+    }
+
+    async fn push_record(&self, record: RequestRecord) {
+        let mut recent = self.recent.lock().await;
+        if recent.len() >= RECENT_RECORDS {
+            recent.pop_front();
+        }
+        recent.push_back(record);
+    }
+
+    /// 罐里对某个地址生效的 cookie 名。
+    pub fn cookie_names_for(&self, url: &str) -> Vec<String> {
+        use reqwest::cookie::CookieStore;
+        let Ok(url) = url.parse() else {
+            return Vec::new();
+        };
+        let Some(value) = self.jar.cookies(&url) else {
+            return Vec::new();
+        };
+        let Ok(text) = value.to_str() else {
+            return Vec::new();
+        };
+        text.split(';')
+            .filter_map(|pair| pair.trim().split('=').next())
+            .filter(|name| !name.is_empty())
+            .map(str::to_string)
+            .collect()
+    }
+
+    /// 这个地区当前攒到的 cookie，没有则返回 `None`。契约测试用；**不要打印它的值**。
+    pub fn cookies_for(&self, region: &Region) -> Option<String> {
+        use reqwest::cookie::CookieStore;
+        let url = region.pickup_message_url().parse().ok()?;
+        self.jar
+            .cookies(&url)
+            .and_then(|v| v.to_str().ok().map(str::to_owned))
     }
 
     /// 确保这个地区的 cookie 已经攒上了。
@@ -163,57 +381,162 @@ impl AppleClient {
     /// cookie 都是 200，怎么对照都测不出差别。所以别拿「我这里两种都正常」
     /// 当反证 —— 这个假设正是这么被误杀过一次的。
     ///
-    /// 一次成功的查询本身也会带回 cookie（那个端点自己就发 8 个 Set-Cookie），
-    /// 所以在正常网络上这次暖场之后就再也不会发生。但受审查的网络上第一次查询
-    /// 就会被拦，攒不到 cookie，只能先主动取一次页面。
+    /// # 三条纪律
     ///
-    /// **失败不影响查询**：暖场取不到页面时什么都不做，让真正的查询照常发出去。
-    /// 让一次辅助请求的失败去决定库存判定，正是这个项目最不该有的东西。
+    /// 1. **同一时刻只暖一次**：锁在整个请求期间持有，并发的门店任务等同一个结果。
+    /// 2. **页面 2xx 不算数**：罐里真的有对取货接口生效的 cookie 才算暖好。
+    /// 3. **失败不影响查询**：暖不上时照常发查询，只是 [`WARM_RETRY_INTERVAL`] 内
+    ///    不再重试暖场。让一次辅助请求的失败去决定库存判定，正是这个项目最不该
+    ///    有的东西。
     async fn ensure_warm(&self, region: &Region) {
-        if self.warmed.lock().await.contains(region.locale) {
+        let url = match self.config.warm_page {
+            WarmPage::Bag => region.bag_url(),
+            WarmPage::BuyPage => region.default_buy_page_url(),
+            WarmPage::None => return,
+        };
+
+        let mut states = self.warm.lock().await;
+        let state = states.entry(region.locale.to_string()).or_default();
+        if state.warmed {
             return;
         }
+        if let Some(at) = state.last_attempt
+            && at.elapsed() < WARM_RETRY_INTERVAL
+        {
+            return;
+        }
+        state.last_attempt = Some(Instant::now());
 
         self.throttle().await;
-        let ok = self
-            .http
-            .get(region.bag_url())
-            .header(reqwest::header::USER_AGENT, &self.config.user_agent)
-            .header(
-                reqwest::header::ACCEPT,
-                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            )
-            .header(reqwest::header::ACCEPT_LANGUAGE, region.accept_language())
-            .send()
-            .await
-            .is_ok_and(|r| r.status().is_success());
+        let started = Instant::now();
+        let mut record = RequestRecord {
+            at_ms: now_ms(),
+            kind: "warm",
+            locale: region.locale.to_string(),
+            store: None,
+            parts: 0,
+            status: None,
+            http_version: None,
+            duration_ms: 0,
+            outcome: String::new(),
+            cookies_sent: self.cookie_names_for(&url),
+            cookies_after: Vec::new(),
+            final_url: None,
+        };
 
-        if ok {
-            self.warmed.lock().await.insert(region.locale.to_string());
+        let sent = self
+            .http
+            .get(&url)
+            .headers(navigation_headers(&self.config.profile, region))
+            .send()
+            .await;
+        match sent {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                record.status = Some(status);
+                record.http_version = Some(format!("{:?}", resp.version()));
+                record.final_url = Some(resp.url().to_string());
+                // 读掉响应体，连接才能复用；内容本身用不上。
+                let _ = read_body_capped(resp, MAX_WARM_BYTES).await;
+                let names = self.cookie_names_for(&region.pickup_message_url());
+                let ok = (200..300).contains(&status) && !names.is_empty();
+                record.cookies_after = names;
+                record.outcome = if ok {
+                    "ok".into()
+                } else if (200..300).contains(&status) {
+                    "no_cookie".into()
+                } else {
+                    "http_error".into()
+                };
+                if ok {
+                    state.warmed = true;
+                    state.failures = 0;
+                } else {
+                    state.failures = state.failures.saturating_add(1);
+                }
+            }
+            Err(err) => {
+                record.outcome = format!("transport: {err}");
+                state.failures = state.failures.saturating_add(1);
+            }
+        }
+        record.duration_ms = started.elapsed().as_millis() as u64;
+        drop(states);
+        self.push_record(record).await;
+    }
+
+    /// 忘掉某地区的暖场标记，下一次会重新取页面。
+    ///
+    /// 被拦截时调用。cookie 会过期，也会被边缘节点作废；一直拿着一份不再被认可
+    /// 的 cookie 反复重试，只会一直被拦。只清标记不清罐：重新取页面会刷新会话。
+    async fn forget_warm(&self, region: &Region) {
+        if let Some(state) = self.warm.lock().await.get_mut(region.locale) {
+            state.warmed = false;
+            state.last_attempt = None;
         }
     }
 
-    /// 忘掉某地区的暖场标记，下一轮会重新攒 cookie。
+    /// 检查该地区是否处于被拦后的冷却期。
     ///
-    /// 被拦截时调用。cookie 会过期，也会被边缘节点作废；一直拿着一份不再被认可
-    /// 的 cookie 反复重试，只会一直被拦。
-    async fn forget_warm(&self, region: &Region) {
-        self.warmed.lock().await.remove(region.locale);
+    /// 返回 `Err` 表示这次不该发请求；`Ok(true)` 表示本次是冷却结束后放出的那一次探测。
+    async fn admit(&self, region: &Region) -> Result<bool, ApiError> {
+        let mut blocks = self.blocks.lock().await;
+        let Some(state) = blocks.get_mut(region.locale) else {
+            return Ok(false);
+        };
+        let now = Instant::now();
+        if now < state.until {
+            return Err(ApiError::Blocked(format!(
+                "HTTP 541 后冷却中，{} 后自动重试",
+                human_duration(state.until - now)
+            )));
+        }
+        if state.probing {
+            return Err(ApiError::Blocked(
+                "冷却已结束，正在用一次探测确认是否解封".into(),
+            ));
+        }
+        state.probing = true;
+        Ok(true)
     }
 
-    /// 这个地区当前攒到的 cookie，没有则返回 `None`。契约测试用。
-    pub fn cookies_for(&self, region: &Region) -> Option<String> {
-        use reqwest::cookie::CookieStore;
-        let url = region.bag_url().parse().ok()?;
-        self.jar
-            .cookies(&url)
-            .and_then(|v| v.to_str().ok().map(str::to_owned))
+    /// 登记一次被拦，返回这次采用的冷却时长。
+    async fn record_block(&self, region: &Region) -> Duration {
+        let mut blocks = self.blocks.lock().await;
+        let now = Instant::now();
+        let state = blocks
+            .entry(region.locale.to_string())
+            .and_modify(|s| {
+                s.level = (s.level + 1).min(BLOCK_COOLDOWNS.len() - 1);
+                s.probing = false;
+            })
+            .or_insert(BlockState {
+                until: now,
+                level: 0,
+                probing: false,
+            });
+        let cooldown = BLOCK_COOLDOWNS[state.level];
+        state.until = now + cooldown;
+        cooldown
+    }
+
+    async fn clear_block(&self, region: &Region) {
+        self.blocks.lock().await.remove(region.locale);
+    }
+
+    async fn end_probe(&self, region: &Region) {
+        if let Some(state) = self.blocks.lock().await.get_mut(region.locale) {
+            state.probing = false;
+        }
     }
 
     /// 查询 `store_number` 门店中 `parts` 各型号的可取货状态。
     ///
     /// 一次请求可以携带多个零件号，Apple 会在同一响应里返回全部结果，因此调用方
     /// 应当按门店聚合后再调用，而不是每个型号发一次请求。
+    ///
+    /// 被拦截（HTTP 541）后：不重试，登记冷却，之后对该地区的调用在冷却期内直接
+    /// 返回 [`ApiError::Blocked`] 而不发请求；冷却结束后只放一次探测。
     pub async fn pickup_message(
         &self,
         region: &Region,
@@ -236,17 +559,40 @@ impl AppleClient {
             query.push((format!("parts.{i}"), part.clone()));
         }
 
-        // 先把 cookie 攒上再查。见 ensure_warm 的文档：没带 cookie 的查询会被
-        // Apple 的边缘节点拦下，而且只在受审查的网络上才拦。
-        self.ensure_warm(region).await;
+        let probing = self.admit(region).await?;
 
-        let body = match self.get(&region.pickup_message_url(), &query, region).await {
-            Ok(body) => body,
+        // 先把 cookie 攒上再查，见 ensure_warm；暖不上也照常查。
+        self.ensure_warm(region).await;
+        // 真实用户是在购买页上触发取货查询的，Referer 就写那一页。
+        let referer = region.default_buy_page_url();
+
+        let result = self
+            .get(
+                &region.pickup_message_url(),
+                &query,
+                region,
+                &referer,
+                store_number,
+                parts.len(),
+            )
+            .await;
+
+        let body = match result {
+            Ok(body) => {
+                self.clear_block(region).await;
+                body
+            }
+            Err(ApiError::Blocked(detail)) => {
+                self.forget_warm(region).await;
+                let cooldown = self.record_block(region).await;
+                return Err(ApiError::Blocked(format!(
+                    "{detail}；已进入冷却，{} 后自动重试一次",
+                    human_duration(cooldown)
+                )));
+            }
             Err(err) => {
-                if matches!(err, ApiError::Blocked(_)) {
-                    // 带着 cookie 还被拦，多半是它已经过期或被作废了。丢掉标记，
-                    // 下一轮重新攒一份，而不是抱着一份不再被认可的 cookie 死磕。
-                    self.forget_warm(region).await;
+                if probing {
+                    self.end_probe(region).await;
                 }
                 return Err(err);
             }
@@ -261,9 +607,8 @@ impl AppleClient {
     /// `reqwest` 的 HTTP/2 支持挂在 `http2` feature 上，而这个 crate 用的是
     /// `default-features = false`。那个 feature 曾经漏了整整一个版本：客户端
     /// 静默退回 HTTP/1.1，所有查询照常成功、所有测试照常通过，**功能上完全
-    /// 看不出来**。但对 Apple 的边缘节点来说，一个自称 Chrome 130 的客户端
-    /// 用 HTTP/1.1 跟它说话，是最一眼可辨的机器人特征 —— 真实的 Chrome 已经
-    /// 多年不这么干了。受风控审查的网络上，用户因此收到一屏 HTTP 541。
+    /// 看不出来**。但对 Apple 的边缘节点来说，一个自称最新 Chrome 的客户端
+    /// 用 HTTP/1.1 跟它说话，是一眼可辨的脚本特征。
     ///
     /// 这种「配置写漏了、功能却没坏」的缺陷，只能靠一条真的去连一次的测试兜住。
     pub async fn negotiated_http_version(&self, region: &Region) -> Result<String, ApiError> {
@@ -271,7 +616,7 @@ impl AppleClient {
         let resp = self
             .http
             .get(region.bag_url())
-            .header(reqwest::header::USER_AGENT, &self.config.user_agent)
+            .headers(navigation_headers(&self.config.profile, region))
             .send()
             .await
             .map_err(|e| ApiError::Transport(e.to_string()))?;
@@ -284,12 +629,16 @@ impl AppleClient {
         url: &str,
         query: &[(String, String)],
         region: &Region,
+        referer: &str,
+        store: &str,
+        parts: usize,
     ) -> Result<Vec<u8>, ApiError> {
         with_retry(self.config.max_retries, || async {
             // 限速放在重试循环内部：每一次真正的出站请求都要排队，
             // 重试不该成为绕过全局节流的后门。
             self.throttle().await;
-            self.get_once(url, query, region).await
+            self.get_once(url, query, region, referer, store, parts)
+                .await
         })
         .await
     }
@@ -313,33 +662,53 @@ impl AppleClient {
         tokio::time::sleep_until(slot).await;
     }
 
-    /// 执行单次 HTTP 请求，并把失败归类。
+    /// 执行单次 HTTP 请求，把失败归类，并留下一条请求记录。
     async fn get_once(
         &self,
         url: &str,
         query: &[(String, String)],
         region: &Region,
+        referer: &str,
+        store: &str,
+        parts: usize,
     ) -> Result<Vec<u8>, ApiError> {
-        let resp = self
+        let started = Instant::now();
+        let mut record = RequestRecord {
+            at_ms: now_ms(),
+            kind: "pickup",
+            locale: region.locale.to_string(),
+            store: Some(store.to_string()),
+            parts,
+            status: None,
+            http_version: None,
+            duration_ms: 0,
+            outcome: String::new(),
+            cookies_sent: self.cookie_names_for(url),
+            cookies_after: Vec::new(),
+            final_url: None,
+        };
+
+        let sent = self
             .http
             .get(url)
             .query(query)
-            .header(reqwest::header::USER_AGENT, &self.config.user_agent)
-            .header(
-                reqwest::header::ACCEPT,
-                "application/json, text/javascript, */*; q=0.01",
-            )
-            .header(reqwest::header::ACCEPT_LANGUAGE, region.accept_language())
-            .header(
-                reqwest::header::REFERER,
-                format!("{}/shop/buy-iphone", region.base_url),
-            )
-            .header("X-Requested-With", "XMLHttpRequest")
+            .headers(api_headers(&self.config.profile, region, referer))
             .send()
-            .await
-            .map_err(|e| ApiError::Transport(e.to_string()))?;
+            .await;
+        let resp = match sent {
+            Ok(resp) => resp,
+            Err(err) => {
+                record.duration_ms = started.elapsed().as_millis() as u64;
+                record.outcome = "transport".into();
+                self.push_record(record).await;
+                return Err(ApiError::Transport(err.to_string()));
+            }
+        };
 
-        let status = resp.status();
+        let status = resp.status().as_u16();
+        record.status = Some(status);
+        record.http_version = Some(format!("{:?}", resp.version()));
+        record.final_url = Some(resp.url().to_string());
         let content_type = resp
             .headers()
             .get(reqwest::header::CONTENT_TYPE)
@@ -347,17 +716,145 @@ impl AppleClient {
             .unwrap_or_default()
             .to_ascii_lowercase();
 
-        let body = read_body_capped(resp, MAX_RESPONSE_BYTES).await?;
+        let body = read_body_capped(resp, MAX_RESPONSE_BYTES).await;
+        record.duration_ms = started.elapsed().as_millis() as u64;
+        record.cookies_after = self.cookie_names_for(url);
 
-        if let Some(err) = classify_status(status.as_u16()) {
+        // 先看状态码：拦截页的响应体读到一半失败，也仍然是「被拦」，不能降级成网络错误。
+        if let Some(err) = classify_status(status) {
+            record.outcome = match &err {
+                ApiError::Blocked(_) => "blocked".into(),
+                ApiError::RateLimited(_) => "rate_limited".into(),
+                _ => "http_error".into(),
+            };
+            self.push_record(record).await;
             return Err(err);
         }
+        let body = match body {
+            Ok(body) => body,
+            Err(err) => {
+                record.outcome = "transport".into();
+                self.push_record(record).await;
+                return Err(err);
+            }
+        };
         // 状态码 200 也未必是 JSON：被拦截时可能返回 HTML。
         if looks_like_json(&content_type, &body) {
+            record.outcome = "ok".into();
+            self.push_record(record).await;
             Ok(body)
         } else {
+            record.outcome = "not_json".into();
+            self.push_record(record).await;
             Err(ApiError::Blocked("HTTP 200 但响应不是 JSON".into()))
         }
+    }
+}
+
+/// 页面导航（暖场、抓购买页）用的请求头：和地址栏直接打开一个页面时 Chrome 发的一致。
+pub(crate) fn navigation_headers(profile: &RequestProfile, region: &Region) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    put(&mut headers, "user-agent", &profile.user_agent);
+    put(
+        &mut headers,
+        "accept",
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    );
+    put(&mut headers, "accept-language", region.accept_language());
+    put(&mut headers, "upgrade-insecure-requests", "1");
+    if let Some(hints) = &profile.client_hints {
+        put(&mut headers, "sec-ch-ua", &hints.ua);
+        put(&mut headers, "sec-ch-ua-mobile", &hints.mobile);
+        put(&mut headers, "sec-ch-ua-platform", &hints.platform);
+    }
+    if profile.fetch_metadata {
+        put(&mut headers, "sec-fetch-site", "none");
+        put(&mut headers, "sec-fetch-mode", "navigate");
+        put(&mut headers, "sec-fetch-dest", "document");
+        put(&mut headers, "sec-fetch-user", "?1");
+    }
+    headers
+}
+
+/// 取货接口请求头：和购买页里同源 `fetch()` 发出的一致。
+pub(crate) fn api_headers(profile: &RequestProfile, region: &Region, referer: &str) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    put(&mut headers, "user-agent", &profile.user_agent);
+    put(&mut headers, "accept", &profile.api_accept);
+    put(&mut headers, "accept-language", region.accept_language());
+    put(&mut headers, "referer", referer);
+    if let Some(hints) = &profile.client_hints {
+        put(&mut headers, "sec-ch-ua", &hints.ua);
+        put(&mut headers, "sec-ch-ua-mobile", &hints.mobile);
+        put(&mut headers, "sec-ch-ua-platform", &hints.platform);
+    }
+    if profile.fetch_metadata {
+        put(&mut headers, "sec-fetch-site", "same-origin");
+        put(&mut headers, "sec-fetch-mode", "cors");
+        put(&mut headers, "sec-fetch-dest", "empty");
+    }
+    if profile.x_requested_with {
+        put(&mut headers, "x-requested-with", "XMLHttpRequest");
+    }
+    if profile.apple_extras {
+        put(&mut headers, "x-skip-redirect", "true");
+        put(&mut headers, "x-aos-ui-fetch-call-1", &fetch_call_token());
+    }
+    headers
+}
+
+/// 往头表里放一项。名字是我们自己写的常量，值是我们自己拼的 ASCII；万一不合法，
+/// 宁可少发这一项也不能让库代码 panic。
+fn put(headers: &mut HeaderMap, name: &'static str, value: &str) {
+    if let Ok(value) = HeaderValue::from_str(value) {
+        headers.insert(HeaderName::from_static(name), value);
+    }
+}
+
+/// 仿照 Apple 商店前端 `x-aos-ui-fetch-call-1` 样例（`y9kyn7tf7c-mtz5ds9h`）拼一个请求标识：
+/// 10 位 `[a-z0-9]` 随机串加短横线加毫秒时间戳的 36 进制。
+///
+/// **这只是仿样例格式，不是已经确认的 Apple 算法**，所以默认档案不发它，只供诊断对照。
+fn fetch_call_token() -> String {
+    use rand::Rng;
+    const ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
+    let mut rng = rand::rng();
+    let head: String = (0..10)
+        .map(|_| ALPHABET[rng.random_range(0..ALPHABET.len())] as char)
+        .collect();
+    format!("{head}-{}", base36(now_ms()))
+}
+
+fn base36(mut n: u64) -> String {
+    const DIGITS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
+    if n == 0 {
+        return "0".into();
+    }
+    let mut out = Vec::new();
+    while n > 0 {
+        out.push(DIGITS[(n % 36) as usize]);
+        n /= 36;
+    }
+    out.reverse();
+    String::from_utf8(out).unwrap_or_default()
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or_default()
+}
+
+/// 把时长写成人看的「5 分钟」「90 秒」。
+fn human_duration(d: Duration) -> String {
+    let secs = d.as_secs();
+    if secs >= 60 && secs.is_multiple_of(60) {
+        format!("{} 分钟", secs / 60)
+    } else if secs >= 120 {
+        format!("{} 分钟", secs.div_ceil(60))
+    } else {
+        format!("{secs} 秒")
     }
 }
 

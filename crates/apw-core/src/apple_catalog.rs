@@ -68,13 +68,6 @@ const PAGE_TIMEOUT: Duration = Duration::from_secs(20);
 /// 单次抓取内部的最大重试次数（不含首次请求）。
 const MAX_RETRIES: u32 = 2;
 
-/// 与 `apple.rs` 保持一致的 UA。
-///
-/// 那边的常量是私有的，引用不到，只能抄一份。上游写死的是 Chrome/94（2021 年），
-/// 这种年代久远的 UA 本身就是明显的机器人特征。
-const PAGE_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
-     AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
-
 /// 抓取 `region` 站点上某个购买页的全部可购买配置。
 ///
 /// `family` 取值来自 [`Region::families`]，它同时决定了取哪个地址、以及解析出来
@@ -292,15 +285,15 @@ async fn fetch_page_once(
     url: &str,
     region: &Region,
 ) -> Result<Vec<u8>, ApiError> {
+    // 请求头与 `apple.rs` 共用同一份档案：整个程序对 Apple 只能有一种身份，
+    // 购买页抓取自称一个版本、取货查询自称另一个版本，本身就是特征。
     let resp = http
         .get(url)
         .timeout(PAGE_TIMEOUT)
-        .header(reqwest::header::USER_AGENT, PAGE_USER_AGENT)
-        .header(
-            reqwest::header::ACCEPT,
-            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        )
-        .header(reqwest::header::ACCEPT_LANGUAGE, region.accept_language())
+        .headers(crate::apple::navigation_headers(
+            &crate::apple::RequestProfile::default(),
+            region,
+        ))
         .header(reqwest::header::REFERER, format!("{}/", region.base_url))
         // 刻意不设置 Accept-Encoding：交给 reqwest 的 gzip 特性自动协商并透明
         // 解压，手动指定反而会拿到一坨没人解压的压缩字节。
