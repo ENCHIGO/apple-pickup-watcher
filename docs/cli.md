@@ -157,6 +157,23 @@ apw watch --targets targets.json --until-in-stock --timeout 300
 
 `apw schema` 提供运行版本、实际命令参数、退出码及 JSON Schema `$defs`（`targets`、`availability`、`targetState`、`check`、`watch`、`error`）。扩展字段可在同一 schemaVersion 内增加；破坏字段语义的改动必须升级 schemaVersion。
 
+## 诊断 HTTP 541：`apw doctor`
+
+被 Apple 拦截（HTTP 541）只在部分网络上出现，维护者的网络复现不了。`doctor` 让受影响的用户在自己的网络上做对照：
+
+```bash
+apw doctor --locale zh_CN --store R359 --part 'MJTF4CH/A'
+apw doctor --locale zh_CN --store R359 --part 'MJTF4CH/A' --interval 30 --json
+```
+
+它对同一门店、同一零件号依次跑六个变体，每个变体用全新的客户端（独立 cookie 罐）查一次：`legacy`（v0.4.1 的请求特征 + 购物袋页暖场）、`chrome`（当前默认：Chrome 153 特征 + 购物袋页暖场）、`chrome-no-warm`（不带 cookie）、`chrome-buypage-warm`（购买页暖场，CDN 页面通常只发 `geo` 一个 cookie）、`chrome-xrw`（加 `X-Requested-With`）、`chrome-apple-extras`（加 Apple 商店前端的两个自定义头）。变体之间至少间隔 10 秒（默认 15），从不重试，连续两个变体被拦就停止，其余标为未跑。
+
+输出是一份 Markdown 报告：每次暖场与取货请求的状态码、HTTP 版本、耗时和 cookie **名字**，末尾附判读。报告不含 cookie 值、IP 或账号信息，可以直接贴进 issue。`--json` 改为每个变体一行 NDJSON，`report.records[]` 是原始请求记录。退出码 0 表示至少一个变体拿到明确答复，3 表示没有。跑之前请先暂停桌面版监控，以免两边互相影响。
+
+### 被拦后的冷却
+
+`check` / `watch` 和桌面版共用同一套客户端：遇到 541 或 403 不再秒级重试，而是把该地区标为冷却，首次 5 分钟，冷却结束后只放一次探测，探测再被拦依次延长到 10、20、30 分钟；期间该地区的查询直接返回 `unknown / blocked`（`detail` 里写明剩余时间），不发请求。任何一次成功查询都会清除冷却。这是保守的客户端策略，不代表 Apple 的封禁时长。
+
 ## 验证与打包
 
 ```bash

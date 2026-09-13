@@ -204,6 +204,17 @@ impl Region {
         format!("{}/shop/bag", self.base_url)
     }
 
+    /// 该地区的默认购买页：第一个 iPhone 购买页，没有 iPhone 页时取第一页，
+    /// 连一页都没有才退回购物袋页。真实用户就是在购买页上触发取货查询的，
+    /// 所以它用作取货请求的 Referer；诊断时也可以拿它做暖场对照。
+    pub fn default_buy_page_url(&self) -> String {
+        self.families
+            .iter()
+            .find(|f| f.category == Category::Iphone)
+            .or_else(|| self.families.first())
+            .map_or_else(|| self.bag_url(), |family| self.buy_page_url(family))
+    }
+
     /// 某个购买页的地址，用于在线刷新商品目录。
     pub fn buy_page_url(&self, family: &Family) -> String {
         format!(
