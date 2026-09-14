@@ -228,6 +228,201 @@ const BLOCK_COOLDOWNS: [Duration; 4] = [
 /// 保留最近多少条出站请求记录，供诊断命令和日志使用。
 const RECENT_RECORDS: usize = 256;
 
+/// 客户端自己给自己定的请求预算。
+///
+/// # 这是 issue #3 的真正原因
+///
+/// Apple 的边缘节点对取货接口按**出口 IP** 计数，像一个令牌桶：2026-09-14 在
+/// 维护者的网络上实测，6 家门店、30 秒一轮，前 30 次请求全部 200，第 31 次起
+/// 541；报告者「6 家门店、60 秒一轮，5 轮后被拦」是同一个数字。被拦之后继续
+/// 请求会一直被拦（每 30 秒试一次，15 分钟内没有一次通过），只有停下来额度才会
+/// 慢慢恢复：停 10 分钟大约恢复十几次。带不带 cookie、请求头像不像浏览器、TLS
+/// 指纹是不是 Chrome，都不改变这个计数 —— `apw doctor` 的六种变体在报告者的
+/// 网络上单发都能通过，桌面版照样在第 6 轮被拦。
+///
+/// 所以客户端必须自己记账：容量和恢复速度都取得比实测保守，留出同一出口 IP 上
+/// 其他程序（浏览器、第二个实例）的份额。超出预算的请求不是被拒绝，而是排队等
+/// 额度恢复；引擎会据此把轮询间隔拉长并告诉用户。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Budget {
+    /// 桶的容量：不间断连发这么多次之后必须放慢。
+    pub capacity: u32,
+    /// 每恢复一次请求额度要等多久。
+    pub refill_every: Duration,
+}
+
+impl Budget {
+    /// 不设预算，只给测试和对照实验用。
+    pub const fn unlimited() -> Self {
+        Self {
+            capacity: u32::MAX,
+            refill_every: Duration::ZERO,
+        }
+    }
+
+    fn is_unlimited(&self) -> bool {
+        self.refill_every.is_zero()
+    }
+}
+
+impl Default for Budget {
+    fn default() -> Self {
+        Self {
+            capacity: 20,
+            refill_every: Duration::from_secs(60),
+        }
+    }
+}
+
+/// 令牌桶的当前状态。`tokens` 允许为负：负数表示已经预约出去、要等恢复的额度。
+#[derive(Debug)]
+struct BudgetState {
+    tokens: f64,
+    updated: Instant,
+}
+
+impl BudgetState {
+    fn new(budget: &Budget, now: Instant) -> Self {
+        Self {
+            tokens: f64::from(budget.capacity),
+            updated: now,
+        }
+    }
+
+    fn refill(&mut self, budget: &Budget, now: Instant) {
+        if budget.is_unlimited() {
+            self.tokens = f64::from(budget.capacity);
+            self.updated = now;
+            return;
+        }
+        let elapsed = now.saturating_duration_since(self.updated);
+        let gained = elapsed.as_secs_f64() / budget.refill_every.as_secs_f64();
+        self.tokens = (self.tokens + gained).min(f64::from(budget.capacity));
+        self.updated = now;
+    }
+
+    /// 预约一次请求的额度，返回从现在起要等多久才轮到它。
+    fn reserve(&mut self, budget: &Budget, now: Instant) -> Duration {
+        self.refill(budget, now);
+        if budget.is_unlimited() {
+            return Duration::ZERO;
+        }
+        self.tokens -= 1.0;
+        if self.tokens >= 0.0 {
+            Duration::ZERO
+        } else {
+            budget.refill_every.mul_f64(-self.tokens)
+        }
+    }
+
+    /// 要凑够 `requests` 次额度还得等多久；不预约。
+    fn wait_for(&mut self, budget: &Budget, now: Instant, requests: usize) -> Duration {
+        self.refill(budget, now);
+        if budget.is_unlimited() {
+            return Duration::ZERO;
+        }
+        let short = requests as f64 - self.tokens;
+        if short <= 0.0 {
+            Duration::ZERO
+        } else {
+            budget.refill_every.mul_f64(short)
+        }
+    }
+}
+
+/// 各地区被拦后的冷却账本。纯状态机，不碰网络，便于单测。
+#[derive(Debug, Default)]
+struct BlockTracker {
+    states: HashMap<String, BlockState>,
+}
+
+impl BlockTracker {
+    /// 该地区现在能不能发请求。`Ok(true)` 表示这次是冷却结束后放出的那一次探测。
+    fn admit(&mut self, locale: &str, now: Instant) -> Result<bool, ApiError> {
+        let Some(state) = self.states.get_mut(locale) else {
+            return Ok(false);
+        };
+        if now < state.until {
+            return Err(ApiError::Blocked(format!(
+                "HTTP 541 后冷却中，{} 后自动重试",
+                human_duration(state.until - now)
+            )));
+        }
+        if state.probing {
+            return Err(ApiError::Blocked(
+                "冷却已结束，正在用一次探测确认是否解封".into(),
+            ));
+        }
+        state.probing = true;
+        Ok(true)
+    }
+
+    /// 登记一次被拦，返回这次采用的冷却时长。
+    ///
+    /// 只有**探测**再被拦才升档。同一轮里并发在飞的其他请求跟着被拦，是同一次
+    /// 事件：v0.4.2-beta 曾把它们各算一次，六家门店一轮就把冷却从 5 分钟直接
+    /// 抬到 30 分钟，用户看到的比不冷却还糟。
+    fn record(&mut self, locale: &str, now: Instant, probing: bool) -> Duration {
+        let state = self.states.entry(locale.to_string()).or_insert(BlockState {
+            until: now,
+            level: 0,
+            probing: false,
+        });
+        if probing {
+            state.level = (state.level + 1).min(BLOCK_COOLDOWNS.len() - 1);
+        }
+        state.probing = false;
+        let cooldown = BLOCK_COOLDOWNS[state.level];
+        state.until = state.until.max(now + cooldown);
+        cooldown
+    }
+
+    /// 一次成功的查询。只有探测成功才算解封；冷却期内并发漏过去的成功不算数 ——
+    /// 同一轮里有的通过有的被拦，说明额度正卡在边上，这时清掉冷却只会让下一轮
+    /// 再撞一次。
+    fn clear(&mut self, locale: &str, probing: bool) {
+        if probing {
+            self.states.remove(locale);
+        }
+    }
+
+    fn end_probe(&mut self, locale: &str) {
+        if let Some(state) = self.states.get_mut(locale) {
+            state.probing = false;
+        }
+    }
+}
+
+/// 一次取货查询的范围：指定门店，或某个地点周边的所有门店。
+#[derive(Debug, Clone)]
+enum PickupScope {
+    Store(String),
+    Nearby(String),
+}
+
+impl PickupScope {
+    fn query_param(&self) -> (String, String) {
+        match self {
+            Self::Store(store) => ("store".into(), store.clone()),
+            Self::Nearby(location) => ("location".into(), location.clone()),
+        }
+    }
+
+    fn store(&self) -> Option<String> {
+        match self {
+            Self::Store(store) => Some(store.clone()),
+            Self::Nearby(_) => None,
+        }
+    }
+
+    fn location(&self) -> Option<String> {
+        match self {
+            Self::Store(_) => None,
+            Self::Nearby(location) => Some(location.clone()),
+        }
+    }
+}
+
 /// 客户端配置。
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
@@ -246,6 +441,8 @@ pub struct ClientConfig {
     pub warm_page: WarmPage,
     /// 传输层实现。
     pub transport: Transport,
+    /// 出站请求预算，见 [`Budget`]。暖场与取货查询都计入。
+    pub budget: Budget,
 }
 
 impl Default for ClientConfig {
@@ -257,6 +454,7 @@ impl Default for ClientConfig {
             profile: RequestProfile::chrome(),
             warm_page: WarmPage::Bag,
             transport: Transport::default_for_build(),
+            budget: Budget::default(),
         }
     }
 }
@@ -273,6 +471,9 @@ pub struct RequestRecord {
     pub transport: &'static str,
     pub locale: String,
     pub store: Option<String>,
+    /// 按地点查询时的 `location` 参数；按门店查询时为 `None`。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
     /// 这次请求携带的零件号数量（含搭档表带）。
     pub parts: usize,
     pub status: Option<u16>,
@@ -331,7 +532,9 @@ pub struct AppleClient {
     /// 任务各取一次，启动瞬间就是一波突发请求。
     warm: Arc<Mutex<HashMap<String, WarmState>>>,
     /// 各地区被拦后的冷却状态。
-    blocks: Arc<Mutex<HashMap<String, BlockState>>>,
+    blocks: Arc<Mutex<BlockTracker>>,
+    /// 出站请求预算的令牌桶，见 [`Budget`]。
+    budget: Arc<Mutex<BudgetState>>,
     /// 最近的出站请求记录。
     recent: Arc<Mutex<VecDeque<RequestRecord>>>,
 }
@@ -339,14 +542,30 @@ pub struct AppleClient {
 impl AppleClient {
     pub fn new(config: ClientConfig) -> Result<Self, ApiError> {
         let http = Http::build(&config)?;
+        let budget = BudgetState::new(&config.budget, Instant::now());
         Ok(Self {
             http,
             config,
             last_sent: Arc::new(Mutex::new(None)),
             warm: Arc::new(Mutex::new(HashMap::new())),
-            blocks: Arc::new(Mutex::new(HashMap::new())),
+            blocks: Arc::new(Mutex::new(BlockTracker::default())),
+            budget: Arc::new(Mutex::new(budget)),
             recent: Arc::new(Mutex::new(VecDeque::with_capacity(RECENT_RECORDS))),
         })
+    }
+
+    /// 当前的请求预算。
+    pub fn budget(&self) -> Budget {
+        self.config.budget
+    }
+
+    /// 要再发 `requests` 次请求，按预算得先等多久。不预约额度，只是估算，
+    /// 引擎用它决定下一轮什么时候开始。
+    pub async fn pacing_delay(&self, requests: usize) -> Duration {
+        self.budget
+            .lock()
+            .await
+            .wait_for(&self.config.budget, Instant::now(), requests)
     }
 
     /// 当前使用的请求特征档案。
@@ -432,6 +651,7 @@ impl AppleClient {
             transport: self.http.label(),
             locale: region.locale.to_string(),
             store: None,
+            location: None,
             parts: 0,
             status: None,
             http_version: None,
@@ -500,54 +720,26 @@ impl AppleClient {
     ///
     /// 返回 `Err` 表示这次不该发请求；`Ok(true)` 表示本次是冷却结束后放出的那一次探测。
     async fn admit(&self, region: &Region) -> Result<bool, ApiError> {
-        let mut blocks = self.blocks.lock().await;
-        let Some(state) = blocks.get_mut(region.locale) else {
-            return Ok(false);
-        };
-        let now = Instant::now();
-        if now < state.until {
-            return Err(ApiError::Blocked(format!(
-                "HTTP 541 后冷却中，{} 后自动重试",
-                human_duration(state.until - now)
-            )));
-        }
-        if state.probing {
-            return Err(ApiError::Blocked(
-                "冷却已结束，正在用一次探测确认是否解封".into(),
-            ));
-        }
-        state.probing = true;
-        Ok(true)
+        self.blocks
+            .lock()
+            .await
+            .admit(region.locale, Instant::now())
     }
 
-    /// 登记一次被拦，返回这次采用的冷却时长。
-    async fn record_block(&self, region: &Region) -> Duration {
-        let mut blocks = self.blocks.lock().await;
-        let now = Instant::now();
-        let state = blocks
-            .entry(region.locale.to_string())
-            .and_modify(|s| {
-                s.level = (s.level + 1).min(BLOCK_COOLDOWNS.len() - 1);
-                s.probing = false;
-            })
-            .or_insert(BlockState {
-                until: now,
-                level: 0,
-                probing: false,
-            });
-        let cooldown = BLOCK_COOLDOWNS[state.level];
-        state.until = now + cooldown;
-        cooldown
+    /// 登记一次被拦，返回这次采用的冷却时长。见 [`BlockTracker::record`]。
+    async fn record_block(&self, region: &Region, probing: bool) -> Duration {
+        self.blocks
+            .lock()
+            .await
+            .record(region.locale, Instant::now(), probing)
     }
 
-    async fn clear_block(&self, region: &Region) {
-        self.blocks.lock().await.remove(region.locale);
+    async fn clear_block(&self, region: &Region, probing: bool) {
+        self.blocks.lock().await.clear(region.locale, probing);
     }
 
     async fn end_probe(&self, region: &Region) {
-        if let Some(state) = self.blocks.lock().await.get_mut(region.locale) {
-            state.probing = false;
-        }
+        self.blocks.lock().await.end_probe(region.locale);
     }
 
     /// 查询 `store_number` 门店中 `parts` 各型号的可取货状态。
@@ -566,6 +758,39 @@ impl AppleClient {
         if store_number.is_empty() {
             return Err(ApiError::Transport("门店编号为空".into()));
         }
+        let body = self
+            .query(region, PickupScope::Store(store_number.to_string()), parts)
+            .await?;
+        parse_pickup_message(&body, store_number)
+    }
+
+    /// 一次查询 `location` 周边所有门店里 `parts` 各型号的可取货状态。
+    ///
+    /// `location` 的写法见 [`crate::model::Store::pickup_location`]。响应里有哪些
+    /// 门店由 Apple 决定（按距离取若干家），调用方要自己核对想要的门店在不在，
+    /// 不在的按门店单独补查。被拦与冷却的处理和 [`Self::pickup_message`] 相同。
+    pub async fn pickup_message_nearby(
+        &self,
+        region: &Region,
+        location: &str,
+        parts: &[String],
+    ) -> Result<Vec<StoreAvailability>, ApiError> {
+        if location.trim().is_empty() {
+            return Err(ApiError::Transport("查询地点为空".into()));
+        }
+        let body = self
+            .query(region, PickupScope::Nearby(location.to_string()), parts)
+            .await?;
+        parse_pickup_stores(&body)
+    }
+
+    /// 两种范围共用的一次取货查询：冷却检查、暖场、发请求、被拦登记。
+    async fn query(
+        &self,
+        region: &Region,
+        scope: PickupScope,
+        parts: &[String],
+    ) -> Result<Vec<u8>, ApiError> {
         if parts.is_empty() {
             return Err(ApiError::Transport("零件号列表为空".into()));
         }
@@ -573,7 +798,7 @@ impl AppleClient {
         let mut query: Vec<(String, String)> = vec![
             ("pl".into(), "true".into()),
             ("mts.0".into(), "regular".into()),
-            ("store".into(), store_number.to_string()),
+            scope.query_param(),
         ];
         for (i, part) in parts.iter().enumerate() {
             query.push((format!("parts.{i}"), part.clone()));
@@ -592,32 +817,31 @@ impl AppleClient {
                 &query,
                 region,
                 &referer,
-                store_number,
+                &scope,
                 parts.len(),
             )
             .await;
 
-        let body = match result {
+        match result {
             Ok(body) => {
-                self.clear_block(region).await;
-                body
+                self.clear_block(region, probing).await;
+                Ok(body)
             }
             Err(ApiError::Blocked(detail)) => {
                 self.forget_warm(region).await;
-                let cooldown = self.record_block(region).await;
-                return Err(ApiError::Blocked(format!(
+                let cooldown = self.record_block(region, probing).await;
+                Err(ApiError::Blocked(format!(
                     "{detail}；已进入冷却，{} 后自动重试一次",
                     human_duration(cooldown)
-                )));
+                )))
             }
             Err(err) => {
                 if probing {
                     self.end_probe(region).await;
                 }
-                return Err(err);
+                Err(err)
             }
-        };
-        parse_pickup_message(&body, store_number)
+        }
     }
 
     /// 探测与 `region` 之间实际协商出来的 HTTP 版本。
@@ -652,20 +876,21 @@ impl AppleClient {
         query: &[(String, String)],
         region: &Region,
         referer: &str,
-        store: &str,
+        scope: &PickupScope,
         parts: usize,
     ) -> Result<Vec<u8>, ApiError> {
         with_retry(self.config.max_retries, || async {
             // 限速放在重试循环内部：每一次真正的出站请求都要排队，
             // 重试不该成为绕过全局节流的后门。
             self.throttle().await;
-            self.get_once(url, query, region, referer, store, parts)
+            self.get_once(url, query, region, referer, scope, parts)
                 .await
         })
         .await
     }
 
-    /// 保证任意两次出站请求之间至少间隔 `min_interval`。
+    /// 每一次出站请求都要经过这里：任意两次之间至少间隔 `min_interval`，并且
+    /// 要先从预算里拿到一次额度（见 [`Budget`]），额度不够就等它恢复。
     async fn throttle(&self) {
         let slot = {
             let mut last = self.last_sent.lock().await;
@@ -680,8 +905,13 @@ impl AppleClient {
             *last = Some(slot);
             slot
         };
+        let budget_slot = {
+            let now = Instant::now();
+            let wait = self.budget.lock().await.reserve(&self.config.budget, now);
+            now + wait
+        };
 
-        tokio::time::sleep_until(slot).await;
+        tokio::time::sleep_until(slot.max(budget_slot)).await;
     }
 
     /// 执行单次 HTTP 请求，把失败归类，并留下一条请求记录。
@@ -691,7 +921,7 @@ impl AppleClient {
         query: &[(String, String)],
         region: &Region,
         referer: &str,
-        store: &str,
+        scope: &PickupScope,
         parts: usize,
     ) -> Result<Vec<u8>, ApiError> {
         let started = Instant::now();
@@ -700,7 +930,8 @@ impl AppleClient {
             kind: "pickup",
             transport: self.http.label(),
             locale: region.locale.to_string(),
-            store: Some(store.to_string()),
+            store: scope.store(),
+            location: scope.location(),
             parts,
             status: None,
             http_version: None,
@@ -1186,6 +1417,22 @@ pub trait Fetcher: Clone + Send + Sync + 'static {
         store_number: &str,
         parts: &[String],
     ) -> impl std::future::Future<Output = Result<StoreAvailability, ApiError>> + Send;
+
+    /// 一次拿到 `location` 周边所有门店里 `parts` 的状态，见
+    /// [`AppleClient::pickup_message_nearby`]。
+    fn pickup_message_nearby(
+        &self,
+        region: &'static Region,
+        location: &str,
+        parts: &[String],
+    ) -> impl std::future::Future<Output = Result<Vec<StoreAvailability>, ApiError>> + Send;
+
+    /// 再发 `requests` 次请求要先等多久，见 [`AppleClient::pacing_delay`]。
+    /// 没有预算概念的实现返回零。
+    fn pacing_delay(&self, requests: usize) -> impl std::future::Future<Output = Duration> + Send {
+        let _ = requests;
+        async { Duration::ZERO }
+    }
 }
 
 impl Fetcher for AppleClient {
@@ -1196,6 +1443,19 @@ impl Fetcher for AppleClient {
         parts: &[String],
     ) -> Result<StoreAvailability, ApiError> {
         AppleClient::pickup_message(self, region, store_number, parts).await
+    }
+
+    async fn pickup_message_nearby(
+        &self,
+        region: &'static Region,
+        location: &str,
+        parts: &[String],
+    ) -> Result<Vec<StoreAvailability>, ApiError> {
+        AppleClient::pickup_message_nearby(self, region, location, parts).await
+    }
+
+    async fn pacing_delay(&self, requests: usize) -> Duration {
+        AppleClient::pacing_delay(self, requests).await
     }
 }
 
@@ -1295,28 +1555,8 @@ struct RegularMessage {
 
 /// 解析取货状态响应。
 pub fn parse_pickup_message(raw: &[u8], want_store: &str) -> Result<StoreAvailability, ApiError> {
-    let resp: PickupResponse = serde_json::from_slice(raw).map_err(|e| ApiError::SchemaDrift {
-        field: "(整个响应)".into(),
-        raw: format!("无法解析成 JSON：{e}"),
-    })?;
-
-    check_envelope(&resp)?;
-
-    let stores = if resp.body.stores.is_empty() {
-        &resp.body.content.pickup_message.stores
-    } else {
-        &resp.body.stores
-    };
-
-    // Apple 对已经停售、尚未开售或当前不可购买的零件号，可能返回一个成功信封
-    // （head.status=200）和空门店列表。它没有说目标门店不存在，更不代表门店无货。
-    // 把这种结果报成结构漂移会误导用户等待程序更新；明确指向商品状态，用户才知道
-    // 应先核对官网和型号目录。
-    if stores.is_empty() {
-        return Err(ApiError::Apple(
-            "Apple 没有返回任何门店；所选型号可能已停售、尚未开售或当前无法购买".into(),
-        ));
-    }
+    let resp = parse_response(raw)?;
+    let stores = store_list(&resp)?;
 
     // 指定了 store 参数时 Apple 只返回该门店，但仍按编号核对，
     // 避免把别的门店的库存错认成目标门店的。
@@ -1335,6 +1575,47 @@ pub fn parse_pickup_message(raw: &[u8], want_store: &str) -> Result<StoreAvailab
         });
     }
 
+    store_availability(matched)
+}
+
+/// 解析按地点查询的响应，返回其中每一家门店的状态，顺序照响应。
+///
+/// 某家门店的 `partsAvailability` 为空时仍保留这家店（parts 为空），调用方按
+/// 型号对账时自然会把它的目标标成未知，而不是在这里把整份响应判废。
+pub fn parse_pickup_stores(raw: &[u8]) -> Result<Vec<StoreAvailability>, ApiError> {
+    let resp = parse_response(raw)?;
+    store_list(&resp)?.iter().map(store_availability).collect()
+}
+
+fn parse_response(raw: &[u8]) -> Result<PickupResponse, ApiError> {
+    let resp: PickupResponse = serde_json::from_slice(raw).map_err(|e| ApiError::SchemaDrift {
+        field: "(整个响应)".into(),
+        raw: format!("无法解析成 JSON：{e}"),
+    })?;
+    check_envelope(&resp)?;
+    Ok(resp)
+}
+
+fn store_list(resp: &PickupResponse) -> Result<&[PickupStore], ApiError> {
+    let stores = if resp.body.stores.is_empty() {
+        &resp.body.content.pickup_message.stores
+    } else {
+        &resp.body.stores
+    };
+
+    // Apple 对已经停售、尚未开售或当前不可购买的零件号，可能返回一个成功信封
+    // （head.status=200）和空门店列表。它没有说目标门店不存在，更不代表门店无货。
+    // 把这种结果报成结构漂移会误导用户等待程序更新；明确指向商品状态，用户才知道
+    // 应先核对官网和型号目录。
+    if stores.is_empty() {
+        return Err(ApiError::Apple(
+            "Apple 没有返回任何门店；所选型号可能已停售、尚未开售或当前无法购买".into(),
+        ));
+    }
+    Ok(stores)
+}
+
+fn store_availability(matched: &PickupStore) -> Result<StoreAvailability, ApiError> {
     let mut parts = std::collections::BTreeMap::new();
     for (key, info) in &matched.parts_availability {
         // 条目里的 partNumber 与 map 键不一致时，无法判断哪个可信。随便选一个
@@ -1414,5 +1695,116 @@ pub fn availability_from(pickup_display: &str) -> Availability {
             field: "pickupDisplay".into(),
             raw: other.to_string(),
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const LOCALE: &str = "zh_HK";
+
+    #[test]
+    fn 同一轮并发被拦只算一次不升档() {
+        let mut tracker = BlockTracker::default();
+        let now = Instant::now();
+        // 六家门店同时在飞，第一家被拦后其余五家的 541 陆续到达。
+        let first = tracker.record(LOCALE, now, false);
+        assert_eq!(first, BLOCK_COOLDOWNS[0]);
+        for i in 1..6 {
+            let again = tracker.record(LOCALE, now + Duration::from_millis(i * 100), false);
+            assert_eq!(again, BLOCK_COOLDOWNS[0], "第 {i} 个并发失败不该把冷却抬高");
+        }
+        // 冷却期内一律拒绝。
+        assert!(
+            tracker
+                .admit(LOCALE, now + Duration::from_secs(60))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn 只有探测再被拦才升档且探测成功才解封() {
+        let mut tracker = BlockTracker::default();
+        let t0 = Instant::now();
+        tracker.record(LOCALE, t0, false);
+        let after = t0 + BLOCK_COOLDOWNS[0] + Duration::from_secs(1);
+
+        // 冷却结束：放一次探测，其余请求等它的结果。
+        assert!(matches!(tracker.admit(LOCALE, after), Ok(true)));
+        assert!(tracker.admit(LOCALE, after).is_err());
+
+        // 探测再被拦：升到下一档。
+        assert_eq!(tracker.record(LOCALE, after, true), BLOCK_COOLDOWNS[1]);
+        let after2 = after + BLOCK_COOLDOWNS[1] + Duration::from_secs(1);
+        assert!(matches!(tracker.admit(LOCALE, after2), Ok(true)));
+
+        // 冷却期内并发漏过去的成功不算解封；探测成功才算。
+        tracker.clear(LOCALE, false);
+        assert!(
+            tracker.admit(LOCALE, after2).is_err(),
+            "非探测的成功不该清掉冷却"
+        );
+        tracker.clear(LOCALE, true);
+        assert!(
+            matches!(tracker.admit(LOCALE, after2), Ok(false)),
+            "解封后照常放行"
+        );
+    }
+
+    #[test]
+    fn 探测因网络失败结束后下一次仍是探测() {
+        let mut tracker = BlockTracker::default();
+        let t0 = Instant::now();
+        tracker.record(LOCALE, t0, false);
+        let after = t0 + BLOCK_COOLDOWNS[0] + Duration::from_secs(1);
+        assert!(matches!(tracker.admit(LOCALE, after), Ok(true)));
+        tracker.end_probe(LOCALE);
+        assert!(matches!(tracker.admit(LOCALE, after), Ok(true)));
+    }
+
+    #[test]
+    fn 预算桶按容量放行并按恢复速度排队() {
+        let budget = Budget {
+            capacity: 3,
+            refill_every: Duration::from_secs(60),
+        };
+        let t0 = Instant::now();
+        let mut state = BudgetState::new(&budget, t0);
+        assert_eq!(state.reserve(&budget, t0), Duration::ZERO);
+        assert_eq!(state.reserve(&budget, t0), Duration::ZERO);
+        assert_eq!(state.reserve(&budget, t0), Duration::ZERO);
+        // 第四次要等一个恢复周期，第五次等两个。
+        assert_eq!(state.reserve(&budget, t0), Duration::from_secs(60));
+        assert_eq!(state.reserve(&budget, t0), Duration::from_secs(120));
+        // 两分钟后欠账还清，再要三次得等三个周期。
+        let t1 = t0 + Duration::from_secs(120);
+        assert_eq!(state.wait_for(&budget, t1, 3), Duration::from_secs(180));
+        // 半小时后桶满，最多也只有容量那么多。
+        let t2 = t0 + Duration::from_secs(1800);
+        assert_eq!(state.wait_for(&budget, t2, 3), Duration::ZERO);
+        assert_eq!(state.wait_for(&budget, t2, 4), Duration::from_secs(60));
+    }
+
+    #[test]
+    fn 不设预算时从不等待() {
+        let budget = Budget::unlimited();
+        let t0 = Instant::now();
+        let mut state = BudgetState::new(&budget, t0);
+        for _ in 0..1000 {
+            assert_eq!(state.reserve(&budget, t0), Duration::ZERO);
+        }
+        assert_eq!(state.wait_for(&budget, t0, 1000), Duration::ZERO);
+    }
+
+    #[test]
+    fn 默认预算低于实测会被拦的阈值() {
+        // 实测：30 次以内的突发被放行，之后 541；停下后每分钟大约恢复一到两次。
+        let budget = Budget::default();
+        assert!(
+            budget.capacity <= 25,
+            "容量要给同一出口 IP 上的浏览器留余量"
+        );
+        assert!(budget.refill_every >= Duration::from_secs(45));
     }
 }

@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{Semaphore, mpsc, oneshot};
 use tokio::task::JoinSet;
 
-use crate::apple::{ApiError, Fetcher};
+use crate::apple::{ApiError, Fetcher, StoreAvailability};
 use crate::model::{Availability, Target, TargetKey, UnknownReason, region_by_locale};
 
 /// 单个监控目标的当前状态。
@@ -76,6 +76,11 @@ pub enum Event {
     ///
     /// 快照让界面任何时候都能整体对齐，不必依赖那些可丢弃事件是否都收到了。
     CycleComplete {
+        /// 距下一轮开始的秒数。停止监控后不再有意义。
+        next_check_in_secs: u64,
+        /// 这段等待是不是被请求预算拉长的（比用户设的间隔更久），见
+        /// [`crate::apple::Budget`]。界面据此告诉用户「不是你的间隔没生效」。
+        paced: bool,
         /// 本轮是否所有目标都拿到了明确答复。
         ///
         /// 界面需要一个明确的「恢复」信号才能收起故障告警。用「所有行都没有
@@ -260,6 +265,38 @@ struct StoreGroup {
     /// （见 [`crate::model::Product::companion_part`]）。只参与请求，不参与对账 ——
     /// 响应里有没有它、它是什么状态，都不影响任何目标。
     companions: Vec<String>,
+    /// 取货接口的 `location`（见 [`crate::model::Target::pickup_location`]）。
+    /// `None` 时这家店只能按门店单独查。
+    location: Option<String>,
+}
+
+/// 按 (地区, 门店) 聚合时的中间索引：零件号、搭档零件号、取货地点。
+type GroupIndex = BTreeMap<(String, String), (Vec<String>, Vec<String>, Option<String>)>;
+
+/// 一轮里的一次出站请求。
+///
+/// Apple 按出口 IP 限制取货查询的次数（见 [`crate::apple::Budget`]），所以请求的
+/// **次数**才是要省的东西：同一地区、同一地点的门店合并成一次按地点的查询，
+/// 一次响应带回周边所有门店。报告者盯 6 家港店的情形从每轮 6 次降到 1 次。
+#[derive(Debug, Clone)]
+enum Query {
+    /// 按门店查一家。
+    Store(StoreGroup),
+    /// 按地点一次查多家。
+    Nearby {
+        locale: String,
+        location: String,
+        groups: Vec<StoreGroup>,
+    },
+}
+
+impl Query {
+    fn groups(&self) -> &[StoreGroup] {
+        match self {
+            Self::Store(group) => std::slice::from_ref(group),
+            Self::Nearby { groups, .. } => groups,
+        }
+    }
 }
 
 /// 单个门店查询完的结果。
@@ -275,6 +312,9 @@ struct StoreOutcome {
     problems: usize,
     /// 需要弹告警时的说明与建议。
     trouble: Option<TroubleReport>,
+    /// 按地点查询的响应里没有这家店，本轮是单独补查的。引擎记下来，之后直接
+    /// 按门店查，不再每轮白白先问一次地点。
+    uncovered: bool,
 }
 
 /// 本轮请求覆盖到的全部目标键。
@@ -282,9 +322,9 @@ struct StoreOutcome {
 /// 用来兜住「请求发出去了，但结果没回来」：子任务 panic 时 JoinError 拿不到是哪个
 /// 门店，光看 outcomes 无从知道谁缺了数据。没有这一层，那些目标会静静地停在上一轮
 /// 的取值上，而那很可能正是「无货」—— 一次故障被伪装成了看起来正常的答案。
-fn expected_keys(groups: &[StoreGroup]) -> BTreeSet<TargetKey> {
+fn expected_keys(queries: &[Query]) -> BTreeSet<TargetKey> {
     let mut keys = BTreeSet::new();
-    for g in groups {
+    for g in queries.iter().flat_map(Query::groups) {
         for part in &g.parts {
             keys.insert(TargetKey(format!(
                 "{}|{}|{}",
@@ -302,27 +342,34 @@ fn expected_keys(groups: &[StoreGroup]) -> BTreeSet<TargetKey> {
 /// 「改状态」分开了，网络部分成了纯函数，测试时不必构造整个引擎。
 async fn run_queries<F: Fetcher>(
     client: F,
-    groups: Vec<StoreGroup>,
+    queries: Vec<Query>,
     concurrency: usize,
 ) -> Vec<StoreOutcome> {
     let sem = Arc::new(Semaphore::new(concurrency.max(1)));
     let mut set = JoinSet::new();
 
-    for group in groups {
+    for query in queries {
         let client = client.clone();
         let sem = Arc::clone(&sem);
         set.spawn(async move {
             // 拿不到许可只可能是信号量被关闭，这里不会发生；真发生了也只是
             // 少查一个门店，不该让整轮崩掉。
             let _permit = sem.acquire_owned().await;
-            query_one_store(&client, group).await
+            match query {
+                Query::Store(group) => vec![query_one_store(&client, group).await],
+                Query::Nearby {
+                    locale,
+                    location,
+                    groups,
+                } => query_nearby(&client, locale, location, groups).await,
+            }
         });
     }
 
     let mut outcomes = Vec::new();
     while let Some(joined) = set.join_next().await {
         match joined {
-            Ok(outcome) => outcomes.push(outcome),
+            Ok(batch) => outcomes.extend(batch),
             Err(err) => {
                 // 子任务 panic 了。Rust 不像 Go 那样会带走整个进程，但绝不能
                 // 当作没发生 —— 这些目标的状态必须被标成未知，否则它们会停在
@@ -340,6 +387,7 @@ async fn run_queries<F: Fetcher>(
                         reason: format!("查询任务内部错误已被拦截：{err}"),
                         advice: Some(TroubleAdvice::WaitForUpdate),
                     }),
+                    uncovered: false,
                 });
             }
         }
@@ -349,36 +397,11 @@ async fn run_queries<F: Fetcher>(
 
 async fn query_one_store<F: Fetcher>(client: &F, group: StoreGroup) -> StoreOutcome {
     let Some(region) = region_by_locale(&group.locale) else {
-        // 地区认不出来就压根发不出请求。必须登记成故障，不能静默跳过 ——
-        // 静默跳过会让这些行永远停在「待查询」，用户看不出程序从没查过它们。
-        let reason = UnknownReason::SchemaDrift {
-            field: "locale".into(),
-            raw: group.locale.clone(),
-        };
-        let n = group.parts.len();
-        return StoreOutcome {
-            parts: group
-                .parts
-                .into_iter()
-                .map(|p| (p, Availability::Unknown(reason.clone())))
-                .collect(),
-            trouble: Some(TroubleReport {
-                // 这句本身就说清了该做什么，不必再挂一条泛泛的建议。
-                reason: format!(
-                    "地区 {} 无法识别，这些监控项无法查询，请删除后重新添加",
-                    group.locale
-                ),
-                advice: None,
-            }),
-            locale: group.locale,
-            store_number: group.store_number,
-            ok: false,
-            problems: n,
-        };
+        return unknown_locale_outcome(group);
     };
 
     // 搭档零件号排在目标之后一起发出去。它们不在 `group.parts` 里，下面对账时
-    // 自然不会给它们造状态行；请求成功与否的判定也只看目标本身。
+    // 只按目标零件号找，搭档在不在响应里都不影响任何目标。
     let mut requested = group.parts.clone();
     requested.extend(group.companions.iter().cloned());
 
@@ -387,90 +410,195 @@ async fn query_one_store<F: Fetcher>(client: &F, group: StoreGroup) -> StoreOutc
         .await
     {
         Err(err) => {
-            // 被拦截和结构漂移分别有明确的处理建议。Apple 业务错误也要展示，
-            // 但不挂泛化建议：例如空门店列表可能与型号停售或尚未开售有关，
-            // 此时让用户换网络或等待程序更新都会把方向带偏。
-            let trouble = match &err {
-                ApiError::Blocked(_) => Some(TroubleReport {
-                    reason: format!("门店 {} 查询失败：{err}", group.store_number),
-                    advice: Some(TroubleAdvice::TryAnotherNetwork),
-                }),
-                ApiError::SchemaDrift { .. } => Some(TroubleReport {
-                    reason: format!("门店 {} 查询失败：{err}", group.store_number),
-                    advice: Some(TroubleAdvice::WaitForUpdate),
-                }),
-                ApiError::Apple(_) => Some(TroubleReport {
-                    reason: format!("门店 {} 查询失败：{err}", group.store_number),
-                    advice: None,
-                }),
-                ApiError::RateLimited(_) | ApiError::Transport(_) => None,
-            };
-
-            let reason = err.into_unknown_reason();
-            let n = group.parts.len();
-            StoreOutcome {
-                parts: group
-                    .parts
-                    .into_iter()
-                    .map(|p| (p, Availability::Unknown(reason.clone())))
-                    .collect(),
-                locale: group.locale,
-                store_number: group.store_number,
-                ok: false,
-                problems: n,
-                trouble,
-            }
+            let label = format!("门店 {}", group.store_number);
+            let trouble = trouble_for(&err, &label);
+            error_outcome(group, err.into_unknown_reason(), trouble)
         }
-        Ok(result) => {
-            let mut parts = Vec::with_capacity(group.parts.len());
-            let mut problems = 0usize;
-            // 真正拿到明确答复（有货或无货）的型号数。
-            let mut resolved = 0usize;
+        Ok(result) => success_outcome(group, &result),
+    }
+}
 
-            for part in &group.parts {
-                match result.parts.get(part) {
+/// 同一地区、同一地点的几家门店合并成一次按地点的查询。
+///
+/// 响应里没有的门店按门店单独补查并标记 `uncovered`；地点本身不被 Apple 接受
+/// （业务错误或结构不符）时也退回逐家查询 —— 那说明我们拼的 `location` 有问题，
+/// 而不是网络有问题，不该让这些门店每轮都卡在同一个错误上。被拦、限流、网络
+/// 失败则整批一起未知，告警只报一条。
+async fn query_nearby<F: Fetcher>(
+    client: &F,
+    locale: String,
+    location: String,
+    groups: Vec<StoreGroup>,
+) -> Vec<StoreOutcome> {
+    let Some(region) = region_by_locale(&locale) else {
+        return groups.into_iter().map(unknown_locale_outcome).collect();
+    };
+
+    let mut requested: Vec<String> = Vec::new();
+    for part in groups
+        .iter()
+        .flat_map(|g| g.parts.iter().chain(g.companions.iter()))
+    {
+        if !requested.contains(part) {
+            requested.push(part.clone());
+        }
+    }
+
+    match client
+        .pickup_message_nearby(region, &location, &requested)
+        .await
+    {
+        Ok(stores) => {
+            let mut outcomes = Vec::with_capacity(groups.len());
+            for group in groups {
+                match stores.iter().find(|s| s.store_number == group.store_number) {
+                    Some(result) => outcomes.push(success_outcome(group, result)),
                     None => {
-                        // 请求成功但响应里没有这个型号，通常意味着零件号已经下架
-                        // 或写错。这属于「查不到」，绝不能当作「无货」。
-                        problems += 1;
-                        parts.push((
-                            part.clone(),
-                            Availability::Unknown(UnknownReason::SchemaDrift {
-                                field: "partsAvailability".into(),
-                                raw: format!("响应中没有型号 {part}"),
-                            }),
-                        ));
-                    }
-                    Some(status) => {
-                        if status.availability.is_failure() {
-                            problems += 1;
-                        } else {
-                            resolved += 1;
-                        }
-                        parts.push((part.clone(), status.availability.clone()));
+                        // Apple 按距离只回若干家，这家不在其中：单独补查，并让引擎
+                        // 记住，下一轮直接按门店查。
+                        let mut outcome = query_one_store(client, group).await;
+                        outcome.uncovered = true;
+                        outcomes.push(outcome);
                     }
                 }
             }
+            outcomes
+        }
+        Err(err @ (ApiError::Apple(_) | ApiError::SchemaDrift { .. })) => {
+            let mut outcomes = Vec::with_capacity(groups.len());
+            for group in groups {
+                let mut outcome = query_one_store(client, group).await;
+                outcome.uncovered = true;
+                if let Some(report) = outcome.trouble.as_mut() {
+                    report.reason = format!(
+                        "{}（按地点「{location}」合并查询失败：{err}）",
+                        report.reason
+                    );
+                }
+                outcomes.push(outcome);
+            }
+            outcomes
+        }
+        Err(err) => {
+            let stores: Vec<&str> = groups.iter().map(|g| g.store_number.as_str()).collect();
+            let label = format!(
+                "{location} 一带 {} 家门店（{}）",
+                stores.len(),
+                stores.join("、")
+            );
+            let trouble = trouble_for(&err, &label);
+            let reason = err.into_unknown_reason();
+            groups
+                .into_iter()
+                .enumerate()
+                .map(|(i, group)| {
+                    // 一次请求失败只报一条告警，挂在第一家上；其余门店照样标未知。
+                    let report = if i == 0 { trouble.clone() } else { None };
+                    error_outcome(group, reason.clone(), report)
+                })
+                .collect()
+        }
+    }
+}
 
-            // 一个型号都没拿到明确答复，说明这个门店这一轮实质上是废的：
-            // 要么零件号全对不上，要么 Apple 换了词表。必须按门店级失败处理，
-            // 否则不退避、不告警，程序会继续按原频率请求一个已经失效的结构。
-            let dead = resolved == 0 && !group.parts.is_empty();
-            StoreOutcome {
-                trouble: dead.then(|| TroubleReport {
-                    reason: format!(
-                        "门店 {} 的全部型号都没能拿到明确答复，Apple 可能已调整接口",
-                        group.store_number
-                    ),
-                    advice: Some(TroubleAdvice::WaitForUpdate),
-                }),
-                locale: group.locale,
-                store_number: group.store_number,
-                parts,
-                ok: !dead,
-                problems,
+fn trouble_for(err: &ApiError, label: &str) -> Option<TroubleReport> {
+    match err {
+        ApiError::Blocked(_) => Some(TroubleReport {
+            reason: format!("{label} 查询失败：{err}"),
+            advice: Some(TroubleAdvice::TryAnotherNetwork),
+        }),
+        ApiError::SchemaDrift { .. } => Some(TroubleReport {
+            reason: format!("{label} 查询失败：{err}"),
+            advice: Some(TroubleAdvice::WaitForUpdate),
+        }),
+        ApiError::Apple(_) => Some(TroubleReport {
+            reason: format!("{label} 查询失败：{err}"),
+            advice: None,
+        }),
+        ApiError::RateLimited(_) | ApiError::Transport(_) => None,
+    }
+}
+
+fn unknown_locale_outcome(group: StoreGroup) -> StoreOutcome {
+    let reason = UnknownReason::SchemaDrift {
+        field: "locale".into(),
+        raw: group.locale.clone(),
+    };
+    let trouble = Some(TroubleReport {
+        // 这句本身就说清了该做什么，不必再挂一条泛泛的建议。
+        reason: format!(
+            "地区 {} 无法识别，这些监控项无法查询，请删除后重新添加",
+            group.locale
+        ),
+        advice: None,
+    });
+    error_outcome(group, reason, trouble)
+}
+
+fn error_outcome(
+    group: StoreGroup,
+    reason: UnknownReason,
+    trouble: Option<TroubleReport>,
+) -> StoreOutcome {
+    let n = group.parts.len();
+    StoreOutcome {
+        parts: group
+            .parts
+            .into_iter()
+            .map(|p| (p, Availability::Unknown(reason.clone())))
+            .collect(),
+        locale: group.locale,
+        store_number: group.store_number,
+        ok: false,
+        problems: n,
+        trouble,
+        uncovered: false,
+    }
+}
+
+fn success_outcome(group: StoreGroup, result: &StoreAvailability) -> StoreOutcome {
+    let mut parts = Vec::with_capacity(group.parts.len());
+    let mut problems = 0usize;
+    let mut resolved = 0usize;
+
+    for part in &group.parts {
+        match result.parts.get(part) {
+            None => {
+                problems += 1;
+                parts.push((
+                    part.clone(),
+                    Availability::Unknown(UnknownReason::SchemaDrift {
+                        field: "partsAvailability".into(),
+                        raw: format!("响应中没有型号 {part}"),
+                    }),
+                ));
+            }
+            Some(status) => {
+                if status.availability.is_failure() {
+                    problems += 1;
+                } else {
+                    resolved += 1;
+                }
+                parts.push((part.clone(), status.availability.clone()));
             }
         }
+    }
+
+    let dead = resolved == 0 && !group.parts.is_empty();
+    StoreOutcome {
+        trouble: dead.then(|| TroubleReport {
+            reason: format!(
+                "门店 {} 的全部型号都没能拿到明确答复，Apple 可能已调整接口",
+                group.store_number
+            ),
+            advice: Some(TroubleAdvice::WaitForUpdate),
+        }),
+        locale: group.locale,
+        store_number: group.store_number,
+        parts,
+        ok: !dead,
+        problems,
+        uncovered: false,
     }
 }
 
@@ -499,6 +627,9 @@ struct Engine<F: Fetcher> {
     /// 不用单个目标的失败次数来驱动：某个零件号下架会让它永远失败，据此退避
     /// 的话，一条陈旧的监控项就能把所有正常门店的查询频率拖慢八倍。
     cycle_failures: u32,
+    /// 按地点查询时 Apple 的响应里没带上的门店（locale, 门店号）。这些店之后
+    /// 直接按门店查；重启后清空，因为 Apple 的附近列表也可能变。
+    uncovered: BTreeSet<(String, String)>,
 }
 
 impl<F: Fetcher> Engine<F> {
@@ -513,6 +644,7 @@ impl<F: Fetcher> Engine<F> {
             states: BTreeMap::new(),
             running: false,
             cycle_failures: 0,
+            uncovered: BTreeSet::new(),
         }
     }
 
@@ -533,9 +665,10 @@ impl<F: Fetcher> Engine<F> {
             // 跑一轮。期间仍然响应命令：把 future 钉住反复轮询，SetTargets
             // 之类的命令不会打断本轮，而 Stop 会直接丢弃它 —— 丢弃即取消，
             // 在飞的 HTTP 请求会跟着一起停。
-            let groups = self.group_targets();
-            let expected = expected_keys(&groups);
-            let queries = run_queries(self.client.clone(), groups, self.config.concurrency);
+            let planned = self.plan_queries();
+            let expected = expected_keys(&planned);
+            let request_count = planned.len();
+            let queries = run_queries(self.client.clone(), planned, self.config.concurrency);
             tokio::pin!(queries);
 
             let outcomes = loop {
@@ -579,7 +712,9 @@ impl<F: Fetcher> Engine<F> {
                 continue;
             }
 
-            self.apply(expected, outcomes);
+            // 下一轮同样要发这么多次请求；预算不够就把等待拉长，而不是发出去挨拦。
+            let pacing = self.client.pacing_delay(request_count).await;
+            let delay = self.apply(expected, outcomes, pacing);
 
             let Some(restarted) = self.flush_events(&mut cmd_rx).await else {
                 return;
@@ -588,7 +723,6 @@ impl<F: Fetcher> Engine<F> {
                 continue;
             }
 
-            let delay = self.next_delay();
             let sleep = tokio::time::sleep(delay);
             tokio::pin!(sleep);
             loop {
@@ -691,6 +825,7 @@ impl<F: Fetcher> Engine<F> {
             Event::CycleComplete {
                 snapshot: pending,
                 healthy,
+                ..
             } => {
                 pending.clone_from(&snapshot);
                 *healthy &= !snapshot.is_empty()
@@ -708,18 +843,67 @@ impl<F: Fetcher> Engine<F> {
         self.states.values().cloned().collect()
     }
 
-    /// 把目标按 (地区, 门店) 聚合，使每个门店每轮只发一次请求。
+    /// 把这一轮要发的请求规划出来：先按门店聚合零件号，再把有 `location` 的
+    /// 门店按（地区, 地点）合并成按地点的查询；没有地点的，以及此前发现地点
+    /// 响应里不包含的门店，按门店单独查。顺序沿用目标的先后。
+    fn plan_queries(&self) -> Vec<Query> {
+        let mut queries: Vec<Query> = Vec::new();
+        let mut nearby_index: BTreeMap<(String, String), usize> = BTreeMap::new();
+
+        for group in self.group_targets() {
+            let store_key = (group.locale.clone(), group.store_number.clone());
+            let location = group
+                .location
+                .as_deref()
+                .map(str::trim)
+                .filter(|l| !l.is_empty() && !self.uncovered.contains(&store_key))
+                .map(str::to_string);
+            let Some(location) = location else {
+                queries.push(Query::Store(group));
+                continue;
+            };
+            let key = (group.locale.clone(), location.clone());
+            match nearby_index.get(&key) {
+                Some(&i) => {
+                    if let Query::Nearby { groups, .. } = &mut queries[i] {
+                        groups.push(group);
+                    }
+                }
+                None => {
+                    nearby_index.insert(key, queries.len());
+                    queries.push(Query::Nearby {
+                        locale: group.locale.clone(),
+                        location,
+                        groups: vec![group],
+                    });
+                }
+            }
+        }
+        queries
+    }
+
+    /// 把目标按 (地区, 门店) 聚合，使每个门店每轮最多一次请求；同一门店的目标
+    /// 里任一条带了取货地点，整家店就用那个地点。
     fn group_targets(&self) -> Vec<StoreGroup> {
         let mut order: Vec<(String, String)> = Vec::new();
-        let mut index: BTreeMap<(String, String), (Vec<String>, Vec<String>)> = BTreeMap::new();
+        let mut index: GroupIndex = BTreeMap::new();
 
         for t in &self.targets {
             let k = (t.locale.clone(), t.store_number.clone());
             if !index.contains_key(&k) {
                 order.push(k.clone());
             }
-            let (parts, companions) = index.entry(k).or_default();
+            let (parts, companions, location) = index.entry(k).or_default();
             parts.push(t.part_number.clone());
+            if location.is_none()
+                && let Some(l) = t
+                    .pickup_location
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|l| !l.is_empty())
+            {
+                *location = Some(l.to_string());
+            }
             if let Some(companion) = t
                 .companion_part
                 .as_deref()
@@ -734,7 +918,7 @@ impl<F: Fetcher> Engine<F> {
         order
             .into_iter()
             .map(|(locale, store_number)| {
-                let (parts, companions) = index
+                let (parts, companions, location) = index
                     .remove(&(locale.clone(), store_number.clone()))
                     .unwrap_or_default();
                 // 搭档恰好也是同一门店的监控目标时，它已经在请求里了，不必重复。
@@ -747,13 +931,21 @@ impl<F: Fetcher> Engine<F> {
                     store_number,
                     parts,
                     companions,
+                    location,
                 }
             })
             .collect()
     }
 
-    /// 把一轮的结果写进状态，并发出相应事件。
-    fn apply(&mut self, mut missing: BTreeSet<TargetKey>, outcomes: Vec<StoreOutcome>) {
+    /// 把一轮的结果写进状态，发出相应事件，返回下一轮之前要等多久。
+    ///
+    /// `pacing` 是客户端按请求预算算出的最短等待；它和用户设的间隔取较大者。
+    fn apply(
+        &mut self,
+        mut missing: BTreeSet<TargetKey>,
+        outcomes: Vec<StoreOutcome>,
+        pacing: Duration,
+    ) -> Duration {
         let mut ok = 0usize;
         let mut failed = 0usize;
         let mut problems = 0usize;
@@ -766,6 +958,10 @@ impl<F: Fetcher> Engine<F> {
                 failed += 1;
             }
             problems += outcome.problems;
+            if outcome.uncovered {
+                self.uncovered
+                    .insert((outcome.locale.clone(), outcome.store_number.clone()));
+            }
 
             if let Some(report) = outcome.trouble {
                 self.emit_droppable(Event::Trouble {
@@ -851,10 +1047,15 @@ impl<F: Fetcher> Engine<F> {
         // 目标数超过通道容量时，排在最后的 CycleComplete 必然被丢，界面就会一直
         // 停在上一轮的取值上 —— 而那很可能正是「无货」。实测 260 个目标时连续
         // 18 轮一条都没送达。
+        let base = self.next_delay();
+        let delay = base.max(pacing);
         self.emit_critical(Event::CycleComplete {
+            next_check_in_secs: delay.as_secs(),
+            paced: pacing > base,
             healthy: problems == 0 && ok > 0,
             snapshot: self.snapshot(),
         });
+        delay
     }
 
     /// 下一轮的等待时长，含抖动与全局退避。

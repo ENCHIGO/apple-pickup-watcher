@@ -87,6 +87,7 @@ fn 跨边界的结构统一用小驼峰() {
         part_number: "MG724CH/A".into(),
         product_name: "iPhone 17 512GB 黑色".into(),
         companion_part: None,
+        pickup_location: None,
     };
     assert_eq!(
         to_value(&target),
@@ -118,8 +119,14 @@ fn 跨边界的结构统一用小驼峰() {
         number: "R683".into(),
         name: "环球港".into(),
         title: "上海-环球港".into(),
+        city: "上海".into(),
+        state: "上海".into(),
+        postal_code: "200062".into(),
     };
-    assert!(to_value(&store).get("number").is_some());
+    let v = to_value(&store);
+    assert!(v.get("number").is_some());
+    // 地址字段只在进程内用来拼取货接口的 location，不进 JSON。
+    assert!(v.get("city").is_none() && v.get("state").is_none() && v.get("postalCode").is_none());
 }
 
 #[test]
@@ -171,6 +178,7 @@ fn 监控目标能原样往返() {
         part_number: "MG6A4J/A".into(),
         product_name: "iPhone 17 256GB ラベンダー".into(),
         companion_part: None,
+        pickup_location: None,
     };
     let json = serde_json::to_string(&target).unwrap();
     let back: Target = serde_json::from_str(&json).expect("反序列化失败");
@@ -195,6 +203,7 @@ fn 搭档零件号只在存在时出现且能往返() {
         part_number: "MEHW4CH/B".into(),
         product_name: "Apple Watch SE 40 毫米 星光色".into(),
         companion_part: Some("MJUA4FE/A".into()),
+        pickup_location: None,
     };
     let v = to_value(&watch);
     assert_eq!(v.get("companionPart"), Some(&json!("MJUA4FE/A")));
@@ -209,4 +218,26 @@ fn plain_with_part(t: &Target, companion: Option<&str>) -> Target {
         companion_part: companion.map(str::to_string),
         ..t.clone()
     }
+}
+
+#[test]
+fn 取货地点只在存在时出现且能往返() {
+    // 和搭档零件号一样：旧配置没有这个字段，读入后不能凭空多出来。
+    let plain: Target = serde_json::from_str(
+        r#"{"locale":"zh_HK","storeNumber":"R499","storeTitle":"香港-Canton Road","partNumber":"MJXW4ZA/A","productName":"iPhone 18 Pro Max"}"#,
+    )
+    .expect("没有 pickupLocation 的旧目标应当能读入");
+    assert_eq!(plain.pickup_location, None);
+    assert!(to_value(&plain).get("pickupLocation").is_none());
+
+    let located = Target {
+        pickup_location: Some("香港".into()),
+        ..plain.clone()
+    };
+    let v = to_value(&located);
+    assert_eq!(v.get("pickupLocation"), Some(&json!("香港")));
+    let back: Target = serde_json::from_value(v).expect("反序列化失败");
+    assert_eq!(located, back);
+    // 地点不参与身份：同一目标带不带地点都是同一条。
+    assert_eq!(located.key(), plain.key());
 }

@@ -526,6 +526,7 @@ impl LegacyTarget {
             part_number: self.part_number,
             product_name: self.product_name,
             companion_part: None,
+            pickup_location: None,
         }
     }
 }
@@ -567,6 +568,7 @@ mod tests {
             part_number: part.into(),
             product_name: "iPhone 17 512GB 黑色".into(),
             companion_part: None,
+            pickup_location: None,
         }
     }
 
