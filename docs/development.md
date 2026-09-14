@@ -4,7 +4,9 @@
 
 ## 工具链与系统依赖
 
-使用 stable Rust，最低版本见根目录 [Cargo.toml](../Cargo.toml)。桌面前端使用 Node.js LTS 和 pnpm 9。
+使用 stable Rust，最低版本见根目录 [Cargo.toml](../Cargo.toml)（目前 1.98，由 `wreq` 决定）。桌面前端使用 Node.js LTS 和 pnpm 9。
+
+`apw-core` 默认启用 `chrome-tls` feature，用 BoringSSL 复刻 Chrome 的 TLS / HTTP/2 指纹，编译需要 cmake 和 C/C++ 工具链（Windows 另需 NASM）；三个平台的 CI 都已安装。本机没有 cmake 时可以 `--no-default-features --features notifications` 退回纯 rustls 构建，但发布产物必须带 `chrome-tls`。
 
 桌面版的系统依赖以 [CI](../.github/workflows/ci.yml) 和 [Release 工作流](../.github/workflows/release.yml) 为准：macOS 需要 Xcode Command Line Tools；Windows 需要 Microsoft C++ 生成工具和 WebView2；Linux 需要 WebKitGTK、托盘和 ALSA 等开发库。Ubuntu 开发环境可使用 [scripts/codex-setup.sh](../scripts/codex-setup.sh)。
 

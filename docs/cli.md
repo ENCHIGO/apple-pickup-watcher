@@ -166,9 +166,13 @@ apw doctor --locale zh_CN --store R359 --part 'MJTF4CH/A'
 apw doctor --locale zh_CN --store R359 --part 'MJTF4CH/A' --interval 30 --json
 ```
 
-它对同一门店、同一零件号依次跑六个变体，每个变体用全新的客户端（独立 cookie 罐）查一次：`legacy`（v0.4.1 的请求特征 + 购物袋页暖场）、`chrome`（当前默认：Chrome 153 特征 + 购物袋页暖场）、`chrome-no-warm`（不带 cookie）、`chrome-buypage-warm`（购买页暖场，CDN 页面通常只发 `geo` 一个 cookie）、`chrome-xrw`（加 `X-Requested-With`）、`chrome-apple-extras`（加 Apple 商店前端的两个自定义头）。变体之间至少间隔 10 秒（默认 15），从不重试，连续两个变体被拦就停止，其余标为未跑。
+它对同一门店、同一零件号依次跑六个变体，每个变体用全新的客户端（独立 cookie 罐）查一次：`legacy`（v0.4.1 的行为：rustls 指纹 + Chrome/130 请求头 + `X-Requested-With`）、`rustls`（v0.4.2-beta.1 的行为：rustls 指纹 + Chrome 149 请求头）、`chrome-tls`（当前默认：Chrome 149 的 TLS / HTTP/2 指纹 + Chrome 149 请求头）、`chrome-tls-no-warm`（不带 cookie）、`chrome-tls-xrw`（加 `X-Requested-With`）、`chrome-tls-apple-extras`（加 Apple 商店前端的两个自定义头）。前三个是「旧行为 → 只换请求头 → 再换传输层指纹」的阶梯。变体之间至少间隔 10 秒（默认 15），从不重试，连续两个变体被拦就停止，其余标为未跑。
 
 输出是一份 Markdown 报告：每次暖场与取货请求的状态码、HTTP 版本、耗时和 cookie **名字**，末尾附判读。报告不含 cookie 值、IP 或账号信息，可以直接贴进 issue。`--json` 改为每个变体一行 NDJSON，`report.records[]` 是原始请求记录。退出码 0 表示至少一个变体拿到明确答复，3 表示没有。跑之前请先暂停桌面版监控，以免两边互相影响。
+
+### 传输层指纹
+
+从 v0.4.2-beta.2 起，取货查询默认走 `chrome-tls` 传输：用 BoringSSL 复刻 Chrome 149 的 TLS 握手与 HTTP/2 设置（wreq），请求头由同一版本的档案控制。rustls 的握手指纹与任何浏览器都不一样，是请求头之外浏览器与我们之间唯一剩下的差别。构建机上没有 cmake 时可以用 `--no-default-features --features notifications` 去掉它，退回 rustls。
 
 ### 被拦后的冷却
 

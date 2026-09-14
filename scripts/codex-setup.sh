@@ -34,6 +34,7 @@ fi
   libssl-dev \
   libasound2-dev \
   build-essential \
+  cmake \
   pkg-config \
   file
 

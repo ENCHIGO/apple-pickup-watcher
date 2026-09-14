@@ -10,7 +10,7 @@
 use std::time::Duration;
 
 use apw_core::apple::{
-    ApiError, AppleClient, ClientConfig, RequestProfile, RequestRecord, WarmPage,
+    ApiError, AppleClient, ClientConfig, RequestProfile, RequestRecord, Transport, WarmPage,
 };
 use apw_core::catalog::Catalog;
 use serde::Serialize;
@@ -26,7 +26,11 @@ pub struct Variant {
     pub config: ClientConfig,
 }
 
-/// 按对照价值排序的变体表。前两个是「旧行为」与「当前默认」，后面逐项只改一个变量。
+/// 按对照价值排序的变体表。
+///
+/// 前三个是「旧行为 → 只换请求头 → 再换传输层指纹」的阶梯，后面每个只在当前默认
+/// 之上改一个变量。传输层指纹（TLS / HTTP/2）是请求头之外唯一剩下的、浏览器与
+/// 我们之间肉眼看不见的差别。
 pub fn variants() -> Vec<Variant> {
     let base = ClientConfig {
         max_retries: 0,
@@ -36,63 +40,69 @@ pub fn variants() -> Vec<Variant> {
     vec![
         Variant {
             name: "legacy",
-            summary: "v0.4.1 的请求特征（Chrome/130、X-Requested-With、无 client hints）+ 购物袋页暖场",
+            summary: "v0.4.1 的行为：rustls 指纹 + Chrome/130 请求头 + X-Requested-With + 购物袋页暖场",
             config: ClientConfig {
                 profile: RequestProfile::legacy(),
                 warm_page: WarmPage::Bag,
+                transport: Transport::Rustls,
                 ..base.clone()
             },
         },
         Variant {
-            name: "chrome",
-            summary: "当前默认：Chrome 153 特征 + 购物袋页暖场",
+            name: "rustls",
+            summary: "v0.4.2-beta.1 的行为：rustls 指纹 + Chrome 149 请求头 + 购物袋页暖场",
             config: ClientConfig {
                 profile: chrome.clone(),
                 warm_page: WarmPage::Bag,
+                transport: Transport::Rustls,
                 ..base.clone()
             },
         },
         Variant {
-            name: "chrome-no-warm",
-            summary: "Chrome 153 特征，不暖场（不带任何 cookie）",
+            name: "chrome-tls",
+            summary: "当前默认：Chrome 149 的 TLS / HTTP/2 指纹 + Chrome 149 请求头 + 购物袋页暖场",
+            config: ClientConfig {
+                profile: chrome.clone(),
+                warm_page: WarmPage::Bag,
+                transport: Transport::ChromeTls,
+                ..base.clone()
+            },
+        },
+        Variant {
+            name: "chrome-tls-no-warm",
+            summary: "同上，但不暖场（不带任何 cookie）",
             config: ClientConfig {
                 profile: chrome.clone(),
                 warm_page: WarmPage::None,
+                transport: Transport::ChromeTls,
                 ..base.clone()
             },
         },
         Variant {
-            name: "chrome-buypage-warm",
-            summary: "Chrome 153 特征 + 购买页暖场（CDN 页面，通常只发 geo 一个 cookie）",
-            config: ClientConfig {
-                profile: chrome.clone(),
-                warm_page: WarmPage::BuyPage,
-                ..base.clone()
-            },
-        },
-        Variant {
-            name: "chrome-xrw",
-            summary: "Chrome 153 特征 + X-Requested-With: XMLHttpRequest",
+            name: "chrome-tls-xrw",
+            summary: "同上，另加 X-Requested-With: XMLHttpRequest",
             config: ClientConfig {
                 profile: RequestProfile {
-                    name: "chrome-153-xrw",
+                    name: "chrome-149-xrw",
                     x_requested_with: true,
                     ..chrome.clone()
                 },
                 warm_page: WarmPage::Bag,
+                transport: Transport::ChromeTls,
                 ..base.clone()
             },
         },
         Variant {
-            name: "chrome-apple-extras",
-            summary: "Chrome 153 特征 + x-skip-redirect + x-aos-ui-fetch-call-1",
+            name: "chrome-tls-apple-extras",
+            summary: "同上，另加 x-skip-redirect 与 x-aos-ui-fetch-call-1",
             config: ClientConfig {
                 profile: RequestProfile {
-                    name: "chrome-153-apple-extras",
+                    name: "chrome-149-apple-extras",
                     apple_extras: true,
                     ..chrome
                 },
                 warm_page: WarmPage::Bag,
+                transport: Transport::ChromeTls,
                 ..base
             },
         },
@@ -181,8 +191,21 @@ pub async fn run<W: AsyncWrite + Unpin>(
         if i > 0 {
             tokio::time::sleep(interval).await;
         }
-        let client = AppleClient::new(variant.config.clone())
-            .map_err(|e| CliError::new(1, "client_error", e.to_string()))?;
+        let client = match AppleClient::new(variant.config.clone()) {
+            Ok(client) => client,
+            Err(err) => {
+                // 例如没有编译 chrome-tls 的构建：这个变体跑不了，但别的还能跑。
+                reports.push(VariantReport {
+                    variant: variant.name,
+                    summary: variant.summary,
+                    profile,
+                    outcome: Outcome::Failed,
+                    detail: err.to_string(),
+                    records: Vec::new(),
+                });
+                continue;
+            }
+        };
         let result = client.pickup_message(region, &store, &all_parts).await;
         let records = client.recent_requests().await;
         let (outcome, detail) = match result {
@@ -250,7 +273,10 @@ fn describe(records: &[RequestRecord], kind: &str) -> String {
         .status
         .map_or_else(|| record.outcome.clone(), |s| s.to_string());
     let version = record.http_version.as_deref().unwrap_or("?");
-    let mut text = format!("{status} {version} {} ms", record.duration_ms);
+    let mut text = format!(
+        "{status} {version} {} ms [{}]",
+        record.duration_ms, record.transport
+    );
     if kind == "warm" {
         if record.cookies_after.is_empty() {
             text.push_str(" · 无 cookie");
@@ -282,11 +308,16 @@ pub fn verdict(reports: &[VariantReport]) -> Vec<String> {
             .find(|r| r.variant == name)
             .map(|r| r.outcome)
     };
+    // 只看真正问过 Apple 的变体：没执行的和客户端都没构造出来的说明不了什么。
     let ran: Vec<&VariantReport> = reports
         .iter()
-        .filter(|r| r.outcome != Outcome::Skipped)
+        .filter(|r| matches!(r.outcome, Outcome::Ok | Outcome::Blocked))
         .collect();
     let mut lines = Vec::new();
+    if ran.is_empty() {
+        lines.push("没有任何变体真正问到 Apple（全部失败或未执行），请先检查网络和构建。".into());
+        return lines;
+    }
     if ran.iter().all(|r| r.outcome == Outcome::Ok) {
         lines.push(
             "当前网络没有复现 541：所有变体都拿到了明确答复。请在出现 541 的时段和网络上再跑一次。"
@@ -298,29 +329,33 @@ pub fn verdict(reports: &[VariantReport]) -> Vec<String> {
         lines.push("该网络此刻对所有变体都拦，这份结果无法区分原因。至少等 10 分钟，或换一条网络（例如手机热点）再跑一次。".into());
         return lines;
     }
-    let chrome = outcome("chrome");
-    if outcome("legacy") == Some(Outcome::Blocked) && chrome == Some(Outcome::Ok) {
+    let rustls = outcome("rustls");
+    let chrome = outcome("chrome-tls");
+    if outcome("legacy") == Some(Outcome::Blocked) && rustls == Some(Outcome::Ok) {
         lines.push(
-            "请求特征有影响：旧档案（Chrome/130 + X-Requested-With）被拦，Chrome 153 档案通过。"
+            "请求头有影响：v0.4.1 的请求头被拦，Chrome 149 请求头（同样的 rustls 指纹）通过。"
                 .into(),
         );
     }
-    if outcome("chrome-no-warm") == Some(Outcome::Blocked) && chrome == Some(Outcome::Ok) {
+    if rustls == Some(Outcome::Blocked) && chrome == Some(Outcome::Ok) {
+        lines.push(
+            "传输层指纹有影响：请求头相同，rustls 的 TLS / HTTP/2 指纹被拦，Chrome 指纹通过。当前默认已是 Chrome 指纹。"
+                .into(),
+        );
+    }
+    if chrome == Some(Outcome::Blocked) && rustls == Some(Outcome::Ok) {
+        lines.push("反常：Chrome 指纹被拦而 rustls 通过，请附上完整报告。".into());
+    }
+    if outcome("chrome-tls-no-warm") == Some(Outcome::Blocked) && chrome == Some(Outcome::Ok) {
         lines.push("cookie 有影响：不暖场被拦，购物袋页暖场后通过。".into());
     }
-    if outcome("chrome-buypage-warm") == Some(Outcome::Blocked) && chrome == Some(Outcome::Ok) {
-        lines.push(
-            "会话 cookie 有影响：只带 geo 的购买页暖场被拦，带完整会话 cookie 的购物袋页暖场通过。"
-                .into(),
-        );
-    }
-    if outcome("chrome-xrw") == Some(Outcome::Blocked) && chrome == Some(Outcome::Ok) {
+    if outcome("chrome-tls-xrw") == Some(Outcome::Blocked) && chrome == Some(Outcome::Ok) {
         lines.push("X-Requested-With 会触发拦截。".into());
     }
-    if chrome == Some(Outcome::Blocked) && outcome("chrome-apple-extras") == Some(Outcome::Ok) {
+    if chrome == Some(Outcome::Blocked) && outcome("chrome-tls-apple-extras") == Some(Outcome::Ok) {
         lines.push("Apple 自定义头（x-skip-redirect / x-aos-ui-fetch-call-1）有影响。".into());
     }
-    if chrome == Some(Outcome::Blocked) && outcome("chrome-no-warm") == Some(Outcome::Ok) {
+    if chrome == Some(Outcome::Blocked) && outcome("chrome-tls-no-warm") == Some(Outcome::Ok) {
         lines.push(
             "反常：不带 cookie 反而通过。可能是暖场攒到的 cookie 已被作废，请附上完整报告。".into(),
         );
@@ -400,10 +435,18 @@ mod tests {
             "诊断绝不能重试"
         );
         assert_eq!(list[0].config.profile.name, "legacy-0.4.1");
+        assert_eq!(list[0].config.transport, Transport::Rustls);
         assert_eq!(list[1].config.profile, RequestProfile::chrome());
-        assert_eq!(list[2].config.warm_page, WarmPage::None);
+        assert_eq!(list[1].config.transport, Transport::Rustls);
+        assert_eq!(list[2].config.transport, Transport::ChromeTls);
+        assert_eq!(list[3].config.warm_page, WarmPage::None);
         assert!(list[4].config.profile.x_requested_with);
         assert!(list[5].config.profile.apple_extras);
+        assert!(
+            list[2..]
+                .iter()
+                .all(|v| v.config.transport == Transport::ChromeTls)
+        );
     }
 
     #[test]
@@ -416,16 +459,20 @@ mod tests {
 
         let mixed = vec![
             report("legacy", Outcome::Blocked),
-            report("chrome", Outcome::Ok),
-            report("chrome-no-warm", Outcome::Blocked),
-            report("chrome-buypage-warm", Outcome::Ok),
-            report("chrome-xrw", Outcome::Ok),
-            report("chrome-apple-extras", Outcome::Skipped),
+            report("rustls", Outcome::Blocked),
+            report("chrome-tls", Outcome::Ok),
+            report("chrome-tls-no-warm", Outcome::Blocked),
+            report("chrome-tls-xrw", Outcome::Ok),
+            report("chrome-tls-apple-extras", Outcome::Skipped),
         ];
         let lines = verdict(&mixed);
-        assert!(lines.iter().any(|l| l.contains("请求特征有影响")));
+        assert!(lines.iter().any(|l| l.contains("传输层指纹有影响")));
         assert!(lines.iter().any(|l| l.contains("cookie 有影响")));
         assert!(lines.iter().any(|l| l.contains("没有执行")));
+        assert!(
+            !lines.iter().any(|l| l.contains("请求头有影响")),
+            "rustls 也被拦，说明不了请求头"
+        );
 
         let md = render_markdown(
             "zh_CN",
