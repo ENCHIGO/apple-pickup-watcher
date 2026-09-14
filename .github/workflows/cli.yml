@@ -39,6 +39,10 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
+      # BoringSSL（chrome-tls 传输）在 MSVC 上要用 NASM 编译汇编；其他平台自带的
+      # cmake 与 C 工具链已经够用。
+      - uses: ilammy/setup-nasm@v1
+        if: runner.os == 'Windows'
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy

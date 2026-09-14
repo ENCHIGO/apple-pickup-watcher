@@ -14,6 +14,9 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 rand.workspace = true
+wreq = { version = "0.16", default-features = false, features = ["cookies", "gzip", "brotli", "query", "stream", "webpki-roots", "tokio-rt"], optional = true }
+wreq-util = { version = "0.2", default-features = false, features = ["emulation"], optional = true }
+futures-util = { version = "0.3", default-features = false, features = ["std"], optional = true }
 rodio = { workspace = true, optional = true }
 dirs.workspace = true
 
@@ -21,7 +24,11 @@ dirs.workspace = true
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "test-util"] }
 
 [features]
-default = ["notifications"]
+default = ["notifications", "chrome-tls"]
+# 用 BoringSSL 复刻 Chrome 的 TLS 与 HTTP/2 指纹（wreq）。关掉后只剩 rustls 传输，
+# 请求特征与浏览器不一致，在受风控审查的网络上更容易被拦；构建机上没有 cmake
+# 时可以临时关掉。
+chrome-tls = ["dep:wreq", "dep:wreq-util", "dep:futures-util"]
 # CLI 只消费库存事件，不需要推送或音频设备依赖。
 notifications = ["dep:rodio"]
 # live 打开后才会跑针对 Apple 真实接口的契约测试：
