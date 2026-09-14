@@ -533,6 +533,10 @@ export default function App() {
             // 界面上那些「无货」也未必反映真实情况。
             <span className="text-unknown"> · 查不到 {summary.untrusted}</span>
           )}
+          {ui.running && ui.pacing !== null && ui.pacing.paced && (
+            // 请求预算在拉长间隔时明说，否则用户会以为设的 30 秒没生效。
+            <span> · 受 Apple 频率限制，下一轮 {ui.pacing.nextCheckInSecs} 秒后</span>
+          )}
         </footer>
 
         <section className="h-36 shrink-0 overflow-hidden rounded-lg border">

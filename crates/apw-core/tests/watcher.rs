@@ -16,6 +16,11 @@ use tokio::sync::mpsc::Receiver;
 /// 假查询源的应答函数：入参依次是「第几次调用」「门店号」「请求的零件号」。
 type Responder =
     Arc<dyn Fn(usize, &str, &[String]) -> Result<StoreAvailability, ApiError> + Send + Sync>;
+/// 按地点查询的记录：(地点, 请求的零件号)。
+type NearbyLog = Arc<Mutex<Vec<(String, Vec<String>)>>>;
+/// 按地点查询的应答函数：入参依次是「第几次调用」「地点」「请求的零件号」。
+type NearbyResponder =
+    Arc<dyn Fn(usize, &str, &[String]) -> Result<Vec<StoreAvailability>, ApiError> + Send + Sync>;
 
 /// 假的查询源，可编程返回值，并记录调用情况。
 #[derive(Clone)]
@@ -27,8 +32,13 @@ struct FakeFetcher {
     peak: Arc<AtomicUsize>,
     /// 每次调用记录下收到的零件号，用于验证「按门店合并请求」。
     seen_parts: Arc<Mutex<Vec<Vec<String>>>>,
+    /// 按地点查询的记录：(地点, 零件号)，用于验证「按地点合并请求」。
+    seen_nearby: NearbyLog,
     delay: Duration,
     responder: Responder,
+    nearby: NearbyResponder,
+    /// `pacing_delay` 的返回值，模拟客户端的请求预算。
+    pacing: Duration,
 }
 
 impl FakeFetcher {
@@ -43,9 +53,27 @@ impl FakeFetcher {
             in_flight: Arc::new(AtomicUsize::new(0)),
             peak: Arc::new(AtomicUsize::new(0)),
             seen_parts: Arc::new(Mutex::new(Vec::new())),
+            seen_nearby: Arc::new(Mutex::new(Vec::new())),
             delay: Duration::from_millis(5),
             responder: Arc::new(responder),
+            nearby: Arc::new(|_, location, _| {
+                Err(ApiError::Transport(format!(
+                    "测试没有设置按地点查询的应答：{location}"
+                )))
+            }),
+            pacing: Duration::ZERO,
         }
+    }
+
+    fn with_nearby(
+        mut self,
+        nearby: impl Fn(usize, &str, &[String]) -> Result<Vec<StoreAvailability>, ApiError>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self {
+        self.nearby = Arc::new(nearby);
+        self
     }
 
     fn call_count(&self) -> usize {
@@ -75,6 +103,27 @@ impl Fetcher for FakeFetcher {
 
         tokio::time::sleep(self.delay).await;
         (self.responder)(nth, store_number, parts)
+    }
+
+    async fn pickup_message_nearby(
+        &self,
+        _region: &'static Region,
+        location: &str,
+        parts: &[String],
+    ) -> Result<Vec<StoreAvailability>, ApiError> {
+        let nth = self.calls.fetch_add(1, Ordering::SeqCst);
+        let _guard = InFlightGuard::enter(&self.in_flight, &self.peak);
+        self.seen_nearby
+            .lock()
+            .await
+            .push((location.to_string(), parts.to_vec()));
+
+        tokio::time::sleep(self.delay).await;
+        (self.nearby)(nth, location, parts)
+    }
+
+    async fn pacing_delay(&self, _requests: usize) -> Duration {
+        self.pacing
     }
 }
 
@@ -127,6 +176,7 @@ fn target(store: &str, part: &str) -> Target {
         part_number: part.into(),
         product_name: format!("型号 {part}"),
         companion_part: None,
+        pickup_location: None,
     }
 }
 
@@ -843,4 +893,282 @@ async fn wait_one_cycle(rx: &mut Receiver<Event>) {
         }
     }
     panic!("等一轮查询结束超时");
+}
+
+fn located(store: &str, part: &str, location: &str) -> Target {
+    Target {
+        locale: "zh_HK".into(),
+        store_number: store.into(),
+        store_title: format!("香港-{store}"),
+        part_number: part.into(),
+        product_name: format!("型号 {part}"),
+        companion_part: None,
+        pickup_location: Some(location.into()),
+    }
+}
+
+fn cycle_complete(events: &[Event]) -> (u64, bool, Vec<Event>) {
+    let Some(Event::CycleComplete {
+        next_check_in_secs,
+        paced,
+        ..
+    }) = events
+        .iter()
+        .find(|e| matches!(e, Event::CycleComplete { .. }))
+    else {
+        panic!("没有 CycleComplete：{events:?}");
+    };
+    (*next_check_in_secs, *paced, Vec::new())
+}
+
+#[tokio::test]
+async fn 同一地点的门店合并成一次按地点的请求() {
+    // 报告者盯 6 家港店：v0.4.2-beta 每轮 6 次请求，第 6 轮被拦。合并后每轮 1 次。
+    let fake = FakeFetcher::new(|_, store, _| panic!("有地点的门店不该再按门店单独查：{store}"))
+        .with_nearby(|_, location, parts| {
+            assert_eq!(location, "香港");
+            Ok(["R409", "R428", "R499"]
+                .iter()
+                .map(|s| {
+                    ok_response(
+                        s,
+                        parts,
+                        if *s == "R499" {
+                            Availability::InStock
+                        } else {
+                            Availability::OutOfStock
+                        },
+                    )
+                })
+                .collect())
+        });
+    let (w, mut rx) = Watcher::spawn(fake.clone(), fast_config());
+    w.set_targets(vec![
+        located("R409", "MJXW4ZA/A", "香港"),
+        located("R428", "MJXW4ZA/A", "香港"),
+        located("R499", "MJRX4ZA/A", "香港"),
+        located("R499", "MJXW4ZA/A", "香港"),
+    ])
+    .await;
+    w.start().await;
+    let events = wait_cycle(&mut rx).await;
+    w.stop().await;
+
+    assert_eq!(fake.call_count(), 1, "三家店四个目标只能发一次请求");
+    let seen = fake.seen_nearby.lock().await;
+    assert_eq!(seen.len(), 1);
+    assert_eq!(seen[0].0, "香港");
+    assert_eq!(
+        seen[0].1,
+        ["MJXW4ZA/A", "MJRX4ZA/A"],
+        "零件号取并集、去重、保持先后"
+    );
+    drop(seen);
+
+    assert_eq!(
+        count_in_stock(&events),
+        2,
+        "R499 的两个型号都有货，其余门店无货"
+    );
+    let snapshot = events
+        .iter()
+        .find_map(|e| match e {
+            Event::CycleComplete { snapshot, .. } => Some(snapshot.clone()),
+            _ => None,
+        })
+        .expect("应当有快照");
+    assert_eq!(snapshot.len(), 4);
+    assert!(
+        snapshot.iter().all(|s| !s.availability.is_unknown()),
+        "每个目标都该从合并响应里拿到自己门店的状态：{snapshot:?}"
+    );
+}
+
+#[tokio::test]
+async fn 地点响应里没有的门店单独补查并从此按门店查() {
+    // Apple 按距离只回若干家；漏掉的店这一轮补查一次，之后不再每轮先问一遍地点。
+    let fake = FakeFetcher::new(|_, store, parts| {
+        assert_eq!(store, "R610", "只有漏掉的那家才按门店查");
+        Ok(ok_response(store, parts, Availability::OutOfStock))
+    })
+    .with_nearby(|_, _, parts| Ok(vec![ok_response("R409", parts, Availability::OutOfStock)]));
+    let (w, mut rx) = Watcher::spawn(fake.clone(), fast_config());
+    w.set_targets(vec![
+        located("R409", "MJXW4ZA/A", "香港"),
+        located("R610", "MJRX4ZA/A", "香港"),
+    ])
+    .await;
+    w.start().await;
+    let first = wait_cycle(&mut rx).await;
+    let second = wait_cycle(&mut rx).await;
+    w.stop().await;
+
+    for events in [&first, &second] {
+        let snapshot = events
+            .iter()
+            .find_map(|e| match e {
+                Event::CycleComplete { snapshot, .. } => Some(snapshot.clone()),
+                _ => None,
+            })
+            .expect("应当有快照");
+        assert!(
+            snapshot.iter().all(|s| !s.availability.is_unknown()),
+            "补查之后两家店都该有明确状态：{snapshot:?}"
+        );
+    }
+
+    let nearby = fake.seen_nearby.lock().await;
+    assert_eq!(nearby.len(), 2, "两轮各一次按地点的请求");
+    assert_eq!(
+        nearby[0].1,
+        ["MJXW4ZA/A", "MJRX4ZA/A"],
+        "第一轮还不知道 R610 不在响应里，两家的零件号都带上"
+    );
+    assert_eq!(
+        nearby[1].1,
+        ["MJXW4ZA/A"],
+        "第二轮记住了 R610 不在地点响应里，只带 R409 的零件号"
+    );
+    let stores = fake.seen_parts.lock().await;
+    assert_eq!(stores.len(), 2, "R610 每轮按门店查一次");
+    assert_eq!(fake.call_count(), 4);
+}
+
+#[tokio::test]
+async fn 没有地点的目标仍按门店查() {
+    let fake =
+        FakeFetcher::new(|_, store, parts| Ok(ok_response(store, parts, Availability::OutOfStock)));
+    let (w, mut rx) = Watcher::spawn(fake.clone(), fast_config());
+    w.set_targets(vec![
+        target("R359", "MG724CH/A"),
+        target("R683", "MG724CH/A"),
+    ])
+    .await;
+    w.start().await;
+    wait_cycle(&mut rx).await;
+    w.stop().await;
+    assert_eq!(fake.call_count(), 2);
+    assert!(fake.seen_nearby.lock().await.is_empty());
+}
+
+#[tokio::test]
+async fn 合并请求被拦时每家店都未知但只告警一次() {
+    let fake = FakeFetcher::new(|_, store, _| panic!("不该按门店查：{store}"))
+        .with_nearby(|_, _, _| Err(ApiError::Blocked("HTTP 541".into())));
+    let (w, mut rx) = Watcher::spawn(fake.clone(), fast_config());
+    w.set_targets(vec![
+        located("R409", "MJXW4ZA/A", "香港"),
+        located("R428", "MJXW4ZA/A", "香港"),
+        located("R499", "MJXW4ZA/A", "香港"),
+    ])
+    .await;
+    w.start().await;
+    let events = wait_cycle(&mut rx).await;
+    w.stop().await;
+
+    let troubles: Vec<&Event> = events
+        .iter()
+        .filter(|e| matches!(e, Event::Trouble { .. }))
+        .collect();
+    assert_eq!(troubles.len(), 1, "一次请求失败只报一条告警：{troubles:?}");
+    if let Event::Trouble { reason, .. } = troubles[0] {
+        assert!(
+            reason.contains("香港") && reason.contains("3 家") && reason.contains("R409"),
+            "告警要说清是哪次合并请求、涉及哪些门店：{reason}"
+        );
+    }
+    let snapshot = events
+        .iter()
+        .find_map(|e| match e {
+            Event::CycleComplete { snapshot, .. } => Some(snapshot.clone()),
+            _ => None,
+        })
+        .expect("应当有快照");
+    assert!(
+        snapshot.iter().all(|s| matches!(
+            &s.availability,
+            Availability::Unknown(UnknownReason::Blocked { .. })
+        )),
+        "整批都得标成被拦的未知：{snapshot:?}"
+    );
+    assert_eq!(fake.call_count(), 1, "被拦后不能再逐家去撞");
+}
+
+#[tokio::test]
+async fn 地点不被接受时退回逐家查询() {
+    // 拼错的 location 是我们的问题，不该让这些店每轮卡在同一个错误上。
+    let fake =
+        FakeFetcher::new(|_, store, parts| Ok(ok_response(store, parts, Availability::OutOfStock)))
+            .with_nearby(|_, _, _| {
+                Err(ApiError::Apple(
+                    "有効な市区町村または郵便番号を入力してください。".into(),
+                ))
+            });
+    let (w, mut rx) = Watcher::spawn(fake.clone(), fast_config());
+    w.set_targets(vec![
+        located("R119", "MJR84J/A", "Shibuya-ku"),
+        located("R224", "MJR84J/A", "Shibuya-ku"),
+    ])
+    .await;
+    w.start().await;
+    let first = wait_cycle(&mut rx).await;
+    let second = wait_cycle(&mut rx).await;
+    w.stop().await;
+
+    let snapshot = first
+        .iter()
+        .find_map(|e| match e {
+            Event::CycleComplete { snapshot, .. } => Some(snapshot.clone()),
+            _ => None,
+        })
+        .expect("应当有快照");
+    assert!(
+        snapshot.iter().all(|s| !s.availability.is_unknown()),
+        "退回逐家查询后当轮就该拿到状态：{snapshot:?}"
+    );
+    assert_eq!(
+        fake.seen_nearby.lock().await.len(),
+        1,
+        "第二轮不再尝试那个地点"
+    );
+    assert_eq!(fake.seen_parts.lock().await.len(), 4, "两轮各两家按门店查");
+    let _ = second;
+}
+
+#[tokio::test]
+async fn 请求预算会把等待拉长并在事件里说明() {
+    let mut fake =
+        FakeFetcher::new(|_, store, parts| Ok(ok_response(store, parts, Availability::OutOfStock)));
+    fake.pacing = Duration::from_millis(400);
+    let (w, mut rx) = Watcher::spawn(fake.clone(), fast_config());
+    w.set_targets(vec![target("R359", "MG724CH/A")]).await;
+    w.start().await;
+    let started = tokio::time::Instant::now();
+    let first = wait_cycle(&mut rx).await;
+    let second = wait_cycle(&mut rx).await;
+    let elapsed = started.elapsed();
+    w.stop().await;
+
+    let (secs, paced, _) = cycle_complete(&first);
+    assert!(
+        paced,
+        "预算比 20 毫秒的间隔长，事件里必须说明是被预算拉长的"
+    );
+    assert_eq!(secs, 0, "不足一秒按整秒截断");
+    assert!(
+        elapsed >= Duration::from_millis(400),
+        "第二轮必须等预算恢复：只过了 {elapsed:?}"
+    );
+    let _ = second;
+
+    // 预算充足时不算 paced。
+    let fake =
+        FakeFetcher::new(|_, store, parts| Ok(ok_response(store, parts, Availability::OutOfStock)));
+    let (w, mut rx) = Watcher::spawn(fake, fast_config());
+    w.set_targets(vec![target("R359", "MG724CH/A")]).await;
+    w.start().await;
+    let events = wait_cycle(&mut rx).await;
+    w.stop().await;
+    let (_, paced, _) = cycle_complete(&events);
+    assert!(!paced);
 }

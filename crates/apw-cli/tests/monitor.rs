@@ -38,6 +38,17 @@ impl Fetcher for Fake {
     ) -> Result<StoreAvailability, ApiError> {
         (self.reply)(self.calls.fetch_add(1, Ordering::SeqCst), store, parts)
     }
+
+    async fn pickup_message_nearby(
+        &self,
+        _: &'static Region,
+        location: &str,
+        _: &[String],
+    ) -> Result<Vec<StoreAvailability>, ApiError> {
+        // These tests build targets without a pickup location, so the engine
+        // never merges them; reaching here would mean the planner changed.
+        panic!("unexpected nearby query for {location}")
+    }
 }
 fn response(store: &str, parts: &[String], availability: Availability) -> StoreAvailability {
     StoreAvailability {
@@ -67,6 +78,7 @@ fn target(part: &str) -> Target {
         part_number: part.into(),
         product_name: part.into(),
         companion_part: None,
+        pickup_location: None,
     }
 }
 fn config() -> WatcherConfig {
@@ -252,6 +264,17 @@ impl Fetcher for Hanging {
         _: &str,
         _: &[String],
     ) -> Result<StoreAvailability, ApiError> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        let _guard = InFlight(self.0.clone());
+        pending().await
+    }
+
+    async fn pickup_message_nearby(
+        &self,
+        _: &'static Region,
+        _: &str,
+        _: &[String],
+    ) -> Result<Vec<StoreAvailability>, ApiError> {
         self.0.fetch_add(1, Ordering::SeqCst);
         let _guard = InFlight(self.0.clone());
         pending().await

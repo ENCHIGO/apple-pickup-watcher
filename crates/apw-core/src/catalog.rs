@@ -305,6 +305,33 @@ impl Catalog {
     }
 
     /// 按门店编号查门店，语义同 [`Catalog::product_by_part`]。
+    /// 给目标补上取货接口的 `location`（见 [`Store::pickup_location`]）。
+    ///
+    /// 已经有值的不动；目录里查不到的门店保持 `None`，引擎会按门店单独查。
+    /// 只增不删，不改目标的顺序和数量。
+    pub fn attach_locations(&self, targets: &mut [Target]) {
+        let mut by_locale: HashMap<String, Option<Vec<Store>>> = HashMap::new();
+        for target in targets.iter_mut() {
+            if target
+                .pickup_location
+                .as_deref()
+                .is_some_and(|l| !l.trim().is_empty())
+            {
+                continue;
+            }
+            let stores = by_locale
+                .entry(target.locale.clone())
+                .or_insert_with(|| self.stores(&target.locale).ok());
+            let Some(stores) = stores else {
+                continue;
+            };
+            target.pickup_location = stores
+                .iter()
+                .find(|s| s.number == target.store_number)
+                .and_then(|s| s.pickup_location(&target.locale));
+        }
+    }
+
     pub fn store_by_number(&self, locale: &str, number: &str) -> Option<Store> {
         self.stores(locale)
             .ok()?
@@ -538,6 +565,8 @@ struct RawAddress {
     city: String,
     #[serde(default)]
     state_name: String,
+    #[serde(default)]
+    postal_code: String,
 }
 
 /// 解析内嵌门店快照，返回按地区分组的门店表。
@@ -611,6 +640,18 @@ fn push_store(
         }
     }
 
+    // 省 / 州按同样的优先级取：门店自己写的优先，其次是所在分组的名字。
+    let state = {
+        let from_store = raw.address.state_name.trim();
+        if !from_store.is_empty() {
+            from_store
+        } else if has_states {
+            state_name.trim()
+        } else {
+            ""
+        }
+    };
+
     out.push(Store {
         number: number.to_string(),
         name: name.to_string(),
@@ -619,6 +660,9 @@ fn push_store(
         } else {
             format!("{city}-{name}")
         },
+        city: raw.address.city.trim().to_string(),
+        state: state.to_string(),
+        postal_code: raw.address.postal_code.trim().to_string(),
     });
 }
 

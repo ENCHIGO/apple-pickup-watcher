@@ -474,6 +474,7 @@ fn 给旧目标补搭档只动查得到的那些() {
         part_number: part.into(),
         product_name: part.into(),
         companion_part: companion.map(str::to_string),
+        pickup_location: None,
     };
     let mut targets = vec![
         mk(&watch.part_number, None),
@@ -694,4 +695,56 @@ fn 地区表与内嵌数据一一对应() {
             region.locale
         );
     }
+}
+
+#[test]
+fn 门店能拼出各站点认的取货地点() {
+    let catalog = Catalog::new();
+    let location = |locale: &str, number: &str| {
+        catalog
+            .store_by_number(locale, number)
+            .unwrap_or_else(|| panic!("内嵌目录应当有 {locale} {number}"))
+            .pickup_location(locale)
+    };
+    // 2026-09-14 在真实接口上逐个验证过的写法。
+    assert_eq!(location("zh_CN", "R359").as_deref(), Some("上海 上海"));
+    assert_eq!(location("zh_CN", "R688").as_deref(), Some("江苏 苏州"));
+    assert_eq!(location("zh_HK", "R499").as_deref(), Some("香港"));
+    assert_eq!(location("zh_TW", "R713").as_deref(), Some("台北市"));
+    assert_eq!(location("en_SG", "R669").as_deref(), Some("Singapore"));
+    assert_eq!(location("en_AU", "R238").as_deref(), Some("Sydney"));
+    assert_eq!(location("en_MY", "R742").as_deref(), Some("Kuala Lumpur"));
+    // 日本站只认市区町村或邮编，数据源的城市是英文区名，所以用邮编。
+    assert_eq!(location("ja_JP", "R119").as_deref(), Some("150-0041"));
+}
+
+#[test]
+fn 给目标补取货地点只动查得到的那些() {
+    use apw_core::model::Target;
+    let catalog = Catalog::new();
+    let mk = |locale: &str, store: &str, location: Option<&str>| Target {
+        locale: locale.into(),
+        store_number: store.into(),
+        store_title: store.into(),
+        part_number: "MJXW4ZA/A".into(),
+        product_name: "iPhone".into(),
+        companion_part: None,
+        pickup_location: location.map(str::to_string),
+    };
+    let mut targets = vec![
+        mk("zh_HK", "R499", None),
+        mk("zh_HK", "R409", Some("自定义")),
+        mk("zh_HK", "R000", None),
+        mk("xx_XX", "R499", None),
+    ];
+    catalog.attach_locations(&mut targets);
+    assert_eq!(targets[0].pickup_location.as_deref(), Some("香港"));
+    assert_eq!(
+        targets[1].pickup_location.as_deref(),
+        Some("自定义"),
+        "已有的地点不该被改写"
+    );
+    assert_eq!(targets[2].pickup_location, None, "目录里没有的门店保持原样");
+    assert_eq!(targets[3].pickup_location, None, "不认识的地区保持原样");
+    assert_eq!(targets.len(), 4, "补地点不能增删目标");
 }

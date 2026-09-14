@@ -31,6 +31,8 @@ export interface Target {
   productName: string;
   /** Apple Watch 表壳的搭档表带零件号，随查询一起发；其他品类没有。 */
   companionPart?: string;
+  /** 取货接口的 location，同城门店靠它合并成一次请求；由后端从目录补上。 */
+  pickupLocation?: string;
 }
 
 export interface TargetState {
@@ -113,7 +115,15 @@ export interface Trouble {
 export type WatcherEvent =
   | { type: "stateChanged"; state: TargetState }
   | { type: "inStock"; state: TargetState }
-  | { type: "cycleComplete"; healthy: boolean; snapshot: TargetState[] }
+  | {
+      type: "cycleComplete";
+      healthy: boolean;
+      snapshot: TargetState[];
+      /** 距下一轮查询的秒数。 */
+      nextCheckInSecs: number;
+      /** 为 true 表示请求预算把等待拉得比设定的间隔更长。 */
+      paced: boolean;
+    }
   | { type: "trouble"; reason: string; advice: TroubleAdvice | null }
   | { type: "runStateChanged"; running: boolean };
 

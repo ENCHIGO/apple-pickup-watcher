@@ -141,7 +141,7 @@ The `/shop/fulfillment-messages` endpoint it depends on no longer works and answ
 
 ### The app reports HTTP 541 or “request blocked”, but Apple’s website opens fine in my browser?
 
-Treat it as a failed query and don’t draw any conclusion about stock from it. Since v0.3.2 the client first loads a buy page to collect cookies before querying, and discards and re-collects them when blocked; upgrade if you are on an older version. If you keep getting blocked after upgrading, please open an [issue](https://github.com/ENCHIGO/apple-pickup-watcher/issues) with the version, region, store / SKU, and a redacted log. The browser and the app do not share the same session conditions, so one machine working does not prove another network is fine.
+Treat it as a failed query and don’t draw any conclusion about stock from it. The cause is a per-IP limit on Apple’s pickup endpoint: roughly 30 back-to-back requests trigger 541, and everything keeps failing for ten to fifteen minutes afterwards. Since v0.4.2 the app merges same-city stores into one request, paces requests against a budget (stretching the interval automatically and saying so in the UI when the budget runs low), and cools down before probing again after a block. If you keep getting blocked after upgrading, please open an [issue](https://github.com/ENCHIGO/apple-pickup-watcher/issues) with the version, region, store / SKU, and a redacted log. Other tools or browsers on the same egress IP share that budget.
 
 ### Will I still get alerts after closing the window?
 
@@ -157,7 +157,7 @@ Install [Bark](https://github.com/Finb/Bark) on your iPhone, paste the push URL 
 
 ### Why is the default polling interval 30 seconds?
 
-Store stock does not flip back and forth within seconds. 30 seconds is plenty for launch-day buying and keeps you out of rate limiting. The minimum is 5 seconds; anything lower falls back to 30. Please don’t use it for bulk buying for resale, which only gets this route shut down for everyone.
+Store stock does not flip back and forth within seconds, and 30 seconds is plenty for launch-day buying. The minimum is 5 seconds; anything lower falls back to 30. It is a floor, not a promise: Apple limits pickup queries per egress IP, so the app stretches the real interval to fit its request budget (one request per city per cycle, roughly one per minute at steady state) and shows the next check time in the footer. Please don’t use it for bulk buying for resale, which only gets this route shut down for everyone.
 
 More: [desktop guide](docs/desktop.md) · [CLI docs](docs/cli.md) · [development and maintenance](docs/development.md)
 

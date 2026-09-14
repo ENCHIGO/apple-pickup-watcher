@@ -47,9 +47,12 @@ async fn 全栈跑通一轮真实监控() {
                 part_number: product.part_number.clone(),
                 product_name: product.title.clone(),
                 companion_part: product.companion_part.clone(),
+                pickup_location: None,
             });
         }
     }
+    // 让每日契约测试走真实的按地点合并查询，而不是只测按门店的老路径。
+    catalog.attach_locations(&mut targets);
     println!("准备监控 {} 项：", targets.len());
     for t in &targets {
         println!("  {} / {}", t.store_title, t.product_name);

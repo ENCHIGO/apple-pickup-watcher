@@ -240,3 +240,54 @@ fn 大小写与空白不影响判定() {
     assert_eq!(availability_from("  AVAILABLE  "), Availability::InStock);
     assert_eq!(availability_from("Unavailable"), Availability::OutOfStock);
 }
+
+#[test]
+fn 按地点查询的响应能拿到每一家门店() {
+    use apw_core::apple::parse_pickup_stores;
+
+    let raw = r#"{"head":{"status":"200"},"body":{"content":{"pickupMessage":{"stores":[
+        {"storeNumber":"R409","storeName":"Causeway Bay","partsAvailability":{
+            "MJXW4ZA/A":{"partNumber":"MJXW4ZA/A","pickupDisplay":"unavailable","messageTypes":{"regular":{"storePickupProductTitle":"iPhone 18 Pro Max"}}}}},
+        {"storeNumber":"R499","storeName":"Canton Road","partsAvailability":{
+            "MJXW4ZA/A":{"partNumber":"MJXW4ZA/A","pickupDisplay":"available","messageTypes":{"regular":{"storePickupProductTitle":"iPhone 18 Pro Max"}}}}},
+        {"storeNumber":"R610","storeName":"New Town Plaza","partsAvailability":{}}
+    ]}}}}"#;
+
+    let stores = parse_pickup_stores(raw.as_bytes()).expect("应当解析成功");
+    let numbers: Vec<&str> = stores.iter().map(|s| s.store_number.as_str()).collect();
+    assert_eq!(
+        numbers,
+        ["R409", "R499", "R610"],
+        "顺序照响应，一家都不能丢"
+    );
+    assert_eq!(
+        stores[0].parts["MJXW4ZA/A"].availability,
+        Availability::OutOfStock
+    );
+    assert_eq!(
+        stores[1].parts["MJXW4ZA/A"].availability,
+        Availability::InStock
+    );
+    assert!(
+        stores[2].parts.is_empty(),
+        "没有型号状态的门店保留下来，由调用方按型号标未知，而不是整份响应报废"
+    );
+
+    // 按门店解析仍然只认指定的那一家。
+    let one = parse_pickup_message(raw.as_bytes(), "R499").expect("应当解析成功");
+    assert_eq!(one.store_name, "Canton Road");
+    assert!(matches!(
+        parse_pickup_message(raw.as_bytes(), "R610"),
+        Err(ApiError::SchemaDrift { .. })
+    ));
+}
+
+#[test]
+fn 按地点查询没有门店时是商品问题而不是结构漂移() {
+    use apw_core::apple::parse_pickup_stores;
+    let raw = r#"{"head":{"status":"200"},"body":{"content":{"pickupMessage":{"stores":[]}}}}"#;
+    assert!(matches!(
+        parse_pickup_stores(raw.as_bytes()),
+        Err(ApiError::Apple(_))
+    ));
+}

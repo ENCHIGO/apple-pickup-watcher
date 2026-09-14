@@ -114,6 +114,10 @@ pub struct InputTarget {
     /// 缺省时按零件号回查目录补齐；目录里没有就不带。
     #[serde(default)]
     pub companion_part: Option<String>,
+    /// Pickup endpoint `location` used to merge same-city stores into one request
+    /// (see `apw_core::model::Store::pickup_location`). Filled from the catalog when omitted.
+    #[serde(default)]
+    pub pickup_location: Option<String>,
 }
 
 pub async fn read_targets<R: AsyncRead + Unpin>(reader: R) -> Result<Vec<InputTarget>, CliError> {
@@ -169,13 +173,27 @@ pub fn resolve_targets(
             )));
         }
         // Catalog absence is not proof of an invalid SKU/store: embedded data can lag.
+        let known_store = catalog.store_by_number(&input.locale, store);
         let store_title = if input.store_title.is_empty() {
-            catalog
-                .store_by_number(&input.locale, store)
-                .map_or_else(|| store.clone(), |s| s.title)
+            known_store
+                .as_ref()
+                .map_or_else(|| store.clone(), |s| s.title.clone())
         } else {
             input.store_title
         };
+        // Same-city stores share one pickup request when the location is known;
+        // an explicit value wins, otherwise the catalog derives it from the address.
+        let pickup_location = input
+            .pickup_location
+            .as_deref()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .map(str::to_string)
+            .or_else(|| {
+                known_store
+                    .as_ref()
+                    .and_then(|s| s.pickup_location(&input.locale))
+            });
         let known = catalog.product_by_part(&input.locale, part);
         let product_name = if input.product_name.is_empty() {
             known
@@ -195,6 +213,7 @@ pub fn resolve_targets(
             store_title,
             product_name,
             companion_part,
+            pickup_location,
         };
         if seen.insert(target.key()) {
             targets.push(target);
@@ -232,6 +251,7 @@ async fn load_targets(args: TargetArgs, catalog: &Catalog) -> Result<Vec<Target>
                     store_title: String::new(),
                     product_name: String::new(),
                     companion_part: None,
+                    pickup_location: None,
                 })
             })
             .collect()
@@ -393,7 +413,10 @@ pub async fn monitor<F: Fetcher, W: AsyncWrite + Unpin>(
     while let Some(event) = events.recv().await {
         match mode {
             Mode::Check => {
-                if let Event::CycleComplete { healthy, snapshot } = event {
+                if let Event::CycleComplete {
+                    healthy, snapshot, ..
+                } = event
+                {
                     let healthy = healthy
                         && !snapshot.is_empty()
                         && snapshot.iter().all(|s| !s.availability.is_unknown());

@@ -77,6 +77,7 @@ fn 目标(store: &str, part: &str) -> Target {
         part_number: part.into(),
         product_name: "iPhone 17 512GB 黑色".into(),
         companion_part: None,
+        pickup_location: None,
     }
 }
 

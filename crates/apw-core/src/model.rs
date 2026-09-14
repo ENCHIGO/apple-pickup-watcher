@@ -441,6 +441,45 @@ pub struct Store {
     pub name: String,
     /// 界面展示名，如「上海-环球港」。
     pub title: String,
+    /// 所在城市，取数据源的 `address.city`，如「上海」「香港」「Chiyoda-ku」。
+    ///
+    /// 只在进程内用来拼取货接口的 `location` 参数，不进任何 JSON：前端、CLI
+    /// 与设置文件的格式都不变。
+    #[serde(skip)]
+    pub city: String,
+    /// 所在省 / 州，取数据源的 `address.stateName`；香港、新加坡这类城市站为空。
+    #[serde(skip)]
+    pub state: String,
+    /// 邮编，缺失为空。
+    #[serde(skip)]
+    pub postal_code: String,
+}
+
+impl Store {
+    /// 取货接口 `location` 参数该填什么，才能一次拿到这家店和它周边门店的库存。
+    ///
+    /// Apple 的取货接口按 `location` 查询时，一次响应会带上该地点附近的所有门店
+    /// （香港 6 家、台北 2 家、悉尼周边 9 家……），而按 `store` 查询每次只回一家。
+    /// 监控同城多家门店时前者能把请求数压到一次 —— 这直接决定会不会触发
+    /// Apple 按出口 IP 计数的频率限制（见 [`crate::apple::Budget`]）。
+    ///
+    /// 各站点认的格式不同，都是 2026-09-14 在真实接口上试出来的：
+    /// - 中国大陆：`省 市`（「上海 上海」「江苏 苏州」），只写「上海」会被拒；
+    /// - 香港：「香港」；台湾、澳大利亚、马来西亚：城市名；新加坡：「Singapore」；
+    /// - 日本：接口要求「市区町村或邮编」，数据源的城市是英文区名，用邮编最稳。
+    ///
+    /// 拼不出来返回 `None`，调用方退回按门店逐家查询。
+    pub fn pickup_location(&self, locale: &str) -> Option<String> {
+        let city = self.city.trim();
+        let state = self.state.trim();
+        let postal = self.postal_code.trim();
+        let pick = |s: &str| (!s.is_empty()).then(|| s.to_string());
+        match locale {
+            "zh_CN" => (!state.is_empty() && !city.is_empty()).then(|| format!("{state} {city}")),
+            "ja_JP" => pick(postal).or_else(|| pick(city)),
+            _ => pick(city).or_else(|| pick(postal)),
+        }
+    }
 }
 
 /// 一条监控目标：在某地区的某门店盯某个型号。
@@ -456,6 +495,13 @@ pub struct Target {
     /// 同一请求里；它不参与目标的身份（[`Target::key`]），也没有自己的状态行。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub companion_part: Option<String>,
+    /// 取货接口的 `location` 参数，见 [`Store::pickup_location`]。
+    ///
+    /// 有它的目标会和同一地区、同一地点的其他目标合并成一次请求；没有的按门店
+    /// 单独查。由目录按门店编号补上（[`crate::catalog::Catalog::attach_locations`]），
+    /// 不参与目标身份，序列化时省略，旧配置与旧输入照常读入。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pickup_location: Option<String>,
 }
 
 impl Target {
@@ -567,6 +613,7 @@ mod tests {
             part_number: part.into(),
             product_name: "x".into(),
             companion_part: None,
+            pickup_location: None,
         };
         assert_ne!(mk("MG724CH/A").key(), mk("MG0A4CH/A").key());
         assert_eq!(mk("MG724CH/A").key(), mk("MG724CH/A").key());

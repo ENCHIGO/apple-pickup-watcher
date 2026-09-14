@@ -477,3 +477,80 @@ async fn 请求记录只含cookie名不含值() {
         "记录里出现了 cookie 的值：{json}"
     );
 }
+
+#[tokio::test]
+async fn 按地点查询用location参数并记在请求记录里() {
+    let apple = FakeApple::start(healthy).await;
+    let region = apple.region();
+    let client = fast(ClientConfig::default());
+    let stores = client
+        .pickup_message_nearby(region, "上海 上海", &["MG724CH/A".to_string()])
+        .await
+        .expect("查询应当成功");
+    assert_eq!(stores.len(), 1, "假 Apple 只回一家店");
+
+    let pickup = &apple.requests(PICKUP_PATH)[0];
+    assert!(
+        pickup
+            .path
+            .contains("location=%E4%B8%8A%E6%B5%B7%20%E4%B8%8A%E6%B5%B7")
+            || pickup
+                .path
+                .contains("location=%E4%B8%8A%E6%B5%B7+%E4%B8%8A%E6%B5%B7"),
+        "按地点查询要带 location：{}",
+        pickup.path
+    );
+    assert!(
+        !pickup.path.contains("store="),
+        "按地点查询不带 store：{}",
+        pickup.path
+    );
+    assert!(pickup.path.contains("parts.0=MG724CH%2FA"));
+
+    let records = client.recent_requests().await;
+    let record = records
+        .iter()
+        .find(|r| r.kind == "pickup")
+        .expect("应当有取货请求记录");
+    assert_eq!(record.location.as_deref(), Some("上海 上海"));
+    assert_eq!(record.store, None);
+}
+
+#[tokio::test]
+async fn 预算用完后请求排队等恢复() {
+    use apw_core::apple::Budget;
+    let apple = FakeApple::start(healthy).await;
+    let region = apple.region();
+    // 容量 2：暖场一次 + 取货一次刚好用完，第二次取货得等一个恢复周期。
+    let client = fast(ClientConfig {
+        budget: Budget {
+            capacity: 2,
+            refill_every: Duration::from_millis(300),
+        },
+        ..ClientConfig::default()
+    });
+    let part = ["MG724CH/A".to_string()];
+    let started = std::time::Instant::now();
+    client
+        .pickup_message(region, "R101", &part)
+        .await
+        .expect("第一次查询");
+    assert!(
+        started.elapsed() < Duration::from_millis(250),
+        "容量内不该等"
+    );
+    assert!(
+        client.pacing_delay(1).await >= Duration::from_millis(200),
+        "额度用完后引擎应当被告知要等"
+    );
+    client
+        .pickup_message(region, "R102", &part)
+        .await
+        .expect("第二次查询");
+    assert!(
+        started.elapsed() >= Duration::from_millis(280),
+        "超出容量的请求必须等额度恢复：只过了 {:?}",
+        started.elapsed()
+    );
+    assert_eq!(apple.requests(PICKUP_PATH).len(), 2);
+}

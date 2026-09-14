@@ -154,6 +154,7 @@ async fn save_settings(
     let mut next = settings;
     next.normalize();
     state.catalog.attach_companions(&mut next.targets);
+    state.catalog.attach_locations(&mut next.targets);
 
     // 设置里的目标列表和查询间隔要同步给引擎，否则改完设置监控还按旧的跑。
     state.watcher.set_targets(next.targets.clone()).await;
@@ -175,6 +176,7 @@ async fn set_targets(
 ) -> Result<Vec<TargetState>, String> {
     let mut targets = targets;
     state.catalog.attach_companions(&mut targets);
+    state.catalog.attach_locations(&mut targets);
     state.watcher.set_targets(targets.clone()).await;
     let mut next = state.settings_snapshot();
     next.targets = targets;
@@ -498,6 +500,7 @@ pub fn run() {
             // 「无货」；启动时按目录补齐，下次写盘就带上了。
             let catalog = Catalog::new();
             catalog.attach_companions(&mut settings.targets);
+            catalog.attach_locations(&mut settings.targets);
 
             let client = AppleClient::new(ClientConfig::default())
                 .map_err(|e| format!("构造 Apple 客户端失败：{e}"))?;

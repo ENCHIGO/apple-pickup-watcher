@@ -37,6 +37,11 @@ export interface UiState {
   running: boolean;
   /** 非 null 表示「当前的状态不可信」，界面要挂一条持续可见的告警。 */
   trouble: Trouble | null;
+  /**
+   * 引擎上一轮结束时报的下一轮时刻。`paced` 为 true 表示是请求预算在拉长
+   * 等待（Apple 按出口 IP 限制取货查询的频率），而不是用户设的间隔。
+   */
+  pacing: { nextCheckInSecs: number; paced: boolean } | null;
   logs: string[];
   regions: Region[];
   categories: CategoryOption[];
@@ -73,6 +78,7 @@ let state: UiState = {
   rows: [],
   running: false,
   trouble: null,
+  pacing: null,
   logs: [],
   regions: [],
   categories: [],
@@ -139,13 +145,21 @@ function applyEvent(event: WatcherEvent): void {
 
     case "cycleComplete": {
       const recovered = event.healthy && state.trouble !== null;
+      const pacedBefore = state.pacing?.paced ?? false;
       update({
         rows: event.snapshot,
         // 只有引擎明说本轮健康，才收起告警。用「所有行都没错误」去反推是
         // 不可靠的：某些故障路径下状态压根没被更新。
         trouble: event.healthy ? null : state.trouble,
+        pacing: { nextCheckInSecs: event.nextCheckInSecs, paced: event.paced },
       });
       if (recovered) pushLog("查询已恢复正常。");
+      // 只在开始被拉长的那一轮记一条，之后每轮都写会把日志刷满。
+      if (event.paced && !pacedBefore) {
+        pushLog(
+          `Apple 限制每个网络的查询频率，本轮起按请求预算放慢：下一轮 ${event.nextCheckInSecs} 秒后。`,
+        );
+      }
       break;
     }
 
@@ -155,7 +169,7 @@ function applyEvent(event: WatcherEvent): void {
       break;
 
     case "runStateChanged":
-      update({ running: event.running });
+      update({ running: event.running, pacing: event.running ? state.pacing : null });
       pushLog(event.running ? "已开始监控。" : "已暂停监控。");
       break;
 
