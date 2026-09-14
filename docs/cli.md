@@ -127,11 +127,11 @@ apw watch --targets targets.json --until-in-stock --timeout 300
 | --- | --- |
 | `stateChanged` | `state` 中的目标状态变化；`not_yet_checked` 表示尚未查询 |
 | `inStock` | `state` 中的目标确认到货；持续有货不重复提醒 |
-| `cycleComplete` | `healthy` 与完整 `snapshot`，用来对齐全部状态和检查时间 |
+| `cycleComplete` | `healthy` 与完整 `snapshot`，用来对齐全部状态和检查时间；`nextCheckInSecs` 是距下一轮的秒数，`paced` 为 true 表示这段等待是请求预算拉长的，不是 `--interval` |
 | `trouble` | `reason` 与可选 `advice`，说明监控故障 |
 | `runStateChanged` | `running`，说明引擎启停 |
 
-`--until-in-stock` 在任一目标到货时退出 0。默认监控 300 秒；期限届满退出 4，即使此前有健康查询，也不代表等待条件已满足。期间的库存行只是各自时间点的观察结果。默认间隔 30 秒、最低 5 秒，抖动和失败退避仍生效。限速和去重属于单个进程；避免启动多个重复的 watcher。
+`--until-in-stock` 在任一目标到货时退出 0。默认监控 300 秒；期限届满退出 4，即使此前有健康查询，也不代表等待条件已满足。期间的库存行只是各自时间点的观察结果。默认间隔 30 秒、最低 5 秒，抖动和失败退避仍生效；请求预算不够时实际间隔会更长（见下文「请求预算与合并查询」）。限速、预算和去重都属于单个进程；避免启动多个重复的 watcher，也不要用循环里的 `check` 代替 `watch`——每次 `check` 都是一个新进程、两次请求，预算记不住。
 
 明确需要长期运行时可用 `--timeout 0`，由终端或进程管理器保持进程。Ctrl-C / SIGTERM 会取消在途查询。消费者关闭输出管道时退出 141。命令退出后监控结束；CLI 本身不弹窗、播放声音、发推送、打开网页或购买商品，agent 可根据用户请求处理 `inStock` 事件。
 
@@ -157,9 +157,16 @@ apw watch --targets targets.json --until-in-stock --timeout 300
 
 `apw schema` 提供运行版本、实际命令参数、退出码及 JSON Schema `$defs`（`targets`、`availability`、`targetState`、`check`、`watch`、`error`）。扩展字段可在同一 schemaVersion 内增加；破坏字段语义的改动必须升级 schemaVersion。
 
+## 请求预算与合并查询
+
+Apple 的边缘节点按请求**次数**限制取货接口（2026-09-14 实测，见 issue #3）：不间断发到约 30 次就返回 HTTP 541，之后十几分钟内怎么发都是 541，停下来额度才慢慢恢复。计数挂在会话 / 出口 IP 上——被烧掉的会话一直被拦，同一浏览器换个不带 cookie 的请求却能过（浏览器带 cookie 541、不带 cookie 200，稳定复现）。请求头和 TLS 指纹在阈值附近两个方向都测过，都没能稳定改变结果；真正有效的是少发请求。所以从 v0.4.2 起客户端做两件事：
+
+- **合并查询**：同一地区、同一地点的门店合并成一次按 `location` 的请求，Apple 在一次响应里返回该地点周边的所有门店（香港 6 家、上海及周边 12 家、东京周边 6 家……）。`apw products` / `apw stores` 不变；`check` / `watch` 会按门店编号从内置目录给目标补上 `pickupLocation`，目录里没有的门店按门店单独查。响应里没带上的门店当轮补查一次，之后直接按门店查。目标 JSON 里也可以显式写 `pickupLocation`，写法与官网取货查询的 `location` 参数一致（大陆是「省 市」，如「江苏 苏州」；日本用邮编）。
+- **请求预算**：每个进程一个令牌桶，容量 20、每 60 秒恢复 1 次，暖场和取货都计入。桶空了不是拒绝，而是排队等恢复：`watch` 会把下一轮推迟到预算够为止，并在 `cycleComplete.paced` 里说明；`check` 单次两个请求，不会等。数字取得比实测保守，给同一出口 IP 上的浏览器和第二个实例留余量。
+
 ## 诊断 HTTP 541：`apw doctor`
 
-被 Apple 拦截（HTTP 541）只在部分网络上出现，维护者的网络复现不了。`doctor` 让受影响的用户在自己的网络上做对照：
+被 Apple 拦截（HTTP 541）的原因已经查清（按出口 IP 计数，见上一节），`doctor` 仍保留用来在自己的网络上做请求特征的对照——例如怀疑某条网络对指纹或 cookie 另有要求时：
 
 ```bash
 apw doctor --locale zh_CN --store R359 --part 'MJTF4CH/A'
@@ -176,7 +183,7 @@ apw doctor --locale zh_CN --store R359 --part 'MJTF4CH/A' --interval 30 --json
 
 ### 被拦后的冷却
 
-`check` / `watch` 和桌面版共用同一套客户端：遇到 541 或 403 不再秒级重试，而是把该地区标为冷却，首次 5 分钟，冷却结束后只放一次探测，探测再被拦依次延长到 10、20、30 分钟；期间该地区的查询直接返回 `unknown / blocked`（`detail` 里写明剩余时间），不发请求。任何一次成功查询都会清除冷却。这是保守的客户端策略，不代表 Apple 的封禁时长。
+`check` / `watch` 和桌面版共用同一套客户端：遇到 541 或 403 不再秒级重试，而是把该地区标为冷却，首次 5 分钟，冷却结束后只放一次探测，只有探测再被拦才依次延长到 10、20、30 分钟；期间该地区的查询直接返回 `unknown / blocked`（`detail` 里写明剩余时间），不发请求。同一轮里并发在飞的其他请求跟着被拦算同一次事件，不升档（v0.4.2-beta 曾把它们各算一次，一轮就抬到 30 分钟）；只有探测成功才算解封。实测被拦后大约 10 到 15 分钟恢复，期间继续发请求不会更快恢复。
 
 ## 验证与打包
 
