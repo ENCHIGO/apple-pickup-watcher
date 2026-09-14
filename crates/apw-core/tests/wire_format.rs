@@ -241,3 +241,20 @@ fn 取货地点只在存在时出现且能往返() {
     // 地点不参与身份：同一目标带不带地点都是同一条。
     assert_eq!(located.key(), plain.key());
 }
+
+#[test]
+fn 一轮结束事件的字段用小驼峰() {
+    use apw_core::watcher::Event;
+    // 枚举上的 rename_all 不会落到变体字段上；这个字段是第一个多词字段，
+    // 真实运行时曾经以 next_check_in_secs 发出去，前端对不上就永远不显示节流提示。
+    let v = to_value(&Event::CycleComplete {
+        next_check_in_secs: 45,
+        paced: true,
+        healthy: true,
+        snapshot: Vec::new(),
+    });
+    assert_eq!(v.get("type"), Some(&json!("cycleComplete")));
+    assert_eq!(v.get("nextCheckInSecs"), Some(&json!(45)));
+    assert_eq!(v.get("paced"), Some(&json!(true)));
+    assert!(v.get("next_check_in_secs").is_none(), "{v}");
+}

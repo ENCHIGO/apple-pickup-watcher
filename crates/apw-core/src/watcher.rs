@@ -75,6 +75,9 @@ pub enum Event {
     /// 一轮查询结束，带上完整快照。
     ///
     /// 快照让界面任何时候都能整体对齐，不必依赖那些可丢弃事件是否都收到了。
+    // 枚举上的 rename_all 只管变体名，不管变体里的字段；多词字段要在变体上再声明一次，
+    // 否则前端收到的是 next_check_in_secs，而它等的是 nextCheckInSecs。
+    #[serde(rename_all = "camelCase")]
     CycleComplete {
         /// 距下一轮开始的秒数。停止监控后不再有意义。
         next_check_in_secs: u64,
