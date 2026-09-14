@@ -107,18 +107,22 @@ pub struct ClientHints {
 }
 
 impl RequestProfile {
-    /// 默认档案：2026-09-13 在 macOS 上从真实 Chrome 153 的购买页抓到的取货请求特征。
+    /// 默认档案：macOS 上的 Chrome 149，头的形状按 2026-09-13 从真实 Chrome 购买页
+    /// 抓到的取货请求来。
     ///
-    /// 更新时整套一起换（UA 主版本与 `sec-ch-ua` 的品牌列表必须一致），并改档案名。
-    /// 不要每次请求随机换 UA，那本身就是特征。
+    /// 版本号取 149 而不是当天最新的 153，是为了和 [`Transport::ChromeTls`] 复刻的
+    /// TLS / HTTP/2 指纹（wreq-util 的 Chrome 149 档案）保持一致：自称一个版本、
+    /// 握手却是另一个版本的样子，正是要避免的那类不一致。更新时整套一起换
+    /// （UA 主版本、`sec-ch-ua` 品牌列表、仿真档案），并改档案名。不要每次请求
+    /// 随机换 UA，那本身就是特征。
     pub fn chrome() -> Self {
         Self {
-            name: "chrome-153-macos-20260913",
+            name: "chrome-149-macos-20260913",
             user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 \
-                         (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
+                         (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
                 .into(),
             client_hints: Some(ClientHints {
-                ua: r#""Google Chrome";v="153", "Not_A Brand";v="8", "Chromium";v="153""#.into(),
+                ua: r#""Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24""#.into(),
                 mobile: "?0".into(),
                 platform: r#""macOS""#.into(),
             }),
@@ -167,6 +171,39 @@ pub enum WarmPage {
     None,
 }
 
+/// 传输层实现：决定 TLS 握手与 HTTP/2 帧长什么样。
+///
+/// 请求头可以逐个对齐，握手指纹却是库决定的：rustls + h2 的 ClientHello 和
+/// HTTP/2 SETTINGS 与任何浏览器都不一样，而这正是边缘风控打分最常用的信号，
+/// 也最能解释「同一台电脑浏览器正常、程序被拦」。`ChromeTls` 用 BoringSSL 复刻
+/// Chrome 的握手（wreq / wreq-util 的 Chrome 149 档案），请求头仍由
+/// [`RequestProfile`] 控制，两边版本一致。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Transport {
+    /// rustls + h2（reqwest）。指纹与浏览器不同，保留给对照和没有 `chrome-tls` 的构建。
+    Rustls,
+    /// BoringSSL 复刻 Chrome 的 TLS 与 HTTP/2 指纹。需要 `chrome-tls` feature（默认开启）。
+    ChromeTls,
+}
+
+impl Transport {
+    /// 本次构建能用的默认传输：编译进了 `chrome-tls` 就用它。
+    pub fn default_for_build() -> Self {
+        if cfg!(feature = "chrome-tls") {
+            Self::ChromeTls
+        } else {
+            Self::Rustls
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Rustls => "rustls",
+            Self::ChromeTls => "chrome-tls",
+        }
+    }
+}
+
 /// 库存接口响应体的读取上限。一次查询的正常响应只有几 KB，拦截页也不过 128 KB，
 /// 4 MB 足够；再大就不是我们要的东西了。
 const MAX_RESPONSE_BYTES: usize = 4 << 20;
@@ -207,6 +244,8 @@ pub struct ClientConfig {
     pub profile: RequestProfile,
     /// 暖场策略。
     pub warm_page: WarmPage,
+    /// 传输层实现。
+    pub transport: Transport,
 }
 
 impl Default for ClientConfig {
@@ -217,6 +256,7 @@ impl Default for ClientConfig {
             timeout: Duration::from_secs(15),
             profile: RequestProfile::chrome(),
             warm_page: WarmPage::Bag,
+            transport: Transport::default_for_build(),
         }
     }
 }
@@ -229,6 +269,8 @@ pub struct RequestRecord {
     pub at_ms: u64,
     /// `warm`（暖场）或 `pickup`（取货查询）。
     pub kind: &'static str,
+    /// 用的传输层：`rustls` 或 `chrome-tls`。
+    pub transport: &'static str,
     pub locale: String,
     pub store: Option<String>,
     /// 这次请求携带的零件号数量（含搭档表带）。
@@ -273,17 +315,15 @@ struct BlockState {
 /// `reqwest::Client` 内部就是 `Arc`，克隆代价极低，共享的是同一个连接池。
 #[derive(Debug, Clone)]
 pub struct AppleClient {
-    http: reqwest::Client,
+    /// 传输层与它自己的 cookie 罐。
+    ///
+    /// 罐由我们持有而不是用库里隐藏的内部罐，是为了能查得到里面到底有没有东西
+    /// —— 暖场之后要确认真的攒到了 cookie。一个「以为自己在带 cookie、其实罐是
+    /// 空的」的客户端，功能上和现在一模一样，没有任何迹象。
+    http: Http,
     config: ClientConfig,
     /// 上一次出站请求的时刻，用于全局限速。
     last_sent: Arc<Mutex<Option<Instant>>>,
-    /// Cookie 罐。
-    ///
-    /// 自己持有一份而不是用 `cookie_store(true)` 那个隐藏的内部罐，是为了能
-    /// 查得到里面到底有没有东西 —— 暖场之后要确认真的攒到了 cookie。
-    /// 一个「以为自己在带 cookie、其实罐是空的」的客户端，功能上和现在一模一样，
-    /// 没有任何迹象。
-    jar: Arc<reqwest::cookie::Jar>,
     /// 各地区的暖场状态。
     ///
     /// 锁在整个暖场请求期间持有，所以同一时刻只会有一次暖场：第一轮的几个门店
@@ -298,21 +338,11 @@ pub struct AppleClient {
 
 impl AppleClient {
     pub fn new(config: ClientConfig) -> Result<Self, ApiError> {
-        let jar = Arc::new(reqwest::cookie::Jar::default());
-        let http = reqwest::Client::builder()
-            .timeout(config.timeout)
-            .connect_timeout(Duration::from_secs(5))
-            .pool_idle_timeout(Duration::from_secs(90))
-            .pool_max_idle_per_host(8)
-            .cookie_provider(jar.clone())
-            .build()
-            .map_err(|e| ApiError::Transport(format!("构造 HTTP 客户端失败：{e}")))?;
-
+        let http = Http::build(&config)?;
         Ok(Self {
             http,
             config,
             last_sent: Arc::new(Mutex::new(None)),
-            jar,
             warm: Arc::new(Mutex::new(HashMap::new())),
             blocks: Arc::new(Mutex::new(HashMap::new())),
             recent: Arc::new(Mutex::new(VecDeque::with_capacity(RECENT_RECORDS))),
@@ -322,6 +352,11 @@ impl AppleClient {
     /// 当前使用的请求特征档案。
     pub fn profile(&self) -> &RequestProfile {
         &self.config.profile
+    }
+
+    /// 当前使用的传输层。
+    pub fn transport(&self) -> Transport {
+        self.config.transport
     }
 
     /// 最近的出站请求记录，按时间先后排列。
@@ -339,30 +374,12 @@ impl AppleClient {
 
     /// 罐里对某个地址生效的 cookie 名。
     pub fn cookie_names_for(&self, url: &str) -> Vec<String> {
-        use reqwest::cookie::CookieStore;
-        let Ok(url) = url.parse() else {
-            return Vec::new();
-        };
-        let Some(value) = self.jar.cookies(&url) else {
-            return Vec::new();
-        };
-        let Ok(text) = value.to_str() else {
-            return Vec::new();
-        };
-        text.split(';')
-            .filter_map(|pair| pair.trim().split('=').next())
-            .filter(|name| !name.is_empty())
-            .map(str::to_string)
-            .collect()
+        self.http.cookie_names_for(url)
     }
 
     /// 这个地区当前攒到的 cookie，没有则返回 `None`。契约测试用；**不要打印它的值**。
     pub fn cookies_for(&self, region: &Region) -> Option<String> {
-        use reqwest::cookie::CookieStore;
-        let url = region.pickup_message_url().parse().ok()?;
-        self.jar
-            .cookies(&url)
-            .and_then(|v| v.to_str().ok().map(str::to_owned))
+        self.http.cookie_header_for(&region.pickup_message_url())
     }
 
     /// 确保这个地区的 cookie 已经攒上了。
@@ -412,6 +429,7 @@ impl AppleClient {
         let mut record = RequestRecord {
             at_ms: now_ms(),
             kind: "warm",
+            transport: self.http.label(),
             locale: region.locale.to_string(),
             store: None,
             parts: 0,
@@ -426,18 +444,20 @@ impl AppleClient {
 
         let sent = self
             .http
-            .get(&url)
-            .headers(navigation_headers(&self.config.profile, region))
-            .send()
+            .fetch(
+                &url,
+                &[],
+                navigation_headers(&self.config.profile, region),
+                MAX_WARM_BYTES,
+            )
             .await;
         match sent {
-            Ok(resp) => {
-                let status = resp.status().as_u16();
+            Ok(fetched) => {
+                // 响应体已经读掉（连接才能复用），内容本身用不上。
+                let status = fetched.status;
                 record.status = Some(status);
-                record.http_version = Some(format!("{:?}", resp.version()));
-                record.final_url = Some(resp.url().to_string());
-                // 读掉响应体，连接才能复用；内容本身用不上。
-                let _ = read_body_capped(resp, MAX_WARM_BYTES).await;
+                record.http_version = Some(fetched.version);
+                record.final_url = Some(fetched.final_url);
                 let names = self.cookie_names_for(&region.pickup_message_url());
                 let ok = (200..300).contains(&status) && !names.is_empty();
                 record.cookies_after = names;
@@ -613,14 +633,16 @@ impl AppleClient {
     /// 这种「配置写漏了、功能却没坏」的缺陷，只能靠一条真的去连一次的测试兜住。
     pub async fn negotiated_http_version(&self, region: &Region) -> Result<String, ApiError> {
         self.throttle().await;
-        let resp = self
+        let fetched = self
             .http
-            .get(region.bag_url())
-            .headers(navigation_headers(&self.config.profile, region))
-            .send()
-            .await
-            .map_err(|e| ApiError::Transport(e.to_string()))?;
-        Ok(format!("{:?}", resp.version()))
+            .fetch(
+                &region.bag_url(),
+                &[],
+                navigation_headers(&self.config.profile, region),
+                MAX_WARM_BYTES,
+            )
+            .await?;
+        Ok(fetched.version)
     }
 
     /// 执行一次带限速与退避重试的 GET，返回响应体。
@@ -676,6 +698,7 @@ impl AppleClient {
         let mut record = RequestRecord {
             at_ms: now_ms(),
             kind: "pickup",
+            transport: self.http.label(),
             locale: region.locale.to_string(),
             store: Some(store.to_string()),
             parts,
@@ -690,33 +713,29 @@ impl AppleClient {
 
         let sent = self
             .http
-            .get(url)
-            .query(query)
-            .headers(api_headers(&self.config.profile, region, referer))
-            .send()
+            .fetch(
+                url,
+                query,
+                api_headers(&self.config.profile, region, referer),
+                MAX_RESPONSE_BYTES,
+            )
             .await;
-        let resp = match sent {
-            Ok(resp) => resp,
+        let fetched = match sent {
+            Ok(fetched) => fetched,
             Err(err) => {
                 record.duration_ms = started.elapsed().as_millis() as u64;
                 record.outcome = "transport".into();
                 self.push_record(record).await;
-                return Err(ApiError::Transport(err.to_string()));
+                return Err(err);
             }
         };
 
-        let status = resp.status().as_u16();
+        let status = fetched.status;
         record.status = Some(status);
-        record.http_version = Some(format!("{:?}", resp.version()));
-        record.final_url = Some(resp.url().to_string());
-        let content_type = resp
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or_default()
-            .to_ascii_lowercase();
-
-        let body = read_body_capped(resp, MAX_RESPONSE_BYTES).await;
+        record.http_version = Some(fetched.version);
+        record.final_url = Some(fetched.final_url);
+        let content_type = fetched.content_type;
+        let body = fetched.body;
         record.duration_ms = started.elapsed().as_millis() as u64;
         record.cookies_after = self.cookie_names_for(url);
 
@@ -753,46 +772,45 @@ impl AppleClient {
 
 /// 页面导航（暖场、抓购买页）用的请求头：和地址栏直接打开一个页面时 Chrome 发的一致。
 pub(crate) fn navigation_headers(profile: &RequestProfile, region: &Region) -> HeaderMap {
+    // 插入顺序照抄 Chrome 发出的顺序：头的先后也是指纹的一部分。
+    // accept-encoding 与 cookie 由传输层自己补在后面。
     let mut headers = HeaderMap::new();
+    if let Some(hints) = &profile.client_hints {
+        put(&mut headers, "sec-ch-ua", &hints.ua);
+        put(&mut headers, "sec-ch-ua-mobile", &hints.mobile);
+        put(&mut headers, "sec-ch-ua-platform", &hints.platform);
+    }
+    put(&mut headers, "upgrade-insecure-requests", "1");
     put(&mut headers, "user-agent", &profile.user_agent);
     put(
         &mut headers,
         "accept",
         "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     );
-    put(&mut headers, "accept-language", region.accept_language());
-    put(&mut headers, "upgrade-insecure-requests", "1");
-    if let Some(hints) = &profile.client_hints {
-        put(&mut headers, "sec-ch-ua", &hints.ua);
-        put(&mut headers, "sec-ch-ua-mobile", &hints.mobile);
-        put(&mut headers, "sec-ch-ua-platform", &hints.platform);
-    }
     if profile.fetch_metadata {
         put(&mut headers, "sec-fetch-site", "none");
         put(&mut headers, "sec-fetch-mode", "navigate");
-        put(&mut headers, "sec-fetch-dest", "document");
         put(&mut headers, "sec-fetch-user", "?1");
+        put(&mut headers, "sec-fetch-dest", "document");
     }
+    put(&mut headers, "accept-language", region.accept_language());
     headers
 }
 
 /// 取货接口请求头：和购买页里同源 `fetch()` 发出的一致。
 pub(crate) fn api_headers(profile: &RequestProfile, region: &Region, referer: &str) -> HeaderMap {
+    // 插入顺序照抄 Chrome 里 fetch() 发出的顺序：脚本自定义头夹在 accept 与
+    // sec-fetch-* 之间，accept-encoding 与 cookie 由传输层补在末尾。
     let mut headers = HeaderMap::new();
-    put(&mut headers, "user-agent", &profile.user_agent);
-    put(&mut headers, "accept", &profile.api_accept);
-    put(&mut headers, "accept-language", region.accept_language());
-    put(&mut headers, "referer", referer);
     if let Some(hints) = &profile.client_hints {
         put(&mut headers, "sec-ch-ua", &hints.ua);
         put(&mut headers, "sec-ch-ua-mobile", &hints.mobile);
+    }
+    put(&mut headers, "user-agent", &profile.user_agent);
+    if let Some(hints) = &profile.client_hints {
         put(&mut headers, "sec-ch-ua-platform", &hints.platform);
     }
-    if profile.fetch_metadata {
-        put(&mut headers, "sec-fetch-site", "same-origin");
-        put(&mut headers, "sec-fetch-mode", "cors");
-        put(&mut headers, "sec-fetch-dest", "empty");
-    }
+    put(&mut headers, "accept", &profile.api_accept);
     if profile.x_requested_with {
         put(&mut headers, "x-requested-with", "XMLHttpRequest");
     }
@@ -800,7 +818,233 @@ pub(crate) fn api_headers(profile: &RequestProfile, region: &Region, referer: &s
         put(&mut headers, "x-skip-redirect", "true");
         put(&mut headers, "x-aos-ui-fetch-call-1", &fetch_call_token());
     }
+    if profile.fetch_metadata {
+        put(&mut headers, "sec-fetch-site", "same-origin");
+        put(&mut headers, "sec-fetch-mode", "cors");
+        put(&mut headers, "sec-fetch-dest", "empty");
+    }
+    put(&mut headers, "referer", referer);
+    put(&mut headers, "accept-language", region.accept_language());
     headers
+}
+
+/// 一次出站请求拿回来的东西，传输层无关。
+struct Fetched {
+    status: u16,
+    /// 实际协商出的 HTTP 版本，如 `HTTP/2.0`。
+    version: String,
+    /// 跟随重定向后的最终地址。
+    final_url: String,
+    content_type: String,
+    /// 响应体，读到上限即止；读到一半失败时保留状态码，由调用方决定怎么归类。
+    body: Result<Vec<u8>, ApiError>,
+}
+
+/// 传输层实现与它自己的 cookie 罐。
+#[derive(Clone)]
+enum Http {
+    Rustls {
+        client: reqwest::Client,
+        jar: Arc<reqwest::cookie::Jar>,
+    },
+    #[cfg(feature = "chrome-tls")]
+    Chrome {
+        client: wreq::Client,
+        jar: Arc<wreq::cookie::Jar>,
+    },
+}
+
+impl std::fmt::Debug for Http {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+impl Http {
+    fn build(config: &ClientConfig) -> Result<Self, ApiError> {
+        match config.transport {
+            Transport::Rustls => {
+                let jar = Arc::new(reqwest::cookie::Jar::default());
+                let client = reqwest::Client::builder()
+                    .timeout(config.timeout)
+                    .connect_timeout(Duration::from_secs(5))
+                    .pool_idle_timeout(Duration::from_secs(90))
+                    .pool_max_idle_per_host(8)
+                    .cookie_provider(jar.clone())
+                    .build()
+                    .map_err(|e| ApiError::Transport(format!("构造 HTTP 客户端失败：{e}")))?;
+                Ok(Self::Rustls { client, jar })
+            }
+            Transport::ChromeTls => {
+                #[cfg(feature = "chrome-tls")]
+                {
+                    // 只取仿真档案里的 TLS / HTTP/1 / HTTP/2 参数，请求头仍由
+                    // RequestProfile 控制：握手是它的，说话是我们的，两边版本一致。
+                    let emulation =
+                        wreq::IntoEmulation::into_emulation(wreq_util::Emulation::Chrome149);
+                    let jar = Arc::new(wreq::cookie::Jar::default());
+                    let client = wreq::Client::builder()
+                        .timeout(config.timeout)
+                        .connect_timeout(Duration::from_secs(5))
+                        .pool_idle_timeout(Duration::from_secs(90))
+                        .pool_max_idle_per_host(8)
+                        .cookie_provider(jar.clone())
+                        .tls_options(emulation.tls_options)
+                        .http1_options(emulation.http1_options)
+                        .http2_options(emulation.http2_options)
+                        .build()
+                        .map_err(|e| ApiError::Transport(format!("构造 HTTP 客户端失败：{e}")))?;
+                    Ok(Self::Chrome { client, jar })
+                }
+                #[cfg(not(feature = "chrome-tls"))]
+                {
+                    Err(ApiError::Transport(
+                        "本次构建没有编译 chrome-tls 传输，请改用 Transport::Rustls".into(),
+                    ))
+                }
+            }
+        }
+    }
+
+    fn label(&self) -> &'static str {
+        match self {
+            Self::Rustls { .. } => Transport::Rustls.label(),
+            #[cfg(feature = "chrome-tls")]
+            Self::Chrome { .. } => Transport::ChromeTls.label(),
+        }
+    }
+
+    /// 发一次 GET，读到上限为止。只有连接层面的失败才返回 `Err`；拿到响应就一定
+    /// 返回 `Ok`，状态码由调用方归类。
+    async fn fetch(
+        &self,
+        url: &str,
+        query: &[(String, String)],
+        headers: HeaderMap,
+        max_body: usize,
+    ) -> Result<Fetched, ApiError> {
+        match self {
+            Self::Rustls { client, .. } => {
+                let resp = client
+                    .get(url)
+                    .query(query)
+                    .headers(headers)
+                    .send()
+                    .await
+                    .map_err(|e| ApiError::Transport(e.to_string()))?;
+                let status = resp.status().as_u16();
+                let version = format!("{:?}", resp.version());
+                let final_url = resp.url().to_string();
+                let content_type = content_type_of(resp.headers());
+                let body = read_body_capped(resp, max_body).await;
+                Ok(Fetched {
+                    status,
+                    version,
+                    final_url,
+                    content_type,
+                    body,
+                })
+            }
+            #[cfg(feature = "chrome-tls")]
+            Self::Chrome { client, .. } => {
+                let resp = client
+                    .get(url)
+                    .query(query)
+                    .headers(headers)
+                    .send()
+                    .await
+                    .map_err(|e| ApiError::Transport(e.to_string()))?;
+                let status = resp.status().as_u16();
+                let version = format!("{:?}", resp.version());
+                let final_url = resp.uri().to_string();
+                let content_type = content_type_of(resp.headers());
+                let body = read_wreq_body_capped(resp, max_body).await;
+                Ok(Fetched {
+                    status,
+                    version,
+                    final_url,
+                    content_type,
+                    body,
+                })
+            }
+        }
+    }
+
+    /// 罐里对某个地址生效的 cookie 名。
+    fn cookie_names_for(&self, url: &str) -> Vec<String> {
+        match self {
+            Self::Rustls { jar, .. } => {
+                use reqwest::cookie::CookieStore;
+                let Ok(url) = url.parse() else {
+                    return Vec::new();
+                };
+                let Some(value) = jar.cookies(&url) else {
+                    return Vec::new();
+                };
+                let Ok(text) = value.to_str() else {
+                    return Vec::new();
+                };
+                text.split(';')
+                    .filter_map(|pair| pair.trim().split('=').next())
+                    .filter(|name| !name.is_empty())
+                    .map(str::to_string)
+                    .collect()
+            }
+            #[cfg(feature = "chrome-tls")]
+            Self::Chrome { jar, .. } => {
+                let Ok(uri) = url.parse::<wreq::Uri>() else {
+                    return Vec::new();
+                };
+                jar.matches(uri).map(|c| c.name().to_string()).collect()
+            }
+        }
+    }
+
+    /// 罐里对某个地址生效的整条 `Cookie` 头，没有则 `None`。**不要打印它**。
+    fn cookie_header_for(&self, url: &str) -> Option<String> {
+        match self {
+            Self::Rustls { jar, .. } => {
+                use reqwest::cookie::CookieStore;
+                let url = url.parse().ok()?;
+                jar.cookies(&url)
+                    .and_then(|v| v.to_str().ok().map(str::to_owned))
+            }
+            #[cfg(feature = "chrome-tls")]
+            Self::Chrome { jar, .. } => {
+                let uri = url.parse::<wreq::Uri>().ok()?;
+                let pairs: Vec<String> = jar
+                    .matches(uri)
+                    .map(|c| format!("{}={}", c.name(), c.value()))
+                    .collect();
+                (!pairs.is_empty()).then(|| pairs.join("; "))
+            }
+        }
+    }
+}
+
+fn content_type_of(headers: &HeaderMap) -> String {
+    headers
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+}
+
+/// 与 [`read_body_capped`] 相同的分块限量读取，wreq 版。
+#[cfg(feature = "chrome-tls")]
+async fn read_wreq_body_capped(resp: wreq::Response, max: usize) -> Result<Vec<u8>, ApiError> {
+    use futures_util::StreamExt;
+    let mut stream = resp.bytes_stream();
+    let mut body = Vec::new();
+    while body.len() < max {
+        let Some(chunk) = stream.next().await else {
+            break;
+        };
+        let chunk = chunk.map_err(|e| ApiError::Transport(format!("读取响应失败：{e}")))?;
+        let n = chunk.len().min(max - body.len());
+        body.extend_from_slice(&chunk[..n]);
+    }
+    Ok(body)
 }
 
 /// 往头表里放一项。名字是我们自己写的常量，值是我们自己拼的 ASCII；万一不合法，

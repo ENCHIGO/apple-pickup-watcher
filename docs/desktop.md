@@ -62,7 +62,7 @@ https://api.day.app/你的Key?group=库存&sound=alarm
 
 程序将这类响应归为被拦截，不能据此判断库存。记录应用版本、地区、门店、SKU、错误和出现时间，可暂停后稍后重试，或按界面建议检查网络。持续失败时提交 [Issue](https://github.com/ENCHIGO/apple-pickup-watcher/issues)。
 
-从 v0.4.2 起，被拦后程序不再立刻重试，而是把该地区标为冷却：首次 5 分钟，冷却结束后只发一次探测，探测再被拦依次延长到 10、20、30 分钟，期间该地区所有目标显示「未知」并注明剩余时间；任何一次成功查询都会清除冷却。启动时的暖场（先取一次购物袋页攒会话 cookie）也改为同一地区只做一次，并且只有真的攒到 cookie 才算成功。请求特征已与真实 Chrome 在购买页上发出的取货请求对齐（UA、client hints、Fetch Metadata、Referer）。
+从 v0.4.2 起，被拦后程序不再立刻重试，而是把该地区标为冷却：首次 5 分钟，冷却结束后只发一次探测，探测再被拦依次延长到 10、20、30 分钟，期间该地区所有目标显示「未知」并注明剩余时间；任何一次成功查询都会清除冷却。启动时的暖场（先取一次购物袋页攒会话 cookie）也改为同一地区只做一次，并且只有真的攒到 cookie 才算成功。请求特征已与真实 Chrome 在购买页上发出的取货请求对齐（UA、client hints、Fetch Metadata、Referer）；从 v0.4.2-beta.2 起，TLS 握手与 HTTP/2 设置也复刻 Chrome 149（BoringSSL），不再暴露 rustls 的指纹。
 
 想帮忙定位原因，可以在出现 541 的网络上运行 CLI 的 [`apw doctor`](cli.md#诊断-http-541apw-doctor)，把报告贴到 issue。
 

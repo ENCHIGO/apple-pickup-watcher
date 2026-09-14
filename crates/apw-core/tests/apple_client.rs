@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use apw_core::apple::{ApiError, AppleClient, ClientConfig, RequestProfile, WarmPage};
+use apw_core::apple::{ApiError, AppleClient, ClientConfig, RequestProfile, Transport, WarmPage};
 use apw_core::model::{Category, Family, Region};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
@@ -232,12 +232,42 @@ async fn 请求头与真实浏览器一致() {
 
     let pickup = &apple.requests(PICKUP_PATH)[0];
     let ua = pickup.header("user-agent").expect("必须有 UA");
-    assert!(ua.contains("Chrome/153"), "UA 应当是当前档案的版本：{ua}");
+    assert!(ua.contains("Chrome/149"), "UA 应当是当前档案的版本：{ua}");
     assert!(
         pickup
             .header("sec-ch-ua")
-            .is_some_and(|v| v.contains("v=\"153\"")),
+            .is_some_and(|v| v.contains("v=\"149\"")),
         "自称 Chrome 就必须带 client hints，且版本一致"
+    );
+    // 头的顺序也照抄 Chrome：client hints 打头，UA 在中间，referer 与语言在后。
+    let order: Vec<String> = pickup
+        .headers
+        .iter()
+        .map(|(k, _)| k.to_ascii_lowercase())
+        .filter(|k| {
+            matches!(
+                k.as_str(),
+                "sec-ch-ua"
+                    | "user-agent"
+                    | "accept"
+                    | "sec-fetch-site"
+                    | "referer"
+                    | "accept-language"
+            )
+        })
+        .collect();
+    assert_eq!(
+        order,
+        [
+            "sec-ch-ua",
+            "user-agent",
+            "accept",
+            "sec-fetch-site",
+            "referer",
+            "accept-language"
+        ],
+        "请求头顺序应当与 Chrome 一致：{:?}",
+        pickup.headers
     );
     assert_eq!(pickup.header("sec-ch-ua-mobile"), Some("?0"));
     assert_eq!(pickup.header("sec-fetch-site"), Some("same-origin"));
@@ -380,6 +410,45 @@ async fn 页面没发cookie不算暖好但查询照发() {
         .expect("应当记录暖场");
     assert_eq!(warm.outcome, "no_cookie");
     assert!(warm.cookies_after.is_empty());
+}
+
+#[tokio::test]
+async fn 两种传输层都能完成查询并在记录里写明() {
+    let mut transports = vec![Transport::Rustls];
+    if cfg!(feature = "chrome-tls") {
+        transports.push(Transport::ChromeTls);
+    }
+    for transport in transports {
+        let apple = FakeApple::start(healthy).await;
+        let region = apple.region();
+        let client = fast(ClientConfig {
+            transport,
+            ..ClientConfig::default()
+        });
+        assert_eq!(client.transport(), transport);
+        client
+            .pickup_message(region, "R683", &["MG724CH/A".to_string()])
+            .await
+            .unwrap_or_else(|e| panic!("{} 传输层应当能完成查询：{e}", transport.label()));
+        let pickup = &apple.requests(PICKUP_PATH)[0];
+        assert!(
+            pickup
+                .header("cookie")
+                .is_some_and(|c| c.contains("dssid2=")),
+            "{} 传输层也必须带上暖场攒到的 cookie",
+            transport.label()
+        );
+        assert!(
+            pickup.header("sec-ch-ua").is_some(),
+            "{} 传输层丢了 client hints",
+            transport.label()
+        );
+        let records = client.recent_requests().await;
+        assert!(
+            records.iter().all(|r| r.transport == transport.label()),
+            "记录必须写明传输层：{records:?}"
+        );
+    }
 }
 
 #[tokio::test]

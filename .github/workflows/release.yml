@@ -90,6 +90,9 @@ jobs:
           node-version: lts/*
           cache: pnpm
 
+      # BoringSSL（chrome-tls 传输）在 MSVC 上要用 NASM 编译汇编。
+      - uses: ilammy/setup-nasm@v1
+        if: runner.os == 'Windows'
       - uses: dtolnay/rust-toolchain@stable
 
       # 缓存整个 target/ 与 cargo registry。Tauri 的依赖树很大（webkit/wry/tao 一层层
