@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { Combobox } from "@/components/Combobox";
+import { MultiCombobox } from "@/components/MultiCombobox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -105,7 +106,8 @@ export default function App() {
     // StrictMode 的重复调用由 connect 内部去重。
   }, []);
 
-  const [storeNumber, setStoreNumber] = useState("");
+  // 门店可以一次选好几家：同城门店合并成一次请求之后，多选不增加请求量。
+  const [storeNumbers, setStoreNumbers] = useState<string[]>([]);
   const [partNumber, setPartNumber] = useState("");
   const [productFamily, setProductFamily] = useState("");
   const [capacity, setCapacity] = useState("");
@@ -164,24 +166,35 @@ export default function App() {
     return { inStock, outOfStock, untrusted };
   }, [ui.rows]);
 
-  const canAdd = storeNumber !== "" && partNumber !== "";
+  const canAdd = storeNumbers.length > 0 && partNumber !== "";
 
   async function onAdd() {
     if (!canAdd) return;
-    const store = ui.stores.find((s) => s.number === storeNumber);
     const product = ui.products.find((p) => p.partNumber === partNumber);
-    if (!store || !product) return;
+    if (!product) return;
 
-    const next: Target = {
-      locale: ui.settings.locale,
-      storeNumber: store.number,
-      storeTitle: store.title,
-      partNumber: product.partNumber,
-      productName: product.title,
-      ...(product.companionPart ? { companionPart: product.companionPart } : {}),
-    };
-    if (targets.some((t) => targetKey(t) === targetKey(next))) return;
-    await setTargets([...targets, next]);
+    // 选了几家店就加几条目标，同一型号；已经在列表里的那几家跳过，不重复。
+    const existing = new Set(targets.map(targetKey));
+    const added: Target[] = [];
+    for (const number of storeNumbers) {
+      const store = ui.stores.find((s) => s.number === number);
+      if (!store) continue;
+      const next: Target = {
+        locale: ui.settings.locale,
+        storeNumber: store.number,
+        storeTitle: store.title,
+        partNumber: product.partNumber,
+        productName: product.title,
+        ...(product.companionPart ? { companionPart: product.companionPart } : {}),
+      };
+      const key = targetKey(next);
+      if (existing.has(key)) continue;
+      existing.add(key);
+      added.push(next);
+    }
+    if (added.length === 0) return;
+    await setTargets([...targets, ...added]);
+    // 只清型号，门店留着：接着给同一批门店加下一个型号是最常见的操作。
     resetProductSelection();
   }
 
@@ -268,7 +281,7 @@ export default function App() {
               value={ui.settings.locale}
               onChange={(locale) => {
                 // 换地区后旧的门店和型号都不再适用，清掉待添加的选择。
-                setStoreNumber("");
+                setStoreNumbers([]);
                 resetProductSelection();
                 void changeLocale(locale);
               }}
@@ -298,15 +311,16 @@ export default function App() {
           </div>
 
           <div className="grid gap-1.5">
-            <Label>门店</Label>
-            <Combobox
+            <Label>门店（可多选）</Label>
+            <MultiCombobox
               className="w-56"
               options={storeOptions}
-              value={storeNumber}
-              onChange={setStoreNumber}
+              values={storeNumbers}
+              onChange={setStoreNumbers}
               placeholder="选择自提门店"
               searchPlaceholder="搜索门店…"
               emptyText="没有匹配的门店"
+              countLabel={(n) => `已选 ${n} 家门店`}
               disabled={storeOptions.length === 0}
             />
           </div>
@@ -491,7 +505,7 @@ export default function App() {
                   <TableRow>
                     <TableCell colSpan={5} className="text-muted-foreground h-24 text-center">
                       {ui.ready
-                        ? "还没有监控目标。选好门店和型号后点「添加」。"
+                        ? "还没有监控目标。选好门店（可多选）和型号后点「添加」。"
                         : "正在载入…"}
                     </TableCell>
                   </TableRow>

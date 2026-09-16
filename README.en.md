@@ -89,7 +89,7 @@ For Claude Code replace `codex` with `claude-code`; drop `--global` to install i
 
 ### Desktop in three steps
 
-1. **Add targets**: choose region → category → store → model and click “Add”. For iPhone, pick the model, capacity and colour step by step. Add as many as you like, mixing categories and stores freely.
+1. **Add targets**: choose region → category → store → model and click “Add”. You can tick several stores at once and get one target per store. For iPhone, pick the model, capacity and colour step by step. Add as many as you like, mixing categories and stores freely.
 2. **Start watching**: click “Start”. Keep the app running and your computer online and awake; closing the window moves it to the tray and keeps it going. It polls every 30 seconds by default, with a minimum of 5 seconds.
 3. **Get the alert, then buy on Apple’s website**: when stock is confirmed you get a desktop notification, the alert sound, and a Bark push, and the shopping bag can open if enabled. Adding the item, choosing the pickup store, checkout, and payment are done by you on Apple’s website.
 
