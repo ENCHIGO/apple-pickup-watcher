@@ -184,21 +184,7 @@ pub struct Bark {
     name: String,
 }
 
-/// 把设置里的推送地址拆成一条条：分号、换行、空白都算分隔符。
-///
-/// 用户想同时推到几台手机（issue #35），最省事的写法是在同一个输入框里用分号
-/// 隔开。去掉空项与重复项，保持先后顺序；地址里不会出现这些字符，不必转义。
-pub fn split_bark_urls(raw: &str) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    for piece in raw.split(|c: char| c == ';' || c == '\n' || c == '\r' || c.is_whitespace()) {
-        let piece = piece.trim();
-        if piece.is_empty() || out.iter().any(|u| u == piece) {
-            continue;
-        }
-        out.push(piece.to_string());
-    }
-    out
-}
+pub use crate::config::split_bark_urls;
 
 impl Bark {
     /// `base_url` 是 Bark App 里给出的推送地址，形如

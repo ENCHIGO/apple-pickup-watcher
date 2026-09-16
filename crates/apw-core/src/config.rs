@@ -182,7 +182,7 @@ impl Settings {
 
         // 推送地址收敛成「分号分隔、无空项、无重复」的规范写法，读回来和
         // 界面上显示的一致；单个地址前后有空格的老配置也顺手修好。
-        self.bark_url = crate::notify::split_bark_urls(&self.bark_url).join(";");
+        self.bark_url = split_bark_urls(&self.bark_url).join(";");
 
         // 去重时**新建 Vec 再整体替换**，不在原 Vec 上就地压缩。
         //
@@ -220,8 +220,25 @@ impl Settings {
 
     /// 配置的全部 Bark 推送地址，空表示未启用。
     pub fn bark_urls(&self) -> Vec<String> {
-        crate::notify::split_bark_urls(&self.bark_url)
+        split_bark_urls(&self.bark_url)
     }
+}
+
+/// 把设置里的推送地址拆成一条条：分号、换行、空白都算分隔符。
+///
+/// 用户想同时推到几台手机（issue #35），最省事的写法是在同一个输入框里用分号
+/// 隔开。放在这里而不是 `notify` 模块，是因为后者挂在 `notifications` feature 后面，
+/// 而 CLI 那份构建没有它 —— 设置的规范化不能依赖一个可选模块。去掉空项与重复项，保持先后顺序；地址里不会出现这些字符，不必转义。
+pub fn split_bark_urls(raw: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for piece in raw.split(|c: char| c == ';' || c == '\n' || c == '\r' || c.is_whitespace()) {
+        let piece = piece.trim();
+        if piece.is_empty() || out.iter().any(|u| u == piece) {
+            continue;
+        }
+        out.push(piece.to_string());
+    }
+    out
 }
 
 /// 设置文件的读写入口。
