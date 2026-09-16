@@ -113,10 +113,13 @@ export default function App() {
   const [capacity, setCapacity] = useState("");
   const [color, setColor] = useState("");
   const [barkDraft, setBarkDraft] = useState<string | null>(null);
+  const [proxiesDraft, setProxiesDraft] = useState<string | null>(null);
   const [intervalDraft, setIntervalDraft] = useState<number | null>(null);
 
   // null 表示尚未编辑；空字符串是用户明确清空，不能退回已保存的地址。
   const barkValue = barkDraft ?? ui.settings.barkUrl;
+  // 旧设置文件没有 proxies 字段，读上来是 undefined，当作空列表。
+  const proxiesValue = proxiesDraft ?? (ui.settings.proxies ?? []).join(";");
   const intervalValue = intervalDraft ?? ui.settings.intervalSeconds;
 
   const storeOptions = useMemo(
@@ -455,6 +458,27 @@ export default function App() {
               onBlur={() => {
                 setBarkDraft(null);
                 void saveSettings({ ...ui.settings, barkUrl: barkValue.trim() });
+              }}
+            />
+          </div>
+
+          <div className="grid flex-1 gap-1.5">
+            <Label htmlFor="proxies">代理地址（可选，多个用分号分隔；http / https / socks5）</Label>
+            <Input
+              id="proxies"
+              className="select-text"
+              placeholder="http://user:pass@1.2.3.4:8080;socks5://5.6.7.8:1080"
+              value={proxiesValue}
+              onChange={(e) => setProxiesDraft(e.target.value)}
+              onBlur={() => {
+                setProxiesDraft(null);
+                // 每个代理是一条额外的出口线路：Apple 的配额按出口 IP 计，
+                // 多一条线路多一份配额，被拦时自动换下一条。后端会再校验一遍。
+                const proxies = proxiesValue
+                  .split(/[;\s]+/)
+                  .map((p) => p.trim())
+                  .filter((p) => p !== "");
+                void saveSettings({ ...ui.settings, proxies });
               }}
             />
           </div>

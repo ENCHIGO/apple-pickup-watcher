@@ -85,6 +85,8 @@ export interface Settings {
   barkUrl: string;
   soundEnabled: boolean;
   openBagOnHit: boolean;
+  /** 代理地址列表；每个代理是一条额外的出口线路，被拦时切换。可为空。 */
+  proxies: string[];
 }
 
 /** 监控目标的唯一键，与 Rust 侧 Target::key 的构成保持一致。 */
