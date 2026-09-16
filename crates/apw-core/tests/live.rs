@@ -135,7 +135,7 @@ async fn 查询时必须带上cookie() {
     let region = region_by_locale("zh_TW").expect("地区表里应当有中国台湾");
 
     assert!(
-        client.cookies_for(region).is_none(),
+        client.cookies_for(region).await.is_none(),
         "还没发过任何请求，cookie 罐就该是空的"
     );
 
@@ -147,10 +147,11 @@ async fn 查询时必须带上cookie() {
 
     let cookies = client
         .cookies_for(region)
+        .await
         .expect("查过一次之后，cookie 罐不该还是空的 —— 暖场或响应里的 Set-Cookie 没生效");
 
     // 只打印名字，值是会话凭证，不能进 CI 日志。
-    let names = client.cookie_names_for(&region.pickup_message_url());
+    let names = client.cookie_names_for(&region.pickup_message_url()).await;
     println!("攒到的 cookie：{}", names.join(", "));
     // Apple 的 shop 会话 cookie。名字变了要来更新这里，而不是删掉断言。
     assert!(

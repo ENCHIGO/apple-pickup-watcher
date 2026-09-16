@@ -52,6 +52,7 @@ function renderApp() {
   }
   return {
     input: () => control((element) => element?.props?.id === "bark"),
+    proxies: () => control((element) => element?.props?.id === "proxies"),
     choice: (placeholder) => control((element) => element?.props?.placeholder === placeholder),
     addButton: () => control((element) => element.type === "Button" &&
       Array.isArray(element.props.children) && element.props.children.includes(" 添加")),
@@ -146,4 +147,15 @@ test("switching category or region clears the phone selection and preserves othe
   assert.equal(app.choice("选择容量").value, "");
   assert.equal(app.choice("选择颜色").value, "");
   assert.equal(app.addButton().disabled, true);
+});
+
+test("proxy addresses are split on semicolons and saved as a list, and old settings without the field read as empty", () => {
+  const app = renderApp();
+  assert.equal(app.proxies().value, "", "老设置没有 proxies 字段，输入框应当是空的而不是报错");
+  app.proxies().onChange({ target: { value: " http://a:8080 ; socks5://b:1080  " } });
+  assert.equal(app.proxies().value, " http://a:8080 ; socks5://b:1080  ");
+  app.proxies().onBlur();
+  assert.deepEqual(app.saved.at(-1).proxies, ["http://a:8080", "socks5://b:1080"]);
+  app.state.settings = { ...app.state.settings, proxies: ["http://c:1"] };
+  assert.equal(app.proxies().value, "http://c:1", "没在编辑时跟随后端保存的列表");
 });

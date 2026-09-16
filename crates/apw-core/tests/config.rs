@@ -89,6 +89,7 @@ fn 样例设置() -> Settings {
         bark_url: "https://api.day.app/xxxx".into(),
         sound_enabled: false,
         open_bag_on_hit: true,
+        proxies: Vec::new(),
     }
 }
 
@@ -497,11 +498,12 @@ fn 设置的线上格式是小驼峰() {
         "barkUrl",
         "soundEnabled",
         "openBagOnHit",
+        "proxies",
     ] {
         assert!(obj.contains_key(key), "缺少字段 {key}：{value}");
     }
     assert!(!obj.contains_key("interval_seconds"), "不该有蛇形字段");
-    assert_eq!(obj.len(), 6);
+    assert_eq!(obj.len(), 7);
 }
 
 #[test]
@@ -517,4 +519,40 @@ fn 配置文件路径落在用户配置目录下() {
             .path()
             .ends_with(Path::new("apple-pickup-watcher").join("settings.v2.json"))
     );
+}
+
+#[test]
+fn 代理地址只留合法的并去重() {
+    use apw_core::config::{Settings, normalize_proxies};
+    let raw = vec![
+        " http://1.2.3.4:8080 ; socks5://user:pw@5.6.7.8:1080".to_string(),
+        "http://1.2.3.4:8080".to_string(),
+        "ftp://nope:21".to_string(),
+        "not a url".to_string(),
+        "socks5h://proxy.example:1080".to_string(),
+        "".to_string(),
+    ];
+    assert_eq!(
+        normalize_proxies(&raw),
+        [
+            "http://1.2.3.4:8080",
+            "socks5://user:pw@5.6.7.8:1080",
+            "socks5h://proxy.example:1080"
+        ],
+        "同一行里的多个地址拆开，去重，协议不对或解析不了的丢掉"
+    );
+
+    let mut s = Settings {
+        proxies: raw,
+        ..Settings::default()
+    };
+    s.normalize();
+    assert_eq!(s.proxies.len(), 3);
+
+    // 旧配置文件没有这个字段：读上来是空列表，不是解析失败。
+    let old: Settings = serde_json::from_str(
+        r#"{"locale":"zh_CN","targets":[],"intervalSeconds":30,"barkUrl":"","soundEnabled":true,"openBagOnHit":true}"#,
+    )
+    .expect("旧配置应当可读");
+    assert!(old.proxies.is_empty());
 }

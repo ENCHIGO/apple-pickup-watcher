@@ -46,6 +46,11 @@ pub enum Command {
     Check {
         #[command(flatten)]
         targets: TargetArgs,
+        /// Proxy URL (http, https, socks5, socks5h); repeat or comma-separate for several.
+        /// Each proxy is an extra egress route rotated with the direct connection and
+        /// switched to when a route gets HTTP 541.
+        #[arg(long, value_delimiter = ',')]
+        proxy: Vec<String>,
         /// Overall deadline in seconds, including reading target input.
         #[arg(long, default_value_t = 60, value_parser = clap::value_parser!(u64).range(1..=86400))]
         timeout: u64,
@@ -54,6 +59,11 @@ pub enum Command {
     Watch {
         #[command(flatten)]
         targets: TargetArgs,
+        /// Proxy URL (http, https, socks5, socks5h); repeat or comma-separate for several.
+        /// Each proxy is an extra egress route rotated with the direct connection and
+        /// switched to when a route gets HTTP 541.
+        #[arg(long, value_delimiter = ',')]
+        proxy: Vec<String>,
         /// Base interval in seconds; engine jitter and failure backoff still apply.
         #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u64).range(5..=86400))]
         interval: u64,
