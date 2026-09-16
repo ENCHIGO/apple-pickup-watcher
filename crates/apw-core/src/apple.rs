@@ -451,7 +451,7 @@ impl std::fmt::Debug for Route {
     }
 }
 
-/// 直连排第一，之后每个代理一条线路。空白项跳过；地址解析不了就整体报错，
+/// 直连排第一，之后每个代理一条线路。空白项跳过；地址不合法就整体报错，
 /// 而不是悄悄少一条线路让用户以为代理在生效。
 fn build_routes(config: &ClientConfig, proxies: &[String]) -> Result<Vec<Arc<Route>>, ApiError> {
     let mut routes = vec![Arc::new(Route::build(config, "direct".into(), None)?)];
@@ -461,6 +461,7 @@ fn build_routes(config: &ClientConfig, proxies: &[String]) -> Result<Vec<Arc<Rou
         if proxy.is_empty() {
             continue;
         }
+        validate_proxy(proxy)?;
         n += 1;
         routes.push(Arc::new(Route::build(
             config,
@@ -469,6 +470,24 @@ fn build_routes(config: &ClientConfig, proxies: &[String]) -> Result<Vec<Arc<Rou
         )?));
     }
     Ok(routes)
+}
+
+/// 代理地址先由我们自己把关，再交给传输层。
+///
+/// 两个传输层对坏地址的态度不一样：reqwest 对没有协议的字符串会自动补上
+/// `http://` 照单全收，wreq 则直接报错。不先统一，「代理地址无效」这个错误就
+/// 只在某一种构建里出现。规则与 [`crate::config::normalize_proxies`] 一致。
+fn validate_proxy(proxy: &str) -> Result<(), ApiError> {
+    let invalid =
+        |why: &str| ApiError::Transport(format!("代理地址无效 {}：{why}", redact_proxy(proxy)));
+    let url = reqwest::Url::parse(proxy).map_err(|e| invalid(&e.to_string()))?;
+    if !matches!(url.scheme(), "http" | "https" | "socks5" | "socks5h") {
+        return Err(invalid("只支持 http、https、socks5、socks5h"));
+    }
+    if url.host_str().is_none() {
+        return Err(invalid("缺少主机名"));
+    }
+    Ok(())
 }
 
 /// 代理地址去掉账号密码后的样子，只用于错误信息与日志。
