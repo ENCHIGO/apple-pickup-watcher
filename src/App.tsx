@@ -445,11 +445,11 @@ export default function App() {
           </div>
 
           <div className="grid flex-1 gap-1.5">
-            <Label htmlFor="bark">Bark 推送地址（留空则不推送）</Label>
+            <Label htmlFor="bark">Bark 推送地址（可填多个，用分号分隔；留空则不推送）</Label>
             <Input
               id="bark"
               className="select-text"
-              placeholder="https://api.day.app/你的BarkKey"
+              placeholder="https://api.day.app/你的BarkKey;https://api.day.app/另一台手机的Key"
               value={barkValue}
               onChange={(e) => setBarkDraft(e.target.value)}
               onBlur={() => {

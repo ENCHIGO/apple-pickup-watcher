@@ -518,3 +518,37 @@ fn 配置文件路径落在用户配置目录下() {
             .ends_with(Path::new("apple-pickup-watcher").join("settings.v2.json"))
     );
 }
+
+#[test]
+fn 多个bark地址在规范化后按分号存储并能拆出() {
+    use apw_core::config::Settings;
+    let mut s = Settings {
+        bark_url: "  https://api.day.app/a ;\nhttps://api.day.app/b ; https://api.day.app/a "
+            .into(),
+        ..Settings::default()
+    };
+    s.normalize();
+    assert_eq!(
+        s.bark_url, "https://api.day.app/a;https://api.day.app/b",
+        "去空白、去重、分号相连"
+    );
+    assert_eq!(
+        s.bark_urls(),
+        ["https://api.day.app/a", "https://api.day.app/b"]
+    );
+
+    let mut single = Settings {
+        bark_url: " https://api.day.app/only ".into(),
+        ..Settings::default()
+    };
+    single.normalize();
+    assert_eq!(
+        single.bark_url, "https://api.day.app/only",
+        "单地址只去掉前后空白，写法不变"
+    );
+
+    let mut none = Settings::default();
+    none.normalize();
+    assert_eq!(none.bark_url, "");
+    assert!(none.bark_urls().is_empty());
+}

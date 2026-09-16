@@ -153,7 +153,7 @@ No, and no. It only checks stock and alerts you, and at most opens your shopping
 
 ### How do I get alerts on my phone?
 
-Install [Bark](https://github.com/Finb/Bark) on your iPhone, paste the push URL it gives you into the “Bark push URL” field in settings, and click “Test alert” to confirm the whole chain works. A failed push never changes the stock verdict.
+Install [Bark](https://github.com/Finb/Bark) on your iPhone, paste the push URL it gives you into the “Bark push URL” field in settings, and click “Test alert” to confirm the whole chain works. To reach several phones, put their URLs in the same field separated by semicolons. A failed push never changes the stock verdict.
 
 ### Why is the default polling interval 30 seconds?
 

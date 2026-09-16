@@ -153,7 +153,7 @@ apw watch    --targets targets.json --until-in-stock --timeout 300          # �
 
 ### 怎么在手机上收到提醒？
 
-在 iPhone 上装 [Bark](https://github.com/Finb/Bark)，把它给你的推送地址填进设置里的「Bark 推送地址」，点「测试提醒」确认整条链路通畅。推送失败不会改变库存判定。
+在 iPhone 上装 [Bark](https://github.com/Finb/Bark)，把它给你的推送地址填进设置里的「Bark 推送地址」，点「测试提醒」确认整条链路通畅。几台手机都要收就把地址用分号隔开一起填。推送失败不会改变库存判定。
 
 ### 查询间隔为什么默认 30 秒？
 
