@@ -564,3 +564,76 @@ async fn 内嵌提示音能真的响一声且并发调用不叠加() {
         "两次并发调用不该叠加播放：{elapsed:?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// 多个 Bark 地址（issue #35）
+// ---------------------------------------------------------------------------
+
+#[test]
+fn 推送地址按分号换行空白拆分并去重() {
+    use apw_core::notify::split_bark_urls;
+    assert_eq!(
+        split_bark_urls(" https://a/k1 ; https://b/k2\nhttps://a/k1\t;;  https://c/k3  "),
+        ["https://a/k1", "https://b/k2", "https://c/k3"]
+    );
+    assert!(split_bark_urls("").is_empty());
+    assert!(split_bark_urls(" ; \n ").is_empty());
+    assert_eq!(split_bark_urls("https://only/one"), ["https://only/one"]);
+}
+
+#[tokio::test]
+async fn 多个地址各推一次且渠道名带序号() {
+    let a = TestServer::ok();
+    let b = TestServer::ok();
+    let raw = format!("{};{}", a.base_url(), b.base_url());
+    let barks = Bark::from_list(&raw, client());
+    assert_eq!(barks.len(), 2);
+    assert_eq!(barks[0].name(), "Bark #1");
+    assert_eq!(barks[1].name(), "Bark #2");
+
+    let mut all = Multi::new();
+    for bark in barks {
+        all.push(bark);
+    }
+    all.notify(&到货通知()).await.expect("两路都应成功");
+    assert_eq!(a.count(), 1, "第一个地址收到一次");
+    assert_eq!(b.count(), 1, "第二个地址收到一次");
+}
+
+#[test]
+fn 只有一个地址时渠道名不带序号() {
+    let barks = Bark::from_list("https://api.day.app/only", client());
+    assert_eq!(barks.len(), 1);
+    assert_eq!(
+        barks[0].name(),
+        "Bark",
+        "单地址不要凭空多出序号，和以前的提示一致"
+    );
+    assert!(Bark::from_list("   ", client()).is_empty());
+}
+
+#[tokio::test]
+async fn 一个地址失败不影响另一个且错误指明是哪个() {
+    let good = TestServer::ok();
+    let bad = TestServer::start("500 Internal Server Error", "boom");
+    let raw = format!("{};{}", good.base_url(), bad.base_url());
+    let mut all = Multi::new();
+    for bark in Bark::from_list(&raw, client()) {
+        all.push(bark);
+    }
+    let err = all
+        .notify(&到货通知())
+        .await
+        .expect_err("第二个地址返回 500，整体应报错");
+    let text = err.to_string();
+    assert!(
+        text.contains("Bark #2"),
+        "错误要点名失败的是第二个地址：{text}"
+    );
+    assert!(
+        !text.contains("Bark #1"),
+        "第一个地址成功了，不该被点名：{text}"
+    );
+    assert_eq!(good.count(), 1, "失败的那路不能拖累成功的那路");
+    assert_eq!(bad.count(), 1);
+}

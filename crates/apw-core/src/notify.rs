@@ -179,7 +179,12 @@ pub struct Bark {
     base_url: String,
     http: reqwest::Client,
     timeout: Duration,
+    /// 渠道名。只配一个地址时就是「Bark」；配了多个时带序号，错误信息才分得清
+    /// 是哪个地址没发出去。
+    name: String,
 }
+
+pub use crate::config::split_bark_urls;
 
 impl Bark {
     /// `base_url` 是 Bark App 里给出的推送地址，形如
@@ -195,7 +200,28 @@ impl Bark {
             base_url: base_url.trim().to_string(),
             http,
             timeout: BARK_TIMEOUT,
+            name: BARK.to_string(),
         }
+    }
+
+    /// 按设置里的原始文本构造一组 Bark 渠道，一个地址一个，见 [`split_bark_urls`]。
+    ///
+    /// 只有一个地址时渠道名就是「Bark」，和过去一样；多个时依次叫「Bark #1」
+    /// 「Bark #2」…… 这样某一台手机的推送失败时，提示里能看出是哪一个。
+    /// 空文本返回空列表。
+    pub fn from_list(raw: &str, http: reqwest::Client) -> Vec<Self> {
+        let urls = split_bark_urls(raw);
+        let many = urls.len() > 1;
+        urls.into_iter()
+            .enumerate()
+            .map(|(i, url)| {
+                let mut bark = Self::new(url, http.clone());
+                if many {
+                    bark.name = format!("{BARK} #{}", i + 1);
+                }
+                bark
+            })
+            .collect()
     }
 
     /// 覆盖默认的单次请求超时。
@@ -212,7 +238,7 @@ impl Bark {
 
 impl Notifier for Bark {
     fn name(&self) -> &str {
-        BARK
+        &self.name
     }
 
     async fn notify(&self, n: &Notification) -> Result<(), NotifyError> {
@@ -230,18 +256,18 @@ impl Notifier for Bark {
             .send()
             .await
             .map_err(|e| NotifyError::Transport {
-                channel: BARK.to_string(),
+                channel: self.name.clone(),
                 detail: e.to_string(),
             })?;
 
         let status = resp.status();
-        let body = read_capped(&mut resp, BARK_MAX_BODY).await?;
+        let body = read_capped(&mut resp, BARK_MAX_BODY, &self.name).await?;
 
         // 上游拿到响应后连状态码都不看：设备 key 写错、服务器返回 400 时用户
         // 毫无察觉，一直以为推送生效了，真到货那天才发现什么也没收到。
         if !status.is_success() {
             return Err(NotifyError::Rejected {
-                channel: BARK.to_string(),
+                channel: self.name.clone(),
                 status: status.as_u16(),
                 body: summarize(&body),
             });
@@ -250,7 +276,7 @@ impl Notifier for Bark {
         // 部分 Bark 部署会在 HTTP 200 的响应体里用 code 字段报错，一并检查。
         if let Some((code, message)) = bark_business_error(&body) {
             return Err(NotifyError::Remote {
-                channel: BARK.to_string(),
+                channel: self.name.clone(),
                 code,
                 message,
             });
@@ -260,7 +286,11 @@ impl Notifier for Bark {
 }
 
 /// 分块读取 Bark 的响应体，读满上限就停手。
-async fn read_capped(resp: &mut reqwest::Response, max: usize) -> Result<Vec<u8>, NotifyError> {
+async fn read_capped(
+    resp: &mut reqwest::Response,
+    max: usize,
+    channel: &str,
+) -> Result<Vec<u8>, NotifyError> {
     let mut body = Vec::new();
     while body.len() < max {
         match resp.chunk().await {
@@ -271,7 +301,7 @@ async fn read_capped(resp: &mut reqwest::Response, max: usize) -> Result<Vec<u8>
             Ok(None) => break,
             Err(e) => {
                 return Err(NotifyError::Transport {
-                    channel: BARK.to_string(),
+                    channel: channel.to_string(),
                     detail: format!("读取响应失败：{e}"),
                 });
             }

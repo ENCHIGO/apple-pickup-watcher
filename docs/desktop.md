@@ -32,7 +32,7 @@
 
 ## Bark 推送
 
-安装 [Bark](https://github.com/Finb/Bark)，将它提供的完整设备地址填入「Bark 推送地址」，留空表示关闭。可保留自定义查询参数，例如：
+安装 [Bark](https://github.com/Finb/Bark)，将它提供的完整设备地址填入「Bark 推送地址」，留空表示关闭。要同时推到几台手机，把各自的地址用分号隔开填在同一个框里，每个地址单独推送、单独报错（失败提示里会标出是第几个地址）。可保留自定义查询参数，例如：
 
 ```text
 https://api.day.app/你的Key?group=库存&sound=alarm
