@@ -90,7 +90,7 @@ function phoneSelectionApp() {
     { partNumber: "C", category: "iphone", family: "iphone18promax", capacity: "512GB", color: "银色", title: "iPhone 18 Pro Max 512GB 银色" },
     { partNumber: "D", category: "ipad", family: "ipadpro", capacity: "256GB", color: "银色", title: "iPad Pro 256GB 银色" },
   ];
-  app.choice("选择自提门店").onChange("R532");
+  app.choice("选择自提门店").onChange(["R532"]);
   app.choice("选择机型").onChange("iphone18pro");
   app.choice("选择容量").onChange("512GB");
   app.choice("选择颜色").onChange("银色");
@@ -142,7 +142,7 @@ test("switching category or region clears the phone selection and preserves othe
   app.choice("选择容量").onChange("512GB");
   app.choice("选择颜色").onChange("银色");
   app.choice("选择地区").onChange("ja_JP");
-  assert.equal(app.choice("选择自提门店").value, "");
+  assert.deepEqual(app.choice("选择自提门店").values, []);
   assert.equal(app.choice("选择机型").value, "");
   assert.equal(app.choice("选择容量").value, "");
   assert.equal(app.choice("选择颜色").value, "");
@@ -158,4 +158,37 @@ test("proxy addresses are split on semicolons and saved as a list, and old setti
   assert.deepEqual(app.saved.at(-1).proxies, ["http://a:8080", "socks5://b:1080"]);
   app.state.settings = { ...app.state.settings, proxies: ["http://c:1"] };
   assert.equal(app.proxies().value, "http://c:1", "没在编辑时跟随后端保存的列表");
+test("selecting several stores adds one target per store, skips existing ones, and keeps the stores selected", async () => {
+  const app = phoneSelectionApp();
+  app.state.stores = [
+    { number: "R532", title: "杭州万象城" },
+    { number: "R471", title: "杭州西湖" },
+    { number: "R359", title: "上海南京东路" },
+  ];
+  // 上海南京东路的这一台已经在监控列表里了，再加不该重复。
+  app.state.rows = [{
+    target: { locale: "zh_CN", storeNumber: "R359", storeTitle: "上海南京东路", partNumber: "B", productName: "iPhone 18 Pro 512GB 银色" },
+    availability: { kind: "out_of_stock" }, lastCheckedMs: null, consecutiveFailures: 0,
+  }];
+  app.choice("选择自提门店").onChange(["R532", "R471", "R359"]);
+  assert.equal(app.addButton().disabled, false);
+  app.addButton().onClick();
+  await new Promise(setImmediate);
+  assert.deepEqual(app.addedTargets, [[
+    { locale: "zh_CN", storeNumber: "R359", storeTitle: "上海南京东路", partNumber: "B", productName: "iPhone 18 Pro 512GB 银色" },
+    { locale: "zh_CN", storeNumber: "R532", storeTitle: "杭州万象城", partNumber: "B", productName: "iPhone 18 Pro 512GB 银色" },
+    { locale: "zh_CN", storeNumber: "R471", storeTitle: "杭州西湖", partNumber: "B", productName: "iPhone 18 Pro 512GB 银色" },
+  ]]);
+  // 型号清掉、门店保留，接着给同一批门店加下一个型号最顺手。
+  assert.equal(app.choice("选择机型").value, "");
+  assert.deepEqual(app.choice("选择自提门店").values, ["R532", "R471", "R359"]);
+  assert.equal(app.addButton().disabled, true);
+});
+
+test("the add button stays disabled until at least one store is selected", () => {
+  const app = phoneSelectionApp();
+  app.choice("选择自提门店").onChange([]);
+  assert.equal(app.addButton().disabled, true);
+  app.choice("选择自提门店").onChange(["R532"]);
+  assert.equal(app.addButton().disabled, false);
 });

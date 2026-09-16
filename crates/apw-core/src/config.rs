@@ -134,7 +134,8 @@ pub struct Settings {
     pub targets: Vec<Target>,
     /// 每轮查询之间的间隔秒数。
     pub interval_seconds: u64,
-    /// 为空表示不启用 Bark 推送。
+    /// 为空表示不启用 Bark 推送。可以填多个地址，用分号分隔，见
+    /// [`Settings::bark_urls`]；字段仍是一个字符串，旧配置原样可读。
     pub bark_url: String,
     /// 有货时是否播放提示音。
     pub sound_enabled: bool,
@@ -184,6 +185,10 @@ impl Settings {
             self.interval_seconds = DEFAULT_INTERVAL_SECONDS;
         }
 
+        // 推送地址收敛成「分号分隔、无空项、无重复」的规范写法，读回来和
+        // 界面上显示的一致；单个地址前后有空格的老配置也顺手修好。
+        self.bark_url = split_bark_urls(&self.bark_url).join(";");
+
         // 去重时**新建 Vec 再整体替换**，不在原 Vec 上就地压缩。
         //
         // Go 版写的是 kept := s.Targets[:0]，复用底层数组原地压缩。而 Save 虽然
@@ -220,6 +225,28 @@ impl Settings {
     pub fn interval(&self) -> Duration {
         Duration::from_secs(self.interval_seconds)
     }
+
+    /// 配置的全部 Bark 推送地址，空表示未启用。
+    pub fn bark_urls(&self) -> Vec<String> {
+        split_bark_urls(&self.bark_url)
+    }
+}
+
+/// 把设置里的推送地址拆成一条条：分号、换行、空白都算分隔符。
+///
+/// 用户想同时推到几台手机（issue #35），最省事的写法是在同一个输入框里用分号
+/// 隔开。放在这里而不是 `notify` 模块，是因为后者挂在 `notifications` feature 后面，
+/// 而 CLI 那份构建没有它 —— 设置的规范化不能依赖一个可选模块。去掉空项与重复项，保持先后顺序；地址里不会出现这些字符，不必转义。
+pub fn split_bark_urls(raw: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for piece in raw.split(|c: char| c == ';' || c == '\n' || c == '\r' || c.is_whitespace()) {
+        let piece = piece.trim();
+        if piece.is_empty() || out.iter().any(|u| u == piece) {
+            continue;
+        }
+        out.push(piece.to_string());
+    }
+    out
 }
 
 /// 代理地址列表的规范化：每一项再按分号 / 空白拆开（用户可能把几个地址粘进同一

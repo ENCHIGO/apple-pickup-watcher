@@ -89,7 +89,7 @@ For Claude Code replace `codex` with `claude-code`; drop `--global` to install i
 
 ### Desktop in three steps
 
-1. **Add targets**: choose region → category → store → model and click “Add”. For iPhone, pick the model, capacity and colour step by step. Add as many as you like, mixing categories and stores freely.
+1. **Add targets**: choose region → category → store → model and click “Add”. You can tick several stores at once and get one target per store. For iPhone, pick the model, capacity and colour step by step. Add as many as you like, mixing categories and stores freely.
 2. **Start watching**: click “Start”. Keep the app running and your computer online and awake; closing the window moves it to the tray and keeps it going. It polls every 30 seconds by default, with a minimum of 5 seconds.
 3. **Get the alert, then buy on Apple’s website**: when stock is confirmed you get a desktop notification, the alert sound, and a Bark push, and the shopping bag can open if enabled. Adding the item, choosing the pickup store, checkout, and payment are done by you on Apple’s website.
 
@@ -153,7 +153,7 @@ No, and no. It only checks stock and alerts you, and at most opens your shopping
 
 ### How do I get alerts on my phone?
 
-Install [Bark](https://github.com/Finb/Bark) on your iPhone, paste the push URL it gives you into the “Bark push URL” field in settings, and click “Test alert” to confirm the whole chain works. A failed push never changes the stock verdict.
+Install [Bark](https://github.com/Finb/Bark) on your iPhone, paste the push URL it gives you into the “Bark push URL” field in settings, and click “Test alert” to confirm the whole chain works. To reach several phones, put their URLs in the same field separated by semicolons. A failed push never changes the stock verdict.
 
 ### Why is the default polling interval 30 seconds?
 
