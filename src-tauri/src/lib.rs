@@ -304,7 +304,10 @@ async fn dispatch_notification(
             .unwrap_or_default();
         // Bark 每次现构造：地址是用户随时可改的设置项，缓存实例会在改完地址后
         // 继续往旧地址推。共享的 http 客户端一并传进去，连接池仍然复用。
-        channels.push(Bark::new(settings.bark_url.clone(), http));
+        // 用户可以填多个地址（分号分隔），每个地址一条渠道，并发推送、各自报错。
+        for bark in Bark::from_list(&settings.bark_url, http) {
+            channels.push(bark);
+        }
     }
     if channels.is_empty() {
         return Ok(());

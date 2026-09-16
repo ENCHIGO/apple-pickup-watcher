@@ -134,7 +134,8 @@ pub struct Settings {
     pub targets: Vec<Target>,
     /// 每轮查询之间的间隔秒数。
     pub interval_seconds: u64,
-    /// 为空表示不启用 Bark 推送。
+    /// 为空表示不启用 Bark 推送。可以填多个地址，用分号分隔，见
+    /// [`Settings::bark_urls`]；字段仍是一个字符串，旧配置原样可读。
     pub bark_url: String,
     /// 有货时是否播放提示音。
     pub sound_enabled: bool,
@@ -179,6 +180,10 @@ impl Settings {
             self.interval_seconds = DEFAULT_INTERVAL_SECONDS;
         }
 
+        // 推送地址收敛成「分号分隔、无空项、无重复」的规范写法，读回来和
+        // 界面上显示的一致；单个地址前后有空格的老配置也顺手修好。
+        self.bark_url = crate::notify::split_bark_urls(&self.bark_url).join(";");
+
         // 去重时**新建 Vec 再整体替换**，不在原 Vec 上就地压缩。
         //
         // Go 版写的是 kept := s.Targets[:0]，复用底层数组原地压缩。而 Save 虽然
@@ -211,6 +216,11 @@ impl Settings {
     /// 查询间隔。
     pub fn interval(&self) -> Duration {
         Duration::from_secs(self.interval_seconds)
+    }
+
+    /// 配置的全部 Bark 推送地址，空表示未启用。
+    pub fn bark_urls(&self) -> Vec<String> {
+        crate::notify::split_bark_urls(&self.bark_url)
     }
 }
 
