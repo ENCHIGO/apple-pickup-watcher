@@ -14,7 +14,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 rand.workspace = true
-wreq = { version = "0.16", default-features = false, features = ["cookies", "gzip", "brotli", "query", "stream", "webpki-roots", "tokio-rt"], optional = true }
+wreq = { version = "0.16", default-features = false, features = ["cookies", "gzip", "brotli", "query", "stream", "webpki-roots", "tokio-rt", "socks"], optional = true }
 wreq-util = { version = "0.2", default-features = false, features = ["emulation"], optional = true }
 futures-util = { version = "0.3", default-features = false, features = ["std"], optional = true }
 rodio = { workspace = true, optional = true }

@@ -141,6 +141,10 @@ pub struct Settings {
     pub sound_enabled: bool,
     /// 有货时是否自动打开购物袋页面。
     pub open_bag_on_hit: bool,
+    /// 代理地址列表，可空。每个代理是一条额外的出口线路，和直连轮流使用、被拦时
+    /// 切换（见 [`crate::apple::ClientConfig::proxies`]）。只保留能解析、协议为
+    /// http / https / socks5 / socks5h 的地址。
+    pub proxies: Vec<String>,
 }
 
 /// 内置地区表里的第一个 locale，作为兜底取值。
@@ -159,6 +163,7 @@ impl Default for Settings {
             bark_url: String::new(),
             sound_enabled: true,
             open_bag_on_hit: true,
+            proxies: Vec::new(),
         }
     }
 }
@@ -211,6 +216,9 @@ impl Settings {
             }
         }
         self.targets = kept;
+
+        // 代理地址只留合法的：写错的留着只会让每一轮查询都撞一次「代理地址无效」。
+        self.proxies = normalize_proxies(&self.proxies);
     }
 
     /// 查询间隔。
@@ -237,6 +245,31 @@ pub fn split_bark_urls(raw: &str) -> Vec<String> {
             continue;
         }
         out.push(piece.to_string());
+    }
+    out
+}
+
+/// 代理地址列表的规范化：每一项再按分号 / 空白拆开（用户可能把几个地址粘进同一
+/// 行），去空白、去重，只保留能解析出主机、协议为 http / https / socks5 / socks5h
+/// 的地址。
+pub fn normalize_proxies(raw: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for entry in raw {
+        for piece in entry.split(|c: char| c == ';' || c.is_whitespace()) {
+            let piece = piece.trim();
+            if piece.is_empty() || out.iter().any(|p| p == piece) {
+                continue;
+            }
+            let Ok(url) = reqwest::Url::parse(piece) else {
+                continue;
+            };
+            if !matches!(url.scheme(), "http" | "https" | "socks5" | "socks5h")
+                || url.host_str().is_none()
+            {
+                continue;
+            }
+            out.push(piece.to_string());
+        }
     }
     out
 }
@@ -577,6 +610,8 @@ impl LegacySettings {
             bark_url: self.bark_url.unwrap_or(fallback.bark_url),
             sound_enabled: self.sound_enabled.unwrap_or(fallback.sound_enabled),
             open_bag_on_hit: self.open_bag_on_hit.unwrap_or(fallback.open_bag_on_hit),
+            // Go 版没有代理设置，迁移过来的文件一律从空开始。
+            proxies: fallback.proxies,
         };
         settings.normalize();
         settings

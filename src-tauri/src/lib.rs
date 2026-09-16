@@ -57,6 +57,8 @@ struct CategoryDto {
 
 struct AppState {
     watcher: Watcher,
+    /// 和引擎共用的 Apple 客户端句柄，改代理设置时用它换线路，不用重启。
+    client: AppleClient,
     catalog: Catalog,
     http: reqwest::Client,
     /// 设置的内存副本。写盘失败不该让界面卡住，所以内存副本是权威的展示来源。
@@ -159,6 +161,14 @@ async fn save_settings(
     // 设置里的目标列表和查询间隔要同步给引擎，否则改完设置监控还按旧的跑。
     state.watcher.set_targets(next.targets.clone()).await;
     state.watcher.set_interval(next.interval()).await;
+    // 代理变了就换线路，立即生效；地址解析不了就把错误报回界面，其余设置照存。
+    if next.proxies != state.settings_snapshot().proxies {
+        state
+            .client
+            .set_proxies(&next.proxies)
+            .await
+            .map_err(|e| format!("代理设置未生效：{e}"))?;
+    }
 
     state.put_settings(next.clone())?;
     Ok(next)
@@ -505,14 +515,17 @@ pub fn run() {
             catalog.attach_companions(&mut settings.targets);
             catalog.attach_locations(&mut settings.targets);
 
-            let client = AppleClient::new(ClientConfig::default())
-                .map_err(|e| format!("构造 Apple 客户端失败：{e}"))?;
+            let client = AppleClient::new(ClientConfig {
+                proxies: settings.proxies.clone(),
+                ..ClientConfig::default()
+            })
+            .map_err(|e| format!("构造 Apple 客户端失败：{e}"))?;
 
             // 用 Watcher::new 而不是 Watcher::spawn：setup 回调跑在主线程上，
             // 并不处在 tokio 运行时上下文里，在这里 tokio::spawn 会 panic，
             // 而且因为发生在不可展开的回调中，进程会直接 abort。
             // 引擎任务交给 Tauri 自己的运行时去驱动。
-            let (watcher, events, engine) = Watcher::new(client, WatcherConfig::default());
+            let (watcher, events, engine) = Watcher::new(client.clone(), WatcherConfig::default());
             tauri::async_runtime::spawn(engine);
 
             {
@@ -527,6 +540,7 @@ pub fn run() {
 
             app.manage(AppState {
                 watcher,
+                client,
                 catalog,
                 http: reqwest::Client::new(),
                 settings: RwLock::new(settings),

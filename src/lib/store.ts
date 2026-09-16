@@ -72,6 +72,7 @@ const DEFAULT_SETTINGS: Settings = {
   barkUrl: "",
   soundEnabled: true,
   openBagOnHit: true,
+  proxies: [],
 };
 
 let state: UiState = {

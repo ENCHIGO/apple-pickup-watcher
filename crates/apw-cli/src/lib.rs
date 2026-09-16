@@ -344,21 +344,28 @@ pub async fn execute<W: AsyncWrite + Unpin>(cli: Cli, out: &mut W) -> Result<u8,
                 "source": source, "refreshComplete": if refresh { Some(complete) } else { None }, "warning": warning, "products": products})).await?;
             return Ok(if complete { 0 } else { 3 });
         }
-        Command::Check { targets, .. } => {
+        Command::Check { targets, proxy, .. } => {
             let targets = load_targets(targets, &catalog).await?;
-            let client = AppleClient::new(ClientConfig::default())
-                .map_err(|e| CliError::new(1, "client_error", e.to_string()))?;
+            let client = AppleClient::new(ClientConfig {
+                proxies: proxy,
+                ..ClientConfig::default()
+            })
+            .map_err(|e| CliError::new(1, "client_error", e.to_string()))?;
             return monitor(client, targets, WatcherConfig::default(), Mode::Check, out).await;
         }
         Command::Watch {
             targets,
             interval,
             until_in_stock,
+            proxy,
             ..
         } => {
             let targets = load_targets(targets, &catalog).await?;
-            let client = AppleClient::new(ClientConfig::default())
-                .map_err(|e| CliError::new(1, "client_error", e.to_string()))?;
+            let client = AppleClient::new(ClientConfig {
+                proxies: proxy,
+                ..ClientConfig::default()
+            })
+            .map_err(|e| CliError::new(1, "client_error", e.to_string()))?;
             let config = WatcherConfig {
                 interval: Duration::from_secs(interval),
                 ..WatcherConfig::default()
