@@ -149,15 +149,6 @@ test("switching category or region clears the phone selection and preserves othe
   assert.equal(app.addButton().disabled, true);
 });
 
-test("proxy addresses are split on semicolons and saved as a list, and old settings without the field read as empty", () => {
-  const app = renderApp();
-  assert.equal(app.proxies().value, "", "老设置没有 proxies 字段，输入框应当是空的而不是报错");
-  app.proxies().onChange({ target: { value: " http://a:8080 ; socks5://b:1080  " } });
-  assert.equal(app.proxies().value, " http://a:8080 ; socks5://b:1080  ");
-  app.proxies().onBlur();
-  assert.deepEqual(app.saved.at(-1).proxies, ["http://a:8080", "socks5://b:1080"]);
-  app.state.settings = { ...app.state.settings, proxies: ["http://c:1"] };
-  assert.equal(app.proxies().value, "http://c:1", "没在编辑时跟随后端保存的列表");
 test("selecting several stores adds one target per store, skips existing ones, and keeps the stores selected", async () => {
   const app = phoneSelectionApp();
   app.state.stores = [
@@ -191,4 +182,15 @@ test("the add button stays disabled until at least one store is selected", () =>
   assert.equal(app.addButton().disabled, true);
   app.choice("选择自提门店").onChange(["R532"]);
   assert.equal(app.addButton().disabled, false);
+});
+
+test("proxy addresses are split on semicolons and saved as a list, and old settings without the field read as empty", () => {
+  const app = renderApp();
+  assert.equal(app.proxies().value, "", "老设置没有 proxies 字段，输入框应当是空的而不是报错");
+  app.proxies().onChange({ target: { value: " http://a:8080 ; socks5://b:1080  " } });
+  assert.equal(app.proxies().value, " http://a:8080 ; socks5://b:1080  ");
+  app.proxies().onBlur();
+  assert.deepEqual(app.saved.at(-1).proxies, ["http://a:8080", "socks5://b:1080"]);
+  app.state.settings = { ...app.state.settings, proxies: ["http://c:1"] };
+  assert.equal(app.proxies().value, "http://c:1", "没在编辑时跟随后端保存的列表");
 });
