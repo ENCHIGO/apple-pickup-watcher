@@ -7,7 +7,8 @@
    所以两套配色都要认真配，不能只把浅色反一下了事。 */
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  /* 页面底色比卡片略灰：分区卡片要有一层底才「浮」得起来，纯白上叠纯白只剩一圈线。 */
+  --background: oklch(0.975 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
