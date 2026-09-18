@@ -306,9 +306,12 @@ async fn apple_watch_表壳配上表带才能拿到明确答复() {
 #[tokio::test(flavor = "multi_thread")]
 async fn 一次请求可以带多个零件号() {
     // 这决定了正确的请求策略：每门店每轮只发一个请求，覆盖该店所有关注型号。
+    //
+    // 三个型号刻意跨三个系列（iPhone 17、iPhone Air、iPhone 18 Pro）。同一系列
+    // 往往同一天整批下架，跨系列挑，「至少两个还在售」能维持得更久。
     let client = client();
     let region = region_by_locale("zh_CN").unwrap();
-    let parts: Vec<String> = ["MG724CH/A", "MG0A4CH/A", "MG364CH/A"]
+    let parts: Vec<String> = ["MG724CH/A", "MG364CH/A", "MJTA4CH/A"]
         .iter()
         .map(|s| s.to_string())
         .collect();
@@ -318,13 +321,35 @@ async fn 一次请求可以带多个零件号() {
         .await
         .expect("批量查询应当成功");
 
-    assert_eq!(
-        result.parts.len(),
+    for p in &parts {
+        match result.parts.get(p) {
+            Some(status) => println!(
+                "{p:12} -> {:4} (pickupDisplay={})",
+                status.availability.label(),
+                status.pickup_display
+            ),
+            None => println!("{p:12} -> 响应里没有（多半已下架，该换成在售型号了）"),
+        }
+    }
+
+    // 不要求三个全部回来。Apple 对已下架的型号是静默略过而不是报错：2026-09-10
+    // iPhone 17 Pro Max 下架，原先写死的 MG0A4CH/A 从响应里消失，这条测试连红了
+    // 一周，报的却不是接口变化。要守住的只是「一次请求、多个型号、同一份响应」，
+    // 两个就足以证明；接口真要是不再接受批量（只回第一个，或一个都不回），这里
+    // 照样会红。
+    let returned = parts
+        .iter()
+        .filter(|p| result.parts.contains_key(*p))
+        .count();
+    assert!(
+        returned >= 2,
+        "批量请求 {} 个型号，同一响应里只回来 {} 个：{:?}",
         parts.len(),
-        "批量请求的型号数与返回的不一致：{:?}",
+        returned,
         result.parts.keys().collect::<Vec<_>>()
     );
-    for p in &parts {
-        assert!(result.parts.contains_key(p), "响应里缺少 {p}");
+    // 回来的必须都是问过的：多出来的键说明响应结构变了，解析器在按错的字段取值。
+    for key in result.parts.keys() {
+        assert!(parts.contains(key), "响应里出现了没请求过的型号 {key}");
     }
 }
