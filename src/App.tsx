@@ -25,7 +25,8 @@ import {
   capacityOptions,
   colorOptions,
   familyOptions,
-  productForSelection,
+  keepAvailable,
+  productsForSelection,
 } from "@/lib/product-selection";
 import {
   Table,
@@ -64,6 +65,7 @@ import {
   describeAvailability,
   formatTime,
   isUntrusted,
+  type Product,
   type StatusTone,
   type Target,
   targetKey,
@@ -108,10 +110,14 @@ export default function App() {
 
   // 门店可以一次选好几家：同城门店合并成一次请求之后，多选不增加请求量。
   const [storeNumbers, setStoreNumbers] = useState<string[]>([]);
+  // 非 iPhone 品类直接选一个完整型号。
   const [partNumber, setPartNumber] = useState("");
-  const [productFamily, setProductFamily] = useState("");
-  const [capacity, setCapacity] = useState("");
-  const [color, setColor] = useState("");
+  // iPhone 按机型 → 容量 → 颜色三级选择，三级都可多选：发售当晚常见的是
+  // 「这两款、这三个颜色，哪个有货要哪个」，一台一台加太慢。三级组合里目录中
+  // 存在的型号全部加入。
+  const [families, setFamilies] = useState<string[]>([]);
+  const [capacities, setCapacities] = useState<string[]>([]);
+  const [colors, setColors] = useState<string[]>([]);
   const [barkDraft, setBarkDraft] = useState<string | null>(null);
   const [proxiesDraft, setProxiesDraft] = useState<string | null>(null);
   const [intervalDraft, setIntervalDraft] = useState<number | null>(null);
@@ -140,19 +146,45 @@ export default function App() {
     [ui.products, ui.category],
   );
   const iphoneCapacityOptions = useMemo(
-    () => capacityOptions(ui.products, ui.category, productFamily),
-    [ui.products, ui.category, productFamily],
+    () => capacityOptions(ui.products, ui.category, families),
+    [ui.products, ui.category, families],
   );
   const iphoneColorOptions = useMemo(
-    () => colorOptions(ui.products, ui.category, productFamily, capacity),
-    [ui.products, ui.category, productFamily, capacity],
+    () => colorOptions(ui.products, ui.category, families, capacities),
+    [ui.products, ui.category, families, capacities],
   );
+  // 点「添加」时会加入的型号。iPhone 是三级选择的组合，其他品类就是选中的那一个。
+  const selectedProducts = useMemo<Product[]>(() => {
+    if (ui.category === "iphone") {
+      return productsForSelection(ui.products, ui.category, families, capacities, colors);
+    }
+    const product = ui.products.find((p) => p.partNumber === partNumber);
+    return product ? [product] : [];
+  }, [ui.products, ui.category, families, capacities, colors, partNumber]);
 
   function resetProductSelection() {
     setPartNumber("");
-    setProductFamily("");
-    setCapacity("");
-    setColor("");
+    setFamilies([]);
+    setCapacities([]);
+    setColors([]);
+  }
+
+  // 上级变了，下级只去掉不再可选的项，仍然成立的留着（理由见 keepAvailable）。
+  function onFamiliesChange(next: string[]) {
+    setFamilies(next);
+    const nextCapacities = keepAvailable(
+      capacities,
+      capacityOptions(ui.products, ui.category, next),
+    );
+    setCapacities(nextCapacities);
+    setColors(
+      keepAvailable(colors, colorOptions(ui.products, ui.category, next, nextCapacities)),
+    );
+  }
+
+  function onCapacitiesChange(next: string[]) {
+    setCapacities(next);
+    setColors(keepAvailable(colors, colorOptions(ui.products, ui.category, families, next)));
   }
 
   const targets = useMemo(() => ui.rows.map((r) => r.target), [ui.rows]);
@@ -169,31 +201,32 @@ export default function App() {
     return { inStock, outOfStock, untrusted };
   }, [ui.rows]);
 
-  const canAdd = storeNumbers.length > 0 && partNumber !== "";
+  const canAdd = storeNumbers.length > 0 && selectedProducts.length > 0;
 
   async function onAdd() {
     if (!canAdd) return;
-    const product = ui.products.find((p) => p.partNumber === partNumber);
-    if (!product) return;
 
-    // 选了几家店就加几条目标，同一型号；已经在列表里的那几家跳过，不重复。
+    // 门店 × 型号，每个组合一条目标；已经在列表里的跳过，不重复。
+    // 按门店分组排，表格里同一家店的几台机器挨在一起。
     const existing = new Set(targets.map(targetKey));
     const added: Target[] = [];
     for (const number of storeNumbers) {
       const store = ui.stores.find((s) => s.number === number);
       if (!store) continue;
-      const next: Target = {
-        locale: ui.settings.locale,
-        storeNumber: store.number,
-        storeTitle: store.title,
-        partNumber: product.partNumber,
-        productName: product.title,
-        ...(product.companionPart ? { companionPart: product.companionPart } : {}),
-      };
-      const key = targetKey(next);
-      if (existing.has(key)) continue;
-      existing.add(key);
-      added.push(next);
+      for (const product of selectedProducts) {
+        const next: Target = {
+          locale: ui.settings.locale,
+          storeNumber: store.number,
+          storeTitle: store.title,
+          partNumber: product.partNumber,
+          productName: product.title,
+          ...(product.companionPart ? { companionPart: product.companionPart } : {}),
+        };
+        const key = targetKey(next);
+        if (existing.has(key)) continue;
+        existing.add(key);
+        added.push(next);
+      }
     }
     if (added.length === 0) return;
     await setTargets([...targets, ...added]);
@@ -331,63 +364,47 @@ export default function App() {
           {ui.category === "iphone" ? (
             <>
               <div className="grid gap-1.5">
-                <Label>机型</Label>
-                <Combobox
+                <Label>机型（可多选）</Label>
+                <MultiCombobox
                   className="w-48"
                   options={iphoneFamilyOptions}
-                  value={productFamily}
-                  onChange={(value) => {
-                    setProductFamily(value);
-                    setCapacity("");
-                    setColor("");
-                    setPartNumber("");
-                  }}
+                  values={families}
+                  onChange={onFamiliesChange}
                   placeholder="选择机型"
                   searchPlaceholder="搜索机型…"
                   emptyText="没有匹配的机型"
+                  countLabel={(n) => `已选 ${n} 款机型`}
                   disabled={iphoneFamilyOptions.length === 0}
                 />
               </div>
 
               <div className="grid gap-1.5">
-                <Label>容量（存储）</Label>
-                <Combobox
+                <Label>容量（可多选）</Label>
+                <MultiCombobox
                   className="w-36"
                   options={iphoneCapacityOptions}
-                  value={capacity}
-                  onChange={(value) => {
-                    setCapacity(value);
-                    setColor("");
-                    setPartNumber("");
-                  }}
+                  values={capacities}
+                  onChange={onCapacitiesChange}
                   placeholder="选择容量"
                   searchPlaceholder="搜索容量…"
                   emptyText="没有匹配的容量"
-                  disabled={productFamily === "" || iphoneCapacityOptions.length === 0}
+                  countLabel={(n) => `已选 ${n} 种容量`}
+                  disabled={families.length === 0 || iphoneCapacityOptions.length === 0}
                 />
               </div>
 
               <div className="grid gap-1.5">
-                <Label>颜色</Label>
-                <Combobox
+                <Label>颜色（可多选）</Label>
+                <MultiCombobox
                   className="w-40"
                   options={iphoneColorOptions}
-                  value={color}
-                  onChange={(value) => {
-                    setColor(value);
-                    const product = productForSelection(
-                      ui.products,
-                      ui.category,
-                      productFamily,
-                      capacity,
-                      value,
-                    );
-                    setPartNumber(product?.partNumber ?? "");
-                  }}
+                  values={colors}
+                  onChange={setColors}
                   placeholder="选择颜色"
                   searchPlaceholder="搜索颜色…"
                   emptyText="没有匹配的颜色"
-                  disabled={capacity === "" || iphoneColorOptions.length === 0}
+                  countLabel={(n) => `已选 ${n} 种颜色`}
+                  disabled={capacities.length === 0 || iphoneColorOptions.length === 0}
                 />
               </div>
             </>
@@ -410,6 +427,15 @@ export default function App() {
           <Button variant="secondary" onClick={() => void onAdd()} disabled={!canAdd}>
             <Plus /> 添加
           </Button>
+          {selectedProducts.length > 1 && (
+            // 多选时把要加的规模点明：三级各勾几项之后，组合数并不直观。
+            <span
+              className="text-muted-foreground pb-2 text-sm"
+              title={selectedProducts.map((p) => p.title).join("、")}
+            >
+              {selectedProducts.length} 个型号 × {storeNumbers.length} 家门店
+            </span>
+          )}
 
           <Tooltip>
             <TooltipTrigger asChild>
