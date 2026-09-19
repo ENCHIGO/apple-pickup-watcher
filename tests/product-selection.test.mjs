@@ -31,29 +31,65 @@ const products = [
   },
 ];
 
-test("iPhone selection exposes model, storage and color separately", () => {
+test("iPhone selection exposes model, storage and colour separately", () => {
   assert.deepEqual(selection.familyOptions(products, "iphone"), [
     { value: "iphone18pro", label: "iPhone 18 Pro" },
     { value: "iphone18promax", label: "iPhone 18 Pro Max" },
   ]);
-  assert.deepEqual(selection.capacityOptions(products, "iphone", "iphone18pro"), [
+  assert.deepEqual(selection.capacityOptions(products, "iphone", ["iphone18pro"]), [
     { value: "256GB", label: "256GB" },
     { value: "512GB", label: "512GB" },
   ]);
-  assert.deepEqual(selection.colorOptions(products, "iphone", "iphone18pro", "512GB"), [
+  assert.deepEqual(selection.colorOptions(products, "iphone", ["iphone18pro"], ["512GB"]), [
     { value: "银色", label: "银色" },
   ]);
 });
 
-test("an exact selection resolves to one Apple part number", () => {
-  assert.equal(
-    selection.productForSelection(
+test("storage and colour options are the union over every selected model and storage", () => {
+  assert.deepEqual(
+    selection.capacityOptions(products, "iphone", ["iphone18pro", "iphone18promax"]),
+    [
+      { value: "256GB", label: "256GB" },
+      { value: "512GB", label: "512GB" },
+    ],
+  );
+  assert.deepEqual(
+    selection.colorOptions(
       products,
       "iphone",
-      "iphone18promax",
-      "512GB",
-      "银色",
-    ).partNumber,
-    "C",
+      ["iphone18pro", "iphone18promax"],
+      ["256GB", "512GB"],
+    ),
+    [
+      { value: "黑色", label: "黑色" },
+      { value: "银色", label: "银色" },
+    ],
   );
+  assert.deepEqual(selection.capacityOptions(products, "iphone", []), []);
+});
+
+test("a selection resolves to every existing combination and skips ones the catalog lacks", () => {
+  assert.deepEqual(
+    selection
+      .productsForSelection(
+        products,
+        "iphone",
+        ["iphone18pro", "iphone18promax"],
+        ["512GB"],
+        ["银色"],
+      )
+      .map((p) => p.partNumber),
+    ["B", "C"],
+  );
+  // Pro 的 256GB 没有银色：这个组合落空，既不报错也不凑合成别的型号。
+  assert.deepEqual(
+    selection.productsForSelection(products, "iphone", ["iphone18pro"], ["256GB"], ["银色"]),
+    [],
+  );
+});
+
+test("narrowing the parent choice keeps only the child choices that still exist", () => {
+  const options = selection.capacityOptions(products, "iphone", ["iphone18promax"]);
+  assert.deepEqual(selection.keepAvailable(["256GB", "512GB"], options), ["512GB"]);
+  assert.deepEqual(selection.keepAvailable([], options), []);
 });

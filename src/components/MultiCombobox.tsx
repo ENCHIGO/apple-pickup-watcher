@@ -67,7 +67,7 @@ export function MultiCombobox({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("justify-between font-normal", className)}
+          className={cn("bg-card justify-between font-normal", className)}
         >
           <span
             // 悬停能看全选了哪几家；触发器本身只放得下一个数字。
