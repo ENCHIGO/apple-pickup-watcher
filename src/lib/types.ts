@@ -133,12 +133,11 @@ export type WatcherEvent =
 export function describeAdvice(advice: TroubleAdvice): string {
   switch (advice) {
     case "try_another_network":
-      return (
-        "这多半不是「等一会儿就好」的故障：Apple 的边缘节点正在拦你这条网络的请求，" +
-        "而同一时刻浏览器通常一切正常。换成手机热点或另一条网络，往往立刻恢复。"
-      );
+      // 先说动作，再说原因，而且短：界面上这句话是在一屏告警里被扫到的，
+      // 不是被读完的。
+      return "换成手机热点或另一条网络，通常立刻恢复。这是 Apple 在拦这条网络的请求，同一时刻浏览器多半照常。";
     case "wait_for_update":
-      return "这个你改设置或换网络都解决不了，需要等程序更新。";
+      return "需要等程序更新，改设置或换网络都解决不了。";
     default:
       return assertNever(advice);
   }

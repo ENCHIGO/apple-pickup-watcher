@@ -56,6 +56,8 @@ function renderApp() {
     choice: (placeholder) => control((element) => element?.props?.placeholder === placeholder),
     addButton: () => control((element) => element.type === "Button" &&
       Array.isArray(element.props.children) && element.props.children.includes(" 添加")),
+    scaleHint: () => control((element) => element.type === "span" &&
+      Array.isArray(element.props.children) && element.props.children.includes(" 个型号 × ")),
     state, saved, addedTargets,
   };
 }
@@ -91,9 +93,9 @@ function phoneSelectionApp() {
     { partNumber: "D", category: "ipad", family: "ipadpro", capacity: "256GB", color: "银色", title: "iPad Pro 256GB 银色" },
   ];
   app.choice("选择自提门店").onChange(["R532"]);
-  app.choice("选择机型").onChange("iphone18pro");
-  app.choice("选择容量").onChange("512GB");
-  app.choice("选择颜色").onChange("银色");
+  app.choice("选择机型").onChange(["iphone18pro"]);
+  app.choice("选择容量").onChange(["512GB"]);
+  app.choice("选择颜色").onChange(["银色"]);
   return app;
 }
 
@@ -106,24 +108,62 @@ test("iPhone choices add the exact monitoring target and reset after adding", as
     locale: "zh_CN", storeNumber: "R532", storeTitle: "杭州万象城",
     partNumber: "B", productName: "iPhone 18 Pro 512GB 银色",
   }]]);
-  assert.equal(app.choice("选择机型").value, "");
+  assert.deepEqual(app.choice("选择机型").values, []);
   assert.equal(app.choice("选择容量").disabled, true);
   assert.equal(app.choice("选择颜色").disabled, true);
   assert.equal(app.addButton().disabled, true);
 });
 
-test("changing storage or model clears the previous SKU before adding a target", () => {
+test("narrowing storage or model keeps the choices that still exist and drops the rest", () => {
   const app = phoneSelectionApp();
-  app.choice("选择容量").onChange("256GB");
-  assert.equal(app.choice("选择颜色").value, "");
+  // 只留 256GB：Pro 的 256GB 只有黑色，之前选的银色不再成立，被去掉。
+  app.choice("选择容量").onChange(["256GB"]);
   assert.deepEqual(app.choice("选择颜色").options, [{ value: "黑色", label: "黑色" }]);
+  assert.deepEqual(app.choice("选择颜色").values, []);
   assert.equal(app.addButton().disabled, true);
-  app.choice("选择颜色").onChange("黑色");
+  app.choice("选择颜色").onChange(["黑色"]);
   assert.equal(app.addButton().disabled, false);
-  app.choice("选择机型").onChange("iphone18promax");
-  assert.equal(app.choice("选择容量").value, "");
-  assert.equal(app.choice("选择颜色").value, "");
+  // 换成 Pro Max：它没有 256GB，容量和颜色都跟着清空。
+  app.choice("选择机型").onChange(["iphone18promax"]);
+  assert.deepEqual(app.choice("选择容量").values, []);
+  assert.deepEqual(app.choice("选择颜色").values, []);
   assert.equal(app.addButton().disabled, true);
+});
+
+test("switching model keeps a storage and colour the new model also has", () => {
+  const app = phoneSelectionApp();
+  // 从 Pro 换到 Pro Max，512GB 银色两款都有，不必重选。
+  app.choice("选择机型").onChange(["iphone18promax"]);
+  assert.deepEqual(app.choice("选择容量").values, ["512GB"]);
+  assert.deepEqual(app.choice("选择颜色").values, ["银色"]);
+  assert.equal(app.addButton().disabled, false);
+});
+
+test("several models, storages and colours add every existing combination for every store", async () => {
+  const app = phoneSelectionApp();
+  app.state.stores = [
+    { number: "R532", title: "杭州万象城" },
+    { number: "R471", title: "杭州西湖" },
+  ];
+  app.choice("选择自提门店").onChange(["R532", "R471"]);
+  app.choice("选择机型").onChange(["iphone18pro", "iphone18promax"]);
+  app.choice("选择容量").onChange(["256GB", "512GB"]);
+  app.choice("选择颜色").onChange(["黑色", "银色"]);
+  // 八种组合里目录只有三台，提示里点明规模。
+  assert.equal(app.scaleHint().children.join(""), "3 个型号 × 2 家门店");
+  assert.equal(app.addButton().disabled, false);
+  app.addButton().onClick();
+  await new Promise(setImmediate);
+  assert.deepEqual(app.addedTargets, [[
+    { locale: "zh_CN", storeNumber: "R532", storeTitle: "杭州万象城", partNumber: "A", productName: "iPhone 18 Pro 256GB 黑色" },
+    { locale: "zh_CN", storeNumber: "R532", storeTitle: "杭州万象城", partNumber: "B", productName: "iPhone 18 Pro 512GB 银色" },
+    { locale: "zh_CN", storeNumber: "R532", storeTitle: "杭州万象城", partNumber: "C", productName: "iPhone 18 Pro Max 512GB 银色" },
+    { locale: "zh_CN", storeNumber: "R471", storeTitle: "杭州西湖", partNumber: "A", productName: "iPhone 18 Pro 256GB 黑色" },
+    { locale: "zh_CN", storeNumber: "R471", storeTitle: "杭州西湖", partNumber: "B", productName: "iPhone 18 Pro 512GB 银色" },
+    { locale: "zh_CN", storeNumber: "R471", storeTitle: "杭州西湖", partNumber: "C", productName: "iPhone 18 Pro Max 512GB 银色" },
+  ]]);
+  assert.deepEqual(app.choice("选择机型").values, []);
+  assert.deepEqual(app.choice("选择自提门店").values, ["R532", "R471"]);
 });
 
 test("switching category or region clears the phone selection and preserves other categories", () => {
@@ -135,17 +175,17 @@ test("switching category or region clears the phone selection and preserves othe
   app.choice("选择型号").onChange("D");
   assert.equal(app.addButton().disabled, false);
   app.choice("选择品类").onChange("iphone");
-  assert.equal(app.choice("选择机型").value, "");
+  assert.deepEqual(app.choice("选择机型").values, []);
   assert.equal(app.addButton().disabled, true);
 
-  app.choice("选择机型").onChange("iphone18pro");
-  app.choice("选择容量").onChange("512GB");
-  app.choice("选择颜色").onChange("银色");
+  app.choice("选择机型").onChange(["iphone18pro"]);
+  app.choice("选择容量").onChange(["512GB"]);
+  app.choice("选择颜色").onChange(["银色"]);
   app.choice("选择地区").onChange("ja_JP");
   assert.deepEqual(app.choice("选择自提门店").values, []);
-  assert.equal(app.choice("选择机型").value, "");
-  assert.equal(app.choice("选择容量").value, "");
-  assert.equal(app.choice("选择颜色").value, "");
+  assert.deepEqual(app.choice("选择机型").values, []);
+  assert.deepEqual(app.choice("选择容量").values, []);
+  assert.deepEqual(app.choice("选择颜色").values, []);
   assert.equal(app.addButton().disabled, true);
 });
 
@@ -171,7 +211,7 @@ test("selecting several stores adds one target per store, skips existing ones, a
     { locale: "zh_CN", storeNumber: "R471", storeTitle: "杭州西湖", partNumber: "B", productName: "iPhone 18 Pro 512GB 银色" },
   ]]);
   // 型号清掉、门店保留，接着给同一批门店加下一个型号最顺手。
-  assert.equal(app.choice("选择机型").value, "");
+  assert.deepEqual(app.choice("选择机型").values, []);
   assert.deepEqual(app.choice("选择自提门店").values, ["R532", "R471", "R359"]);
   assert.equal(app.addButton().disabled, true);
 });

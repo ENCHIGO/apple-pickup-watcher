@@ -346,7 +346,7 @@ impl BlockTracker {
         };
         if now < state.until {
             return Err(ApiError::Blocked(format!(
-                "HTTP 541 后冷却中，{} 后自动重试",
+                "HTTP 541 后冷却中，{}后自动重试",
                 human_duration(state.until - now)
             )));
         }
@@ -973,7 +973,7 @@ impl AppleClient {
         }
         let when = soonest.map_or("探测结束".to_string(), human_duration);
         Err(ApiError::Blocked(format!(
-            "所有线路都不可用（{}），{when} 后自动重试",
+            "所有线路都不可用（{}），{when}后自动重试",
             parts.join("、")
         )))
     }
@@ -1083,7 +1083,7 @@ impl AppleClient {
                         String::new()
                     };
                     last_err = Some(ApiError::Blocked(format!(
-                        "{detail}；{who}已进入冷却，{} 后自动重试一次",
+                        "{detail}；{who}已进入冷却，{}后自动重试一次",
                         human_duration(cooldown)
                     )));
                 }

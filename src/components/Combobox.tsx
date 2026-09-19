@@ -54,7 +54,7 @@ export function Combobox({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("justify-between font-normal", className)}
+          className={cn("bg-card justify-between font-normal", className)}
         >
           <span
             // 触发器宽度是固定的，选中项再长也只能截断；挂个原生 title，
