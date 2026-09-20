@@ -74,6 +74,6 @@ python3 crates/apw-core/data/generate.py
 
 桌面更新签名使用 `TAURI_SIGNING_PRIVATE_KEY` 和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 两个仓库 Secret。缺少密钥时工作流按配置输出未签名安装包；应用内更新需要与内嵌公钥匹配的签名。私钥应离线备份，不提交到仓库。
 
-[CLI 工作流](../.github/workflows/cli.yml) 独立构建 macOS Apple Silicon / Intel、Windows x64 和 Linux x86_64，上传包含 CLI、skill、文档、许可及校验和的 Actions artifacts。它不自动创建公开 Release。
+[CLI 工作流](../.github/workflows/cli.yml) 独立构建 macOS Apple Silicon / Intel、Windows x64 和 Linux x86_64，上传包含 CLI、skill、文档、许可及校验和的 Actions artifacts。它不自动创建公开 Release。发版时在 Release 草稿就绪后手动触发一次并填 `release_tag`（`gh workflow run cli.yml -f release_tag=v0.5.0`），工作流会按该标签的代码构建，并把四个平台的包和校验和传到对应的 Release 上；artifacts 所在的 `*.blob.core.windows.net` 在不少网络下连不上，不要指望在本机下载后再上传。
 
 发布后的版本分支由 [Release branches 工作流](../.github/workflows/release-branches.yml) 维护。站点部署与桌面发布彼此独立。
