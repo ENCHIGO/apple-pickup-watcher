@@ -89,6 +89,13 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body {
+    /* 整页不该能被拖出回弹：WebView 默认和网页一样有橡皮筋效果，触控板一划，
+       整个界面连标题带表格一起被拽下来再弹回去，一眼就露了「这是个网页」的底。
+       列表和日志各自的滚动不受影响。 */
+    overscroll-behavior: none;
+  }
   body {
     @apply bg-background text-foreground;
     /* 桌面应用不该能选中界面文字，那是网页的行为。日志区单独放开。 */
