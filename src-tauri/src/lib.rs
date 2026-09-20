@@ -15,7 +15,7 @@ use apw_core::apple::{AppleClient, ClientConfig};
 use apw_core::catalog::Catalog;
 use apw_core::config::{MIN_INTERVAL_SECONDS, Settings, SettingsStore};
 use apw_core::model::{Category, Product, REGIONS, Store, Target, region_by_locale};
-use apw_core::notify::{Bark, Multi, Notification, Notifier, Sound};
+use apw_core::notify::{Bark, Feishu, Multi, Notification, Notifier, Sound};
 use apw_core::watcher::{Event, TargetState, Watcher, WatcherConfig};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
@@ -283,7 +283,9 @@ async fn install_update(app: AppHandle) -> Result<(), String> {
 async fn test_notify(app: AppHandle) -> Result<(), String> {
     dispatch_notification(
         &app,
-        Notification::new("提醒测试", "如果你看到并听到了这条，说明提醒是通的"),
+        // 标题刻意和真实到货提醒一样带「有货了」：飞书自定义机器人的关键词
+        // 安全模式只放行含关键词的消息，测试文案若不含，用户会误以为配置坏了。
+        Notification::new("有货了（测试）", "如果你看到并听到了这条，说明提醒是通的"),
     )
     .await
     .map_err(|e| e.to_string())
@@ -317,6 +319,17 @@ async fn dispatch_notification(
         // 用户可以填多个地址（分号分隔），每个地址一条渠道，并发推送、各自报错。
         for bark in Bark::from_list(&settings.bark_url, http) {
             channels.push(bark);
+        }
+    }
+    if !settings.feishu_webhook.trim().is_empty() {
+        let http = app
+            .try_state::<AppState>()
+            .map(|s| s.http.clone())
+            .unwrap_or_default();
+        // 飞书与 Bark 同样的构造规则：地址随时可改、支持分号分隔多个、
+        // 共享连接池，渠道各自报错。
+        for feishu in Feishu::from_list(&settings.feishu_webhook, http) {
+            channels.push(feishu);
         }
     }
     if channels.is_empty() {

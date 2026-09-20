@@ -87,6 +87,7 @@ fn 样例设置() -> Settings {
         targets: vec![目标("R683", "MG724CH/A"), 目标("R448", "MG0A4CH/A")],
         interval_seconds: 45,
         bark_url: "https://api.day.app/xxxx".into(),
+        feishu_webhook: "https://open.feishu.cn/open-apis/bot/v2/hook/yyyy".into(),
         sound_enabled: false,
         open_bag_on_hit: true,
         proxies: Vec::new(),
@@ -496,6 +497,7 @@ fn 设置的线上格式是小驼峰() {
         "targets",
         "intervalSeconds",
         "barkUrl",
+        "feishuWebhook",
         "soundEnabled",
         "openBagOnHit",
         "proxies",
@@ -503,7 +505,7 @@ fn 设置的线上格式是小驼峰() {
         assert!(obj.contains_key(key), "缺少字段 {key}：{value}");
     }
     assert!(!obj.contains_key("interval_seconds"), "不该有蛇形字段");
-    assert_eq!(obj.len(), 7);
+    assert_eq!(obj.len(), 8);
 }
 
 #[test]
