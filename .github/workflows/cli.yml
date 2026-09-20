@@ -4,13 +4,25 @@ on:
   push:
     branches: ["**"]
   pull_request:
+  # 手动触发时填 release_tag（例如 v0.5.0），就按那个标签的代码构建四个平台的包，
+  # 并直接传到对应的 Release 上（草稿或已发布都行）。留空则和平时一样只出 artifacts。
+  #
+  # 为什么让 CI 来传：artifacts 存在 *.blob.core.windows.net 上，那个域名在不少
+  # 网络下根本连不上，v0.5.0 发版时维护者本机 `gh run download` 重试多次全是 EOF，
+  # CLI 包只能缺席。runner 到 Release 之间没有这个问题。
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "把 CLI 包上传到这个标签的 Release（留空只构建）"
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: cli-${{ github.head_ref || github.ref_name }}
+  # release_tag 放进 group：给 Release 补包的那一次不该被 main 上的普通构建顶掉。
+  group: cli-${{ inputs.release_tag || github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -39,6 +51,10 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
+        with:
+          # 给 Release 补包时构建标签对应的代码，包里的版本号才对得上；
+          # 其他情况留空，即默认的触发提交。
+          ref: ${{ inputs.release_tag }}
       # BoringSSL（chrome-tls 传输）在 MSVC 上要用 NASM 编译汇编；其他平台自带的
       # cmake 与 C 工具链已经够用。
       - uses: ilammy/setup-nasm@v1
@@ -65,3 +81,28 @@ jobs:
           name: apw-cli-${{ matrix.target }}
           path: target/cli-dist/*
           if-no-files-found: error
+
+  # 只有手动触发并填了 release_tag 才运行。写权限单独给这一个 job，
+  # 上面编译和跑测试的 job 保持只读。
+  publish:
+    name: 上传到 Release
+    if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+    needs: cli
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: cli-dist
+          pattern: apw-cli-*
+          merge-multiple: true
+      - name: 上传四个平台的 CLI 包与校验和
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          ls -la cli-dist
+          # --clobber：补传可以重跑，同名文件直接覆盖。
+          gh release upload "$TAG" cli-dist/* --clobber --repo "$GITHUB_REPOSITORY"
