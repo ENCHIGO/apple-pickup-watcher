@@ -257,7 +257,7 @@ impl Notifier for Bark {
             .await
             .map_err(|e| NotifyError::Transport {
                 channel: self.name.clone(),
-                detail: e.to_string(),
+                detail: describe_http_error(e),
             })?;
 
         let status = resp.status();
@@ -302,12 +302,47 @@ async fn read_capped(
             Err(e) => {
                 return Err(NotifyError::Transport {
                     channel: channel.to_string(),
-                    detail: format!("读取响应失败：{e}"),
+                    detail: format!("读取响应失败：{}", describe_http_error(e)),
                 });
             }
         }
     }
     Ok(body)
+}
+
+/// 把 reqwest 的错误写成给人看的一句话，**不带请求地址**。
+///
+/// reqwest 的错误文本自带完整 URL（`error sending request for url (…)`），而 Bark
+/// 的设备 key、飞书机器人的密钥都在路径里。这句话会原样进日志，用户排查问题时
+/// 常把日志贴进公开的 issue，等于把推送权限交了出去。
+///
+/// 去掉地址之后，把错误链上的原因接在后面。原来那句只说「发请求出错」，连不上、
+/// 超时还是证书问题都看不出来；接上原因，用户才知道该查哪一头。
+fn describe_http_error(err: reqwest::Error) -> String {
+    use std::error::Error as _;
+
+    let err = err.without_url();
+    let mut text = err.to_string();
+    let mut cause = err.source();
+    while let Some(inner) = cause {
+        let part = inner.to_string();
+        // 有的层会把下一层的话原样再说一遍，重复的不再接。
+        if !part.is_empty() && !text.contains(&part) {
+            text.push('：');
+            text.push_str(&part);
+        }
+        cause = inner.source();
+    }
+    text
+}
+
+/// 出错提示里复述用户填的地址时只留协议和主机，路径换成省略号：Bark 的设备
+/// key、飞书机器人的密钥都在路径里。
+fn redacted(u: &Url) -> String {
+    match u.host_str().filter(|host| !host.is_empty()) {
+        Some(host) => format!("{}://{host}/…", u.scheme()),
+        None => format!("{}:…", u.scheme()),
+    }
 }
 
 /// 从 Bark 的 JSON 响应里挑出业务错误码。
@@ -352,7 +387,8 @@ fn build_bark_url(base_url: &str, n: &Notification) -> Result<Url, NotifyError> 
 
     if !matches!(u.scheme(), "http" | "https") || u.host_str().unwrap_or_default().is_empty() {
         return Err(config_err(format!(
-            "地址必须是以 http:// 或 https:// 开头的完整地址，当前为 {base_url:?}"
+            "地址必须是以 http:// 或 https:// 开头的完整地址，当前为 {}",
+            redacted(&u)
         )));
     }
 
@@ -556,7 +592,7 @@ impl Notifier for Feishu {
             .await
             .map_err(|e| NotifyError::Transport {
                 channel: self.name.clone(),
-                detail: e.to_string(),
+                detail: describe_http_error(e),
             })?;
 
         let status = resp.status();
@@ -591,7 +627,8 @@ fn validate_feishu_webhook(webhook: &str) -> Result<Url, NotifyError> {
     let u = Url::parse(webhook).map_err(|e| feishu_config_err(format!("地址无法解析：{e}")))?;
     if !matches!(u.scheme(), "http" | "https") || u.host_str().unwrap_or_default().is_empty() {
         return Err(feishu_config_err(format!(
-            "地址必须是以 http:// 或 https:// 开头的完整地址，当前为 {webhook:?}"
+            "地址必须是以 http:// 或 https:// 开头的完整地址，当前为 {}",
+            redacted(&u)
         )));
     }
     if u.path().trim_end_matches('/').is_empty() {

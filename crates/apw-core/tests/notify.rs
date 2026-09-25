@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use apw_core::notify::{Bark, Multi, Notification, Notifier, NotifyError, Sound};
+use apw_core::notify::{Bark, Feishu, Multi, Notification, Notifier, NotifyError, Sound};
 
 // ---------------------------------------------------------------------------
 // 极简 HTTP 测试服务端
@@ -636,4 +636,75 @@ async fn 一个地址失败不影响另一个且错误指明是哪个() {
     );
     assert_eq!(good.count(), 1, "失败的那路不能拖累成功的那路");
     assert_eq!(bad.count(), 1);
+}
+
+// ---------------------------------------------------------------------------
+// 密钥不能跟着错误信息进日志
+// ---------------------------------------------------------------------------
+
+/// 一个此刻没人监听的本地端口：连上去立刻被拒。
+fn closed_port() -> SocketAddr {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("绑定本地端口");
+    listener.local_addr().expect("取本地地址")
+    // listener 在这里析构，端口随即关闭。
+}
+
+/// Bark 的设备 key、飞书机器人的密钥都在地址的路径里。错误信息会原样进日志，
+/// 用户排查问题时常把日志贴进公开的 issue，所以错误文本里只能有协议和主机。
+fn assert_no_secret(err: &NotifyError, secret: &str) {
+    let text = err.to_string();
+    assert!(!text.contains(secret), "错误信息泄露了密钥：{text}");
+}
+
+#[tokio::test]
+async fn bark连不上时错误信息里没有设备key() {
+    let addr = closed_port();
+    let err = Bark::new(format!("http://{addr}/SECRET-DEVICE-KEY"), client())
+        .notify(&到货通知())
+        .await
+        .expect_err("端口没人监听，推送必须失败");
+    assert!(matches!(err, NotifyError::Transport { .. }), "{err}");
+    assert_no_secret(&err, "SECRET-DEVICE-KEY");
+    // 去掉地址不能把失败原因一起丢掉：reqwest 那句之后得接着说为什么。
+    assert!(err.to_string().contains("error sending request："), "{err}");
+}
+
+#[tokio::test]
+async fn 飞书连不上时错误信息里没有机器人密钥() {
+    let addr = closed_port();
+    let err = Feishu::new(
+        format!("http://{addr}/open-apis/bot/v2/hook/SECRET-HOOK-TOKEN"),
+        client(),
+    )
+    .notify(&到货通知())
+    .await
+    .expect_err("端口没人监听，推送必须失败");
+    assert!(matches!(err, NotifyError::Transport { .. }), "{err}");
+    assert_no_secret(&err, "SECRET-HOOK-TOKEN");
+    assert!(err.to_string().contains("error sending request："), "{err}");
+}
+
+#[tokio::test]
+async fn 地址协议不对时只复述协议和主机() {
+    let bark = Bark::new("ftp://api.day.app/SECRET-DEVICE-KEY".to_string(), client())
+        .notify(&到货通知())
+        .await
+        .expect_err("ftp 地址必须被拒");
+    assert!(matches!(bark, NotifyError::Config { .. }), "{bark}");
+    assert_no_secret(&bark, "SECRET-DEVICE-KEY");
+    assert!(bark.to_string().contains("ftp://api.day.app/…"), "{bark}");
+
+    let feishu = Feishu::new(
+        "ftp://open.feishu.cn/open-apis/bot/v2/hook/SECRET-HOOK-TOKEN".to_string(),
+        client(),
+    )
+    .notify(&到货通知())
+    .await
+    .expect_err("ftp 地址必须被拒");
+    assert!(matches!(feishu, NotifyError::Config { .. }), "{feishu}");
+    assert_no_secret(&feishu, "SECRET-HOOK-TOKEN");
+    assert!(
+        feishu.to_string().contains("ftp://open.feishu.cn/…"),
+        "{feishu}"
+    );
 }
