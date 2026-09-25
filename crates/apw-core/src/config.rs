@@ -137,6 +137,10 @@ pub struct Settings {
     /// 为空表示不启用 Bark 推送。可以填多个地址，用分号分隔，见
     /// [`Settings::bark_urls`]；字段仍是一个字符串，旧配置原样可读。
     pub bark_url: String,
+    /// 飞书群自定义机器人的 webhook 地址，为空表示不启用。可以填多个地址，
+    /// 用分号分隔（规则同 [`split_bark_urls`]）。创建机器人时安全设置选
+    /// 「自定义关键词」并填「有货」即可，提醒标题「有货了」天然命中。
+    pub feishu_webhook: String,
     /// 有货时是否播放提示音。
     pub sound_enabled: bool,
     /// 有货时是否自动打开购物袋页面。
@@ -161,6 +165,7 @@ impl Default for Settings {
             targets: Vec::new(),
             interval_seconds: DEFAULT_INTERVAL_SECONDS,
             bark_url: String::new(),
+            feishu_webhook: String::new(),
             sound_enabled: true,
             open_bag_on_hit: true,
             proxies: Vec::new(),
@@ -188,6 +193,7 @@ impl Settings {
         // 推送地址收敛成「分号分隔、无空项、无重复」的规范写法，读回来和
         // 界面上显示的一致；单个地址前后有空格的老配置也顺手修好。
         self.bark_url = split_bark_urls(&self.bark_url).join(";");
+        self.feishu_webhook = split_bark_urls(&self.feishu_webhook).join(";");
 
         // 去重时**新建 Vec 再整体替换**，不在原 Vec 上就地压缩。
         //
@@ -608,6 +614,8 @@ impl LegacySettings {
                 .and_then(|v| u64::try_from(v).ok())
                 .unwrap_or(fallback.interval_seconds),
             bark_url: self.bark_url.unwrap_or(fallback.bark_url),
+            // Go 版没有飞书推送，迁移过来的文件一律从空开始。
+            feishu_webhook: String::new(),
             sound_enabled: self.sound_enabled.unwrap_or(fallback.sound_enabled),
             open_bag_on_hit: self.open_bag_on_hit.unwrap_or(fallback.open_bag_on_hit),
             // Go 版没有代理设置，迁移过来的文件一律从空开始。

@@ -173,10 +173,13 @@ function settingsSummary(s: Settings): string {
   return [
     `每 ${s.intervalSeconds} 秒查一轮`,
     s.barkUrl.trim() === "" ? "Bark 未配置" : "Bark 已配置",
+    (s.feishuWebhook ?? "").trim() === "" ? null : "飞书已配置",
     (s.proxies ?? []).length > 0 ? `代理 ${s.proxies.length} 条` : "无代理",
     s.soundEnabled ? "提示音开" : "提示音关",
     s.openBagOnHit ? "有货时开购物袋" : "有货时不开购物袋",
-  ].join(" · ");
+  ]
+    .filter((part) => part !== null)
+    .join(" · ");
 }
 
 /** 运行状态。一个会呼吸的点比一行灰字更像「它还活着」。 */
@@ -260,6 +263,7 @@ export default function App() {
   const [capacities, setCapacities] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
   const [barkDraft, setBarkDraft] = useState<string | null>(null);
+  const [feishuDraft, setFeishuDraft] = useState<string | null>(null);
   const [proxiesDraft, setProxiesDraft] = useState<string | null>(null);
   const [intervalDraft, setIntervalDraft] = useState<number | null>(null);
   // 设置改一次就放着不动，折起来把纵向空间还给表格；记住上次的选择。
@@ -276,6 +280,8 @@ export default function App() {
 
   // null 表示尚未编辑；空字符串是用户明确清空，不能退回已保存的地址。
   const barkValue = barkDraft ?? ui.settings.barkUrl;
+  // 旧设置文件没有 feishuWebhook 字段，读上来是 undefined，当作空。
+  const feishuValue = feishuDraft ?? (ui.settings.feishuWebhook ?? "");
   // 旧设置文件没有 proxies 字段，读上来是 undefined，当作空列表。
   const proxiesValue = proxiesDraft ?? (ui.settings.proxies ?? []).join(";");
   const intervalValue = intervalDraft ?? ui.settings.intervalSeconds;
@@ -653,6 +659,23 @@ export default function App() {
                 onBlur={() => {
                   setBarkDraft(null);
                   void saveSettings({ ...ui.settings, barkUrl: barkValue.trim() });
+                }}
+              />
+            </div>
+
+            <div className="grid min-w-64 flex-1 gap-1.5">
+              <Label htmlFor="feishu" className="whitespace-nowrap">
+                飞书机器人 Webhook
+              </Label>
+              <Input
+                id="feishu"
+                className="select-text"
+                placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/你的密钥，留空不推送"
+                value={feishuValue}
+                onChange={(e) => setFeishuDraft(e.target.value)}
+                onBlur={() => {
+                  setFeishuDraft(null);
+                  void saveSettings({ ...ui.settings, feishuWebhook: feishuValue.trim() });
                 }}
               />
             </div>

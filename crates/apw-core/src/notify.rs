@@ -470,6 +470,180 @@ fn merge_query(existing: Option<&str>, encoded_link: Option<&str>) -> Option<Str
 }
 
 // ---------------------------------------------------------------------------
+// 飞书群自定义机器人
+// ---------------------------------------------------------------------------
+
+const FEISHU: &str = "飞书";
+
+/// 飞书机器人的默认单次请求超时，与 Bark 一致。
+const FEISHU_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// 通过飞书群自定义机器人的 webhook 向群里推送通知。
+///
+/// webhook 地址形如 `https://open.feishu.cn/open-apis/bot/v2/hook/<密钥>`，
+/// 在群设置 → 群机器人 → 添加自定义机器人后获得。安卓 / iOS / 桌面端的飞书
+/// App 都能收到推送，是 Bark 之外接收端最广的渠道。
+///
+/// 安全校验推荐用飞书的**关键词模式**：创建机器人时把关键词设成「有货」，
+/// 到货提醒的标题「有货了」天然含关键词，无需任何额外签名逻辑。
+#[derive(Debug, Clone)]
+pub struct Feishu {
+    webhook: String,
+    http: reqwest::Client,
+    timeout: Duration,
+    /// 渠道名。只配一个地址时就是「飞书」；配了多个时带序号。
+    name: String,
+}
+
+impl Feishu {
+    /// `webhook` 为空或全是空白表示未配置，[`Notifier::notify`] 直接返回
+    /// `Ok(())`，不发任何请求。`http` 传入与其他出站请求共用的客户端以复用
+    /// 连接池。
+    pub fn new(webhook: String, http: reqwest::Client) -> Self {
+        Self {
+            webhook: webhook.trim().to_string(),
+            http,
+            timeout: FEISHU_TIMEOUT,
+            name: FEISHU.to_string(),
+        }
+    }
+
+    /// 按设置里的原始文本构造一组飞书渠道，规则同 [`Bark::from_list`]：
+    /// 分号 / 换行分隔，一个地址一个，多个时依次叫「飞书 #1」「飞书 #2」……
+    pub fn from_list(raw: &str, http: reqwest::Client) -> Vec<Self> {
+        let urls = split_bark_urls(raw);
+        let many = urls.len() > 1;
+        urls.into_iter()
+            .enumerate()
+            .map(|(i, url)| {
+                let mut feishu = Self::new(url, http.clone());
+                if many {
+                    feishu.name = format!("{FEISHU} #{}", i + 1);
+                }
+                feishu
+            })
+            .collect()
+    }
+
+    /// 用户是否配置了飞书机器人。
+    pub fn is_configured(&self) -> bool {
+        !self.webhook.is_empty()
+    }
+}
+
+impl Notifier for Feishu {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    async fn notify(&self, n: &Notification) -> Result<(), NotifyError> {
+        if !self.is_configured() {
+            return Ok(());
+        }
+
+        let url = validate_feishu_webhook(&self.webhook)?;
+
+        let mut resp = self
+            .http
+            .post(url)
+            .timeout(self.timeout)
+            .json(&serde_json::json!({
+                "msg_type": "text",
+                "content": { "text": feishu_text(n) },
+            }))
+            .send()
+            .await
+            .map_err(|e| NotifyError::Transport {
+                channel: self.name.clone(),
+                detail: e.to_string(),
+            })?;
+
+        let status = resp.status();
+        let body = read_capped(&mut resp, BARK_MAX_BODY, &self.name).await?;
+
+        if !status.is_success() {
+            return Err(NotifyError::Rejected {
+                channel: self.name.clone(),
+                status: status.as_u16(),
+                body: summarize(&body),
+            });
+        }
+
+        // 飞书把业务错误也放在 HTTP 200 的响应体里：code 非 0 即失败，
+        // 最常见的是关键词不匹配（19021）。不检查它，推送形同虚设。
+        if let Some((code, message)) = feishu_business_error(&body) {
+            return Err(NotifyError::Remote {
+                channel: self.name.clone(),
+                code,
+                message,
+            });
+        }
+        Ok(())
+    }
+}
+
+/// 校验 webhook 地址并返回可请求的 [`Url`]。
+///
+/// 合法形态是 `http(s)://<域名>/open-apis/bot/v2/hook/<密钥>`，路径里带着密钥，
+/// 所以除了协议和主机，还要求路径不能是空的。
+fn validate_feishu_webhook(webhook: &str) -> Result<Url, NotifyError> {
+    let u = Url::parse(webhook).map_err(|e| feishu_config_err(format!("地址无法解析：{e}")))?;
+    if !matches!(u.scheme(), "http" | "https") || u.host_str().unwrap_or_default().is_empty() {
+        return Err(feishu_config_err(format!(
+            "地址必须是以 http:// 或 https:// 开头的完整地址，当前为 {webhook:?}"
+        )));
+    }
+    if u.path().trim_end_matches('/').is_empty() {
+        return Err(feishu_config_err(
+            "地址缺少密钥，应形如 https://open.feishu.cn/open-apis/bot/v2/hook/<密钥>".to_string(),
+        ));
+    }
+    Ok(u)
+}
+
+fn feishu_config_err(detail: String) -> NotifyError {
+    NotifyError::Config {
+        channel: FEISHU.to_string(),
+        detail,
+    }
+}
+
+/// 组装文本消息：标题、正文、链接各占一行；链接单发一行的原因是飞书的
+/// 文本消息没有独立的「点开跳转」参数，附在末尾至少可复制。
+fn feishu_text(n: &Notification) -> String {
+    let mut lines = Vec::new();
+    for text in [n.title.trim(), n.body.trim()] {
+        if !text.is_empty() {
+            lines.push(text.to_string());
+        }
+    }
+    if let Some(url) = n.url.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        lines.push(url.to_string());
+    }
+    lines.join("\n")
+}
+
+/// 从飞书的 JSON 响应里挑出业务错误码。
+///
+/// 成功时是 `{"code":0,"msg":"success"}`；旧版接口偶见 `StatusCode` 字段名，
+/// 一并认。字段缺失（网关改写过响应之类）不算失败：不能把「认不出」当成「没发出去」。
+fn feishu_business_error(body: &[u8]) -> Option<(i64, String)> {
+    #[derive(serde::Deserialize)]
+    struct Payload {
+        #[serde(default)]
+        code: Option<i64>,
+        #[serde(rename = "StatusCode", default)]
+        status_code: Option<i64>,
+        #[serde(default)]
+        msg: Option<String>,
+    }
+
+    let payload: Payload = serde_json::from_slice(body).ok()?;
+    let code = payload.code.or(payload.status_code)?;
+    (code != 0).then(|| (code, payload.msg.unwrap_or_default()))
+}
+
+// ---------------------------------------------------------------------------
 // 本地提示音
 // ---------------------------------------------------------------------------
 
@@ -1065,6 +1239,59 @@ mod tests {
         assert_eq!(
             bark_business_error(r#"{"code":400,"message":"key 无效"}"#.as_bytes()),
             Some((400, "key 无效".to_string()))
+        );
+    }
+
+    #[test]
+    fn 飞书webhook地址不合法时报配置错误() {
+        for bad in [
+            "",
+            "不是地址",
+            "ftp://open.feishu.cn/hook/key",
+            // 主机名后面没有路径，即没有密钥。
+            "https://open.feishu.cn",
+            "https://open.feishu.cn/",
+        ] {
+            let err = validate_feishu_webhook(bad)
+                .err()
+                .unwrap_or_else(|| panic!("{bad:?} 不该被接受"));
+            assert_eq!(err.channel(), Some("飞书"), "{bad:?}");
+            assert!(matches!(err, NotifyError::Config { .. }), "{bad:?}");
+        }
+        // 正常地址能通过，且带密钥的路径原样保留。
+        let url = validate_feishu_webhook("https://open.feishu.cn/open-apis/bot/v2/hook/abc")
+            .expect("正常地址必须能通过");
+        assert_eq!(url.path(), "/open-apis/bot/v2/hook/abc");
+    }
+
+    #[test]
+    fn 飞书文本消息标题正文链接各占一行() {
+        let notification = n("有货了", "上海-环球港 iPhone 17 512GB")
+            .with_url("https://www.apple.com.cn/shop/bag");
+        assert_eq!(
+            feishu_text(&notification),
+            "有货了\n上海-环球港 iPhone 17 512GB\nhttps://www.apple.com.cn/shop/bag"
+        );
+        // 空标题跳过、无链接不加行。
+        assert_eq!(feishu_text(&n("  ", "只有正文")), "只有正文");
+        // 标题正文都空的极端情况：拼出空文本，由服务端的关键词校验兜底报错。
+        assert_eq!(feishu_text(&n(" ", "")), "");
+    }
+
+    #[test]
+    fn 飞书业务错误码只在明确失败时才算错() {
+        // 成功形态与认不出的形态都不算错。
+        assert_eq!(
+            feishu_business_error(br#"{"code":0,"msg":"success"}"#),
+            None
+        );
+        assert_eq!(feishu_business_error(br#"{"StatusCode":0}"#), None);
+        assert_eq!(feishu_business_error(br#"{"msg":"ok"}"#), None);
+        assert_eq!(feishu_business_error(b"not json"), None);
+        // 关键词不匹配是推送静默失效的头号原因，必须挑出来。
+        assert_eq!(
+            feishu_business_error(r#"{"code":19021,"msg":"Key Words Not Found"}"#.as_bytes()),
+            Some((19021, "Key Words Not Found".to_string()))
         );
     }
 }
