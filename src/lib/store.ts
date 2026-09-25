@@ -70,6 +70,7 @@ const DEFAULT_SETTINGS: Settings = {
   targets: [],
   intervalSeconds: 30,
   barkUrl: "",
+  feishuWebhook: "",
   soundEnabled: true,
   openBagOnHit: true,
   proxies: [],
