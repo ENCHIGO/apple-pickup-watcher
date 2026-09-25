@@ -53,6 +53,7 @@ function renderApp() {
   return {
     input: () => control((element) => element?.props?.id === "bark"),
     proxies: () => control((element) => element?.props?.id === "proxies"),
+    feishu: () => control((element) => element?.props?.id === "feishu"),
     choice: (placeholder) => control((element) => element?.props?.placeholder === placeholder),
     addButton: () => control((element) => element.type === "Button" &&
       Array.isArray(element.props.children) && element.props.children.includes(" 添加")),
@@ -233,4 +234,20 @@ test("proxy addresses are split on semicolons and saved as a list, and old setti
   assert.deepEqual(app.saved.at(-1).proxies, ["http://a:8080", "socks5://b:1080"]);
   app.state.settings = { ...app.state.settings, proxies: ["http://c:1"] };
   assert.equal(app.proxies().value, "http://c:1", "没在编辑时跟随后端保存的列表");
+});
+
+test("the Feishu webhook reads empty from old settings, saves trimmed on blur, and can be cleared", () => {
+  const app = renderApp();
+  assert.equal(app.feishu().value, "", "老设置没有 feishuWebhook 字段，输入框应当是空的而不是报错");
+  app.feishu().onChange({ target: { value: "  https://open.feishu.cn/open-apis/bot/v2/hook/abc  " } });
+  app.feishu().onBlur();
+  assert.equal(app.saved.at(-1).feishuWebhook, "https://open.feishu.cn/open-apis/bot/v2/hook/abc");
+  // 没在编辑时跟随后端保存的值。
+  app.state.settings = { ...app.state.settings, feishuWebhook: "https://open.feishu.cn/open-apis/bot/v2/hook/def" };
+  assert.equal(app.feishu().value, "https://open.feishu.cn/open-apis/bot/v2/hook/def");
+  // 清空是明确的操作：保存空串，输入框不退回旧地址。
+  app.feishu().onChange({ target: { value: "" } });
+  app.feishu().onBlur();
+  assert.equal(app.saved.at(-1).feishuWebhook, "");
+  assert.equal(app.feishu().value, "");
 });

@@ -38,7 +38,7 @@ Available as a desktop app, the `apw` command line tool, and an agent skill. Fre
 | **Three stock states, and failures are never disguised as “out of stock”** | Every target is exactly one of *in stock / out of stock / unknown*. When a query is blocked, rate-limited, fails on the network, or the response shape changes, you see **“unknown” with the reason** and a “monitoring is currently unreliable” warning, never a silent “out of stock”. |
 | **Watch many stores and models at once** | Mix targets from different product categories and different stores in one list. iPhone is picked in three steps (model → capacity → colour), each accepting several choices, and every combination the catalogue has is added at once; other categories pick the full model directly, and every dropdown is searchable. |
 | **Closing the window doesn’t quit** | The app moves to the system tray and the Rust backend keeps querying and alerting, so it can sit there for hours before a launch without an open window. |
-| **Alerts on every channel you need** | Desktop notifications, an alert sound, and optional [Bark](https://github.com/Finb/Bark) push to your iPhone. Continuous availability is not re-announced every cycle; the app can open your shopping bag automatically if enabled. |
+| **Alerts on every channel you need** | Desktop notifications, an alert sound, optional [Bark](https://github.com/Finb/Bark) push to your iPhone, and an optional Feishu (Lark) group bot that reaches Android, iPhone and desktop. Continuous availability is not re-announced every cycle; the app can open your shopping bag automatically if enabled. |
 | **Model catalog refreshes from Apple** | An offline snapshot is built in, and one click refreshes the current category from Apple’s buy pages, so new models on already supported pages can be watched on launch day. |
 | **CLI and agent skill** | The `apw` command prints JSON / NDJSON and needs no desktop environment; the bundled skill lets agents such as Codex check stock and wait for restocks directly. |
 
@@ -61,7 +61,7 @@ Grab the installer for your platform from [Releases](https://github.com/ENCHIGO/
 xattr -cr "/Applications/Apple Pickup Watcher.app"
 ```
 
-Installation details, Bark push, and the config file location are in the [desktop guide](docs/desktop.md).
+Installation details, Bark and Feishu push, and the config file location are in the [desktop guide](docs/desktop.md).
 
 ### CLI `apw`
 
@@ -91,7 +91,7 @@ For Claude Code replace `codex` with `claude-code`; drop `--global` to install i
 
 1. **Add targets**: choose region → category → store → model and click “Add”. You can tick several stores at once and get one target per store. For iPhone, pick the model, capacity and colour step by step; each step accepts several choices, and every combination the catalogue has is added at once. Add as many as you like, mixing categories and stores freely.
 2. **Start watching**: click “Start”. Keep the app running and your computer online and awake; closing the window moves it to the tray and keeps it going. It polls every 30 seconds by default, with a minimum of 5 seconds.
-3. **Get the alert, then buy on Apple’s website**: when stock is confirmed you get a desktop notification, the alert sound, and a Bark push, and the shopping bag can open if enabled. Adding the item, choosing the pickup store, checkout, and payment are done by you on Apple’s website.
+3. **Get the alert, then buy on Apple’s website**: when stock is confirmed you get a desktop notification, the alert sound, and a Bark or Feishu push, and the shopping bag can open if enabled. Adding the item, choosing the pickup store, checkout, and payment are done by you on Apple’s website.
 
 Continuous availability is not re-announced every cycle; a target alerts again only after it leaves the in-stock state and comes back. When you see “monitoring is currently unreliable”, don’t trust the “out of stock” rows in the list. Follow the hint and find the cause first.
 
@@ -153,7 +153,7 @@ No, and no. It only checks stock and alerts you, and at most opens your shopping
 
 ### How do I get alerts on my phone?
 
-Install [Bark](https://github.com/Finb/Bark) on your iPhone, paste the push URL it gives you into the “Bark push URL” field in settings, and click “Test alert” to confirm the whole chain works. To reach several phones, put their URLs in the same field separated by semicolons. A failed push never changes the stock verdict.
+Install [Bark](https://github.com/Finb/Bark) on your iPhone, paste the push URL it gives you into the “Bark push URL” field in settings, and click “Test alert” to confirm the whole chain works. To reach several phones, put their URLs in the same field separated by semicolons. On Android, or to alert a Feishu group, add a custom bot to the group with the keyword “有货” as its security setting and paste its webhook URL into the “飞书机器人 Webhook” field; see the [desktop guide](docs/desktop.md#飞书群机器人推送). A failed push never changes the stock verdict.
 
 ### Why is the default polling interval 30 seconds?
 
@@ -165,7 +165,7 @@ More: [desktop guide](docs/desktop.md) · [CLI docs](docs/cli.md) · [developmen
 
 | Document | Contents |
 | --- | --- |
-| [Desktop guide](docs/desktop.md) | Installation, monitoring and alert rules, model catalog, Bark, config file, FAQ |
+| [Desktop guide](docs/desktop.md) | Installation, monitoring and alert rules, model catalog, Bark and Feishu push, config file, FAQ |
 | [CLI and agent skill](docs/cli.md) | Build and install, commands, JSON / NDJSON format, batch targets, exit codes |
 | [Development and maintenance](docs/development.md) | Toolchain, checks, code layout, live API contract tests, release process |
 | [Website maintenance](docs/discoverability.md) | Building and deploying the project site, search indexing conventions |

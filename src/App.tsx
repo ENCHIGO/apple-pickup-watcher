@@ -670,7 +670,10 @@ export default function App() {
               <Input
                 id="feishu"
                 className="select-text"
-                placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/你的密钥，留空不推送"
+                // 关键词写在最前：输入框窄，后半句会被截掉，而装机器人时最容易
+                // 选错的就是安全设置。完整说明挂在 title 上，悬停可见。
+                placeholder="关键词填「有货」，粘贴 webhook 地址，多个用分号分隔"
+                title="飞书群 → 设置 → 群机器人 → 添加自定义机器人。安全设置只支持「自定义关键词」，填「有货」；签名校验不支持。多个群的地址用分号分隔，留空不推送。"
                 value={feishuValue}
                 onChange={(e) => setFeishuDraft(e.target.value)}
                 onBlur={() => {

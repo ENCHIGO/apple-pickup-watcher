@@ -485,7 +485,8 @@ const FEISHU_TIMEOUT: Duration = Duration::from_secs(10);
 /// App 都能收到推送，是 Bark 之外接收端最广的渠道。
 ///
 /// 安全校验推荐用飞书的**关键词模式**：创建机器人时把关键词设成「有货」，
-/// 到货提醒的标题「有货了」天然含关键词，无需任何额外签名逻辑。
+/// 到货提醒的标题「有货了」天然含关键词，无需任何额外签名逻辑。签名校验模式
+/// 不支持：那种机器人会回 19021，用户应改用关键词模式。
 #[derive(Debug, Clone)]
 pub struct Feishu {
     webhook: String,
@@ -570,7 +571,7 @@ impl Notifier for Feishu {
         }
 
         // 飞书把业务错误也放在 HTTP 200 的响应体里：code 非 0 即失败，
-        // 最常见的是关键词不匹配（19021）。不检查它，推送形同虚设。
+        // 最常见的是关键词不匹配（19024）；选了签名校验会是 19021。不检查它，推送形同虚设。
         if let Some((code, message)) = feishu_business_error(&body) {
             return Err(NotifyError::Remote {
                 channel: self.name.clone(),
@@ -1290,8 +1291,8 @@ mod tests {
         assert_eq!(feishu_business_error(b"not json"), None);
         // 关键词不匹配是推送静默失效的头号原因，必须挑出来。
         assert_eq!(
-            feishu_business_error(r#"{"code":19021,"msg":"Key Words Not Found"}"#.as_bytes()),
-            Some((19021, "Key Words Not Found".to_string()))
+            feishu_business_error(r#"{"code":19024,"msg":"Key Words Not Found"}"#.as_bytes()),
+            Some((19024, "Key Words Not Found".to_string()))
         );
     }
 }
