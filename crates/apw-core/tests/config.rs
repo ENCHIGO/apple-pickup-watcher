@@ -592,3 +592,77 @@ fn 代理地址只留合法的并去重() {
     .expect("旧配置应当可读");
     assert!(old.proxies.is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// 推送地址：界面上是一个列表，文件里按渠道分两栏存
+// ---------------------------------------------------------------------------
+
+#[test]
+fn 推送地址按长相归到bark或飞书() {
+    use apw_core::config::{PushKind, push_kind};
+
+    for feishu in [
+        "https://open.feishu.cn/open-apis/bot/v2/hook/abc",
+        "https://open.larksuite.com/open-apis/bot/v2/hook/abc",
+        " https://open.feishu.cn/open-apis/bot/v2/hook/abc ",
+        // 漏写协议也认得出来，发送时报的才会是飞书那边的错。
+        "open.feishu.cn/open-apis/bot/v2/hook/abc",
+    ] {
+        assert_eq!(push_kind(feishu), PushKind::Feishu, "{feishu:?}");
+    }
+    for bark in [
+        "https://api.day.app/key",
+        "https://api.day.app/key?group=库存&sound=alarm",
+        // 自建的 Bark 服务器主机名认不出来，兜底当 Bark。
+        "https://bark.example.com/key",
+        // 只看路径：飞书地址出现在查询参数里不算。
+        "https://api.day.app/key?url=https://open.feishu.cn/open-apis/bot/v2/hook/x",
+        "不是地址",
+    ] {
+        assert_eq!(push_kind(bark), PushKind::Bark, "{bark:?}");
+    }
+}
+
+#[test]
+fn 推送地址整组替换时各归各的渠道并去重() {
+    let b1 = "https://api.day.app/b1";
+    let b2 = "https://api.day.app/b2";
+    let f1 = "https://open.feishu.cn/open-apis/bot/v2/hook/f1";
+    let mut s = Settings::default();
+    s.set_push_urls(&[
+        format!(" {f1} "),
+        b1.to_string(),
+        String::new(),
+        // 老版本里用分号连着的一整串被粘进了同一行。
+        format!("{b2};{b1}"),
+    ]);
+    assert_eq!(s.bark_url, format!("{b1};{b2}"));
+    assert_eq!(s.feishu_webhook, f1);
+    // 读回来是 Bark 在前、飞书在后，各自保持填写顺序。
+    assert_eq!(s.push_urls(), vec![b1, b2, f1]);
+
+    s.set_push_urls(&[]);
+    assert!(s.bark_url.is_empty() && s.feishu_webhook.is_empty());
+    assert!(s.push_urls().is_empty());
+}
+
+#[test]
+fn 填在bark一栏的飞书地址规范化后挪到飞书() {
+    // 支持飞书之前只有 Bark 一栏可填，有人把飞书地址填了进去。升级后它应当
+    // 自己挪到飞书，开始正常推送，而不是一直按 Bark 的格式发、一直报错。
+    let mut s = Settings {
+        bark_url: "https://api.day.app/b1;https://open.feishu.cn/open-apis/bot/v2/hook/f1".into(),
+        ..Settings::default()
+    };
+    s.normalize();
+    assert_eq!(s.bark_url, "https://api.day.app/b1");
+    assert_eq!(
+        s.feishu_webhook,
+        "https://open.feishu.cn/open-apis/bot/v2/hook/f1"
+    );
+
+    // 再规范化一次结果不变。
+    let once = s.clone();
+    s.normalize();
+    assert_eq!(s, once);
+}

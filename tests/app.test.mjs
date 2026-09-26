@@ -5,6 +5,7 @@ import { loadSource } from "./load-source.mjs";
 function renderApp() {
   const saved = [];
   const addedTargets = [];
+  const pushSaves = [];
   const state = {
     settings: { locale: "zh_CN", barkUrl: "https://api.day.app/saved-key", intervalSeconds: 30 },
     stores: [], products: [], rows: [], regions: [], categories: [], logs: [],
@@ -30,6 +31,14 @@ function renderApp() {
       setTargets: async (targets) => { addedTargets.push(targets); },
       setCategory: (category) => { state.category = category; },
       changeLocale: async (locale) => { state.settings = { ...state.settings, locale }; },
+      setPushUrls: async (urls) => {
+        pushSaves.push(urls);
+        // 模拟后端分栏存放。真正的归类规则在 Rust 侧，由 crates/apw-core/tests/config.rs 覆盖；
+        // 这里只需要让界面拿到「哪个地址存在哪一栏」。
+        const feishu = urls.filter((url) => url.includes("/open-apis/bot/v2/hook/"));
+        const bark = urls.filter((url) => !feishu.includes(url));
+        state.settings = { ...state.settings, barkUrl: bark.join(";"), feishuWebhook: feishu.join(";") };
+      },
     };
     if (specifier.startsWith("@/components/") || specifier === "lucide-react") {
       return new Proxy({}, { get: (_target, name) => String(name) });
@@ -50,38 +59,100 @@ function renderApp() {
     assert.ok(element, "expected UI control to be rendered");
     return element.props;
   }
+  function all(predicate) {
+    cursor = 0;
+    const found = [];
+    const walk = (element) => {
+      if (!element || typeof element !== "object") return;
+      if (predicate(element)) found.push(element);
+      const children = Array.isArray(element) ? element : element?.props?.children;
+      for (const child of Array.isArray(children) ? children : [children]) walk(child);
+    };
+    walk(App());
+    return found;
+  }
+  const isPushInput = (element) => /^push-\d+$/.test(element?.props?.id ?? "");
+  const isAddPush = (element) => element.type === "Button" &&
+    Array.isArray(element.props.children) && element.props.children.includes(" 添加推送地址");
   return {
-    input: () => control((element) => element?.props?.id === "bark"),
     proxies: () => control((element) => element?.props?.id === "proxies"),
-    feishu: () => control((element) => element?.props?.id === "feishu"),
+    pushRow: (index) => control((element) => element?.props?.id === `push-${index}`),
+    pushValues: () => all(isPushInput).map((element) => element.props.value),
+    // 渠道标签按行的顺序排列；还没保存的行没有标签。
+    pushLabels: () => all((element) => element.type === "Badge").map((element) => element.props.children),
+    removePush: (index) => control((element) => element?.props?.["aria-label"] === `删除推送地址 ${index + 1}`),
+    addPush: () => control(isAddPush),
+    hasAddPush: () => all(isAddPush).length > 0,
     choice: (placeholder) => control((element) => element?.props?.placeholder === placeholder),
     addButton: () => control((element) => element.type === "Button" &&
       Array.isArray(element.props.children) && element.props.children.includes(" 添加")),
     scaleHint: () => control((element) => element.type === "span" &&
       Array.isArray(element.props.children) && element.props.children.includes(" 个型号 × ")),
-    state, saved, addedTargets,
+    state, saved, addedTargets, pushSaves,
   };
 }
 
-test("clearing a saved Bark URL keeps the input empty and persists an empty URL on blur", () => {
+const K1 = "https://api.day.app/k1";
+const K2 = "https://api.day.app/k2";
+const F1 = "https://open.feishu.cn/open-apis/bot/v2/hook/f1";
+
+test("saved push addresses are one list, Bark first then Feishu, labelled by where the backend filed them", () => {
   const app = renderApp();
-  assert.equal(app.input().value, "https://api.day.app/saved-key");
-  app.input().onChange({ target: { value: "" } });
-  assert.equal(app.input().value, "");
-  app.input().onBlur();
-  assert.equal(app.saved.at(-1).barkUrl, "");
-  assert.equal(app.input().value, "");
+  assert.deepEqual(app.pushValues(), ["https://api.day.app/saved-key"]);
+  // 没动过时跟着后端走。
+  app.state.settings = { ...app.state.settings, barkUrl: `${K1};${K2}`, feishuWebhook: F1 };
+  assert.deepEqual(app.pushValues(), [K1, K2, F1]);
+  assert.deepEqual(app.pushLabels(), ["Bark", "Bark", "飞书"]);
+  // 最后一行有内容才给「添加」，界面上最多只有一个空行。
+  assert.equal(app.hasAddPush(), true);
 });
 
-test("an untouched Bark field follows backend settings and a saved edit is trimmed", () => {
+test("old settings without push addresses show one empty row that saves on blur", () => {
   const app = renderApp();
-  app.input();
-  app.state.settings = { ...app.state.settings, barkUrl: "https://api.day.app/loaded-key" };
-  assert.equal(app.input().value, "https://api.day.app/loaded-key");
-  app.input().onChange({ target: { value: " https://api.day.app/new-key  " } });
-  app.input().onBlur();
-  assert.equal(app.saved.at(-1).barkUrl, "https://api.day.app/new-key");
-  assert.equal(app.input().value, "https://api.day.app/new-key");
+  app.state.settings = { locale: "zh_CN", barkUrl: "", intervalSeconds: 30 };
+  assert.deepEqual(app.pushValues(), [""], "老设置没有 feishuWebhook 字段，也应当是一个空行而不是报错");
+  assert.equal(app.hasAddPush(), false);
+  assert.equal(app.removePush(0).disabled, true, "只剩一个空行时删除没有意义");
+  app.pushRow(0).onChange({ target: { value: `  ${F1}  ` } });
+  app.pushRow(0).onBlur();
+  assert.deepEqual(app.pushSaves.at(-1), [F1]);
+  assert.deepEqual(app.pushValues(), [F1]);
+  assert.deepEqual(app.pushLabels(), ["飞书"]);
+});
+
+test("adding a row keeps the typed order, splits a pasted semicolon list, and skips saves with no change", () => {
+  const app = renderApp();
+  app.pushRow(0).onBlur();
+  assert.equal(app.pushSaves.length, 0, "没改动就不该写盘");
+  app.addPush().onClick();
+  assert.deepEqual(app.pushValues(), ["https://api.day.app/saved-key", ""]);
+  assert.equal(app.hasAddPush(), false);
+  // 老版本用分号连着的一整串粘进了一行：拆成几行，各归各的渠道。
+  app.pushRow(1).onChange({ target: { value: ` ${F1};${K2} ` } });
+  app.pushRow(1).onBlur();
+  assert.deepEqual(app.pushSaves.at(-1), ["https://api.day.app/saved-key", F1, K2]);
+  assert.deepEqual(app.pushValues(), ["https://api.day.app/saved-key", F1, K2]);
+  assert.deepEqual(app.pushLabels(), ["Bark", "飞书", "Bark"]);
+  // 新开的空行没填就离开，这一行直接消失，不写盘。
+  app.addPush().onClick();
+  app.pushRow(3).onBlur();
+  assert.deepEqual(app.pushValues(), ["https://api.day.app/saved-key", F1, K2]);
+  assert.equal(app.pushSaves.length, 1);
+});
+
+test("deleting a row saves the rest at once, and clearing the last one leaves an empty row", () => {
+  const app = renderApp();
+  app.state.settings = { ...app.state.settings, barkUrl: K1, feishuWebhook: F1 };
+  app.removePush(0).onClick();
+  assert.deepEqual(app.pushSaves.at(-1), [F1]);
+  assert.deepEqual(app.pushValues(), [F1]);
+  assert.equal(app.state.settings.barkUrl, "");
+  // 清空也是明确的操作：保存空列表，界面不退回旧地址。
+  app.pushRow(0).onChange({ target: { value: "" } });
+  app.pushRow(0).onBlur();
+  assert.deepEqual(app.pushSaves.at(-1), []);
+  assert.deepEqual(app.pushValues(), [""]);
+  assert.equal(app.state.settings.feishuWebhook, "");
 });
 
 function phoneSelectionApp() {
@@ -234,20 +305,4 @@ test("proxy addresses are split on semicolons and saved as a list, and old setti
   assert.deepEqual(app.saved.at(-1).proxies, ["http://a:8080", "socks5://b:1080"]);
   app.state.settings = { ...app.state.settings, proxies: ["http://c:1"] };
   assert.equal(app.proxies().value, "http://c:1", "没在编辑时跟随后端保存的列表");
-});
-
-test("the Feishu webhook reads empty from old settings, saves trimmed on blur, and can be cleared", () => {
-  const app = renderApp();
-  assert.equal(app.feishu().value, "", "老设置没有 feishuWebhook 字段，输入框应当是空的而不是报错");
-  app.feishu().onChange({ target: { value: "  https://open.feishu.cn/open-apis/bot/v2/hook/abc  " } });
-  app.feishu().onBlur();
-  assert.equal(app.saved.at(-1).feishuWebhook, "https://open.feishu.cn/open-apis/bot/v2/hook/abc");
-  // 没在编辑时跟随后端保存的值。
-  app.state.settings = { ...app.state.settings, feishuWebhook: "https://open.feishu.cn/open-apis/bot/v2/hook/def" };
-  assert.equal(app.feishu().value, "https://open.feishu.cn/open-apis/bot/v2/hook/def");
-  // 清空是明确的操作：保存空串，输入框不退回旧地址。
-  app.feishu().onChange({ target: { value: "" } });
-  app.feishu().onBlur();
-  assert.equal(app.saved.at(-1).feishuWebhook, "");
-  assert.equal(app.feishu().value, "");
 });

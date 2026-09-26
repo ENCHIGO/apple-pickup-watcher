@@ -174,6 +174,23 @@ async fn save_settings(
     Ok(next)
 }
 
+/// 用界面上的推送地址列表整体替换现有的。
+///
+/// 每个地址是 Bark 还是飞书由 [`Settings::set_push_urls`] 按长相判断，界面不自己猜。
+/// 只动推送地址：不经过 [`save_settings`]，免得顺带把引擎的目标、间隔和代理
+/// 也重新下发一遍。
+#[tauri::command]
+async fn set_push_urls(
+    state: tauri::State<'_, AppState>,
+    urls: Vec<String>,
+) -> Result<Settings, String> {
+    let mut next = state.settings_snapshot();
+    next.set_push_urls(&urls);
+    next.normalize();
+    state.put_settings(next.clone())?;
+    Ok(next)
+}
+
 #[tauri::command]
 async fn get_snapshot(state: tauri::State<'_, AppState>) -> Result<Vec<TargetState>, String> {
     Ok(state.watcher.snapshot().await)
@@ -596,6 +613,7 @@ pub fn run() {
             refresh_products,
             get_settings,
             save_settings,
+            set_push_urls,
             get_snapshot,
             set_targets,
             set_interval,
