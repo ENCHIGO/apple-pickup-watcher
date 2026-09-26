@@ -134,12 +134,16 @@ pub struct Settings {
     pub targets: Vec<Target>,
     /// 每轮查询之间的间隔秒数。
     pub interval_seconds: u64,
-    /// 为空表示不启用 Bark 推送。可以填多个地址，用分号分隔，见
-    /// [`Settings::bark_urls`]；字段仍是一个字符串，旧配置原样可读。
+    /// Bark 推送地址，为空表示不启用。多个地址在文件里用分号连成一个字符串，
+    /// 见 [`Settings::bark_urls`]；字段仍是一个字符串，旧配置原样可读。
+    ///
+    /// 界面上 Bark 和飞书是同一个「推送地址」列表，用户不用自己选渠道：
+    /// 读写都走 [`Settings::push_urls`] / [`Settings::set_push_urls`]，
+    /// 每个地址归哪个渠道由 [`push_kind`] 按长相判断，这两个字段只是存法。
     pub bark_url: String,
-    /// 飞书群自定义机器人的 webhook 地址，为空表示不启用。可以填多个地址，
-    /// 用分号分隔（规则同 [`split_bark_urls`]）。创建机器人时安全设置选
-    /// 「自定义关键词」并填「有货」即可，提醒标题「有货了」天然命中。
+    /// 飞书群自定义机器人的 webhook 地址，为空表示不启用；存法同
+    /// [`Settings::bark_url`]。创建机器人时安全设置选「自定义关键词」并填
+    /// 「有货」即可，提醒标题「有货了」天然命中。
     pub feishu_webhook: String,
     /// 有货时是否播放提示音。
     pub sound_enabled: bool,
@@ -192,8 +196,11 @@ impl Settings {
 
         // 推送地址收敛成「分号分隔、无空项、无重复」的规范写法，读回来和
         // 界面上显示的一致；单个地址前后有空格的老配置也顺手修好。
-        self.bark_url = split_bark_urls(&self.bark_url).join(";");
-        self.feishu_webhook = split_bark_urls(&self.feishu_webhook).join(";");
+        //
+        // 同时按地址长相重新归一次渠道：支持飞书之前，只有 Bark 一栏可填，
+        // 有人把飞书地址填进了 Bark；升级后它会自己挪到飞书，开始正常推送。
+        let all = self.push_urls();
+        self.set_push_urls(&all);
 
         // 去重时**新建 Vec 再整体替换**，不在原 Vec 上就地压缩。
         //
@@ -236,12 +243,69 @@ impl Settings {
     pub fn bark_urls(&self) -> Vec<String> {
         split_bark_urls(&self.bark_url)
     }
+
+    /// 全部推送地址：Bark 在前、飞书在后，各自保持填写顺序，去掉重复。
+    pub fn push_urls(&self) -> Vec<String> {
+        let mut all = split_bark_urls(&self.bark_url);
+        for url in split_bark_urls(&self.feishu_webhook) {
+            if !all.contains(&url) {
+                all.push(url);
+            }
+        }
+        all
+    }
+
+    /// 用一组推送地址整体替换现有的，逐个按 [`push_kind`] 归到 Bark 或飞书。
+    ///
+    /// 每一项还会再按分号、换行和空白拆开：用户把老版本里分号连着的一整串
+    /// 粘进一行，也能拆成几个地址各归各的渠道。
+    pub fn set_push_urls(&mut self, urls: &[String]) {
+        let mut bark: Vec<String> = Vec::new();
+        let mut feishu: Vec<String> = Vec::new();
+        for url in split_bark_urls(&urls.join("\n")) {
+            match push_kind(&url) {
+                PushKind::Bark => bark.push(url),
+                PushKind::Feishu => feishu.push(url),
+            }
+        }
+        self.bark_url = bark.join(";");
+        self.feishu_webhook = feishu.join(";");
+    }
 }
 
-/// 把设置里的推送地址拆成一条条：分号、换行、空白都算分隔符。
+/// 推送地址属于哪个渠道。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PushKind {
+    Bark,
+    Feishu,
+}
+
+/// 飞书（含 Lark 国际版）群机器人 webhook 固定的路径前缀。
+const FEISHU_HOOK_PATH: &str = "/open-apis/bot/v2/hook/";
+
+/// 按地址长相判断推送渠道。
 ///
-/// 用户想同时推到几台手机（issue #35），最省事的写法是在同一个输入框里用分号
-/// 隔开。放在这里而不是 `notify` 模块，是因为后者挂在 `notifications` feature 后面，
+/// 飞书群机器人的 webhook 路径是固定的，认得出来；其余一律当 Bark。自建的 Bark
+/// 服务器主机名五花八门，没法逐个认，只能兜底。判断放在 Rust 这一侧、界面不另
+/// 抄一份：抄一份，迟早会有一边先认了新渠道、另一边还按老规矩归类。
+pub fn push_kind(url: &str) -> PushKind {
+    let url = url.trim();
+    let feishu = match reqwest::Url::parse(url) {
+        Ok(parsed) => parsed.path().starts_with(FEISHU_HOOK_PATH),
+        // 漏写协议之类解析不了的地址按字面找：先归对渠道，发送时报的错才对得上号。
+        Err(_) => url.contains(FEISHU_HOOK_PATH),
+    };
+    if feishu {
+        PushKind::Feishu
+    } else {
+        PushKind::Bark
+    }
+}
+
+/// 把设置里的推送地址拆成一条条：分号、换行、空白都算分隔符。Bark 和飞书共用，
+/// 名字是只有 Bark 时起的。
+///
+/// 文件里多个地址用分号连成一个字符串（issue #35 起就是这个存法）。放在这里而不是 `notify` 模块，是因为后者挂在 `notifications` feature 后面，
 /// 而 CLI 那份构建没有它 —— 设置的规范化不能依赖一个可选模块。去掉空项与重复项，保持先后顺序；地址里不会出现这些字符，不必转义。
 pub fn split_bark_urls(raw: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();

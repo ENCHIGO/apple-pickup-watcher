@@ -29,6 +29,14 @@ import {
   productsForSelection,
 } from "@/lib/product-selection";
 import {
+  cleanPushRows,
+  PUSH_KIND_LABEL,
+  type PushKind,
+  pushSummary,
+  samePushUrls,
+  savedPushAddresses,
+} from "@/lib/push";
+import {
   Table,
   TableBody,
   TableCell,
@@ -52,6 +60,7 @@ import {
   saveSettings,
   setCategory,
   setIntervalSeconds,
+  setPushUrls,
   setTargets,
   startWatching,
   stopWatching,
@@ -172,14 +181,11 @@ function readSettingsOpen(): boolean {
 function settingsSummary(s: Settings): string {
   return [
     `每 ${s.intervalSeconds} 秒查一轮`,
-    s.barkUrl.trim() === "" ? "Bark 未配置" : "Bark 已配置",
-    (s.feishuWebhook ?? "").trim() === "" ? null : "飞书已配置",
+    pushSummary(savedPushAddresses(s)),
     (s.proxies ?? []).length > 0 ? `代理 ${s.proxies.length} 条` : "无代理",
     s.soundEnabled ? "提示音开" : "提示音关",
     s.openBagOnHit ? "有货时开购物袋" : "有货时不开购物袋",
-  ]
-    .filter((part) => part !== null)
-    .join(" · ");
+  ].join(" · ");
 }
 
 /** 运行状态。一个会呼吸的点比一行灰字更像「它还活着」。 */
@@ -262,8 +268,9 @@ export default function App() {
   const [families, setFamilies] = useState<string[]>([]);
   const [capacities, setCapacities] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
-  const [barkDraft, setBarkDraft] = useState<string | null>(null);
-  const [feishuDraft, setFeishuDraft] = useState<string | null>(null);
+  // 推送地址：Bark 和飞书是同一个列表，一行一个。null 表示还没动过，跟着后端走；
+  // 动过之后以这份为准，保持用户填写的顺序，渠道标签按后端的归类显示。
+  const [pushDraft, setPushDraft] = useState<string[] | null>(null);
   const [proxiesDraft, setProxiesDraft] = useState<string | null>(null);
   const [intervalDraft, setIntervalDraft] = useState<number | null>(null);
   // 设置改一次就放着不动，折起来把纵向空间还给表格；记住上次的选择。
@@ -278,10 +285,27 @@ export default function App() {
     }
   }
 
-  // null 表示尚未编辑；空字符串是用户明确清空，不能退回已保存的地址。
-  const barkValue = barkDraft ?? ui.settings.barkUrl;
-  // 旧设置文件没有 feishuWebhook 字段，读上来是 undefined，当作空。
-  const feishuValue = feishuDraft ?? (ui.settings.feishuWebhook ?? "");
+  const savedPush = useMemo(() => savedPushAddresses(ui.settings), [ui.settings]);
+  const savedPushKind = new Map<string, PushKind>(savedPush.map((p) => [p.url, p.kind]));
+  const pushRows = pushDraft ?? savedPush.map((p) => p.url);
+  // 一个地址都没有时留一个空行，直接粘贴就行，不用先点「添加」。
+  const visiblePushRows = pushRows.length > 0 ? pushRows : [""];
+  const lastPushRow = visiblePushRows[visiblePushRows.length - 1] ?? "";
+
+  function editPushRow(index: number, value: string) {
+    setPushDraft(visiblePushRows.map((row, i) => (i === index ? value : row)));
+  }
+
+  // 失焦和删除都走这里：整理后整组交给后端归类保存；没有实际改动就不写盘。
+  // 整理后的列表留作草稿：保存是异步的，这时退回「跟着后端走」，界面会先闪回
+  // 旧地址，紧接着点「添加」还会以旧列表为底，把刚填的地址弄丢。
+  function commitPushRows(rows: string[]) {
+    const urls = cleanPushRows(rows);
+    setPushDraft(urls);
+    if (!samePushUrls(urls, savedPush.map((p) => p.url))) {
+      void setPushUrls(urls);
+    }
+  }
   // 旧设置文件没有 proxies 字段，读上来是 undefined，当作空列表。
   const proxiesValue = proxiesDraft ?? (ui.settings.proxies ?? []).join(";");
   const intervalValue = intervalDraft ?? ui.settings.intervalSeconds;
@@ -626,111 +650,144 @@ export default function App() {
           open={settingsOpen}
           onToggle={toggleSettings}
         >
-          <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="interval" className="whitespace-nowrap">
-                查询间隔（秒）
-              </Label>
-              <Input
-                id="interval"
-                type="number"
-                min={5}
-                className="w-28 select-text"
-                value={intervalValue}
-                onChange={(e) => setIntervalDraft(e.target.valueAsNumber)}
-                onBlur={() => {
-                  const s = Number.isFinite(intervalValue) ? Math.round(intervalValue) : 30;
-                  setIntervalDraft(null);
-                  void setIntervalSeconds(s);
-                }}
-              />
+          {/* 两栏：左边是查询与本机提醒，右边是推送地址。推送地址一行一个会占好几行，
+              和别的设置叠成一列的话，默认窗口高度下监控列表会被挤得看不见。 */}
+          <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+            <div className="grid min-w-80 grow-[2] basis-80 gap-3">
+              <div className="flex items-end gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="interval" className="whitespace-nowrap">
+                    查询间隔（秒）
+                  </Label>
+                  <Input
+                    id="interval"
+                    type="number"
+                    min={5}
+                    className="w-24 select-text"
+                    value={intervalValue}
+                    onChange={(e) => setIntervalDraft(e.target.valueAsNumber)}
+                    onBlur={() => {
+                      const s = Number.isFinite(intervalValue) ? Math.round(intervalValue) : 30;
+                      setIntervalDraft(null);
+                      void setIntervalSeconds(s);
+                    }}
+                  />
+                </div>
+                <div className="grid min-w-0 flex-1 gap-1.5">
+                  <Label htmlFor="proxies" className="whitespace-nowrap">
+                    代理地址（可选）
+                  </Label>
+                  <Input
+                    id="proxies"
+                    className="select-text"
+                    placeholder="http://user:pass@host:port;socks5://host:port，多个用分号分隔"
+                    value={proxiesValue}
+                    onChange={(e) => setProxiesDraft(e.target.value)}
+                    onBlur={() => {
+                      setProxiesDraft(null);
+                      // 每个代理是一条额外的出口线路：Apple 的配额按出口 IP 计，
+                      // 多一条线路多一份配额，被拦时自动换下一条。后端会再校验一遍。
+                      const proxies = proxiesValue
+                        .split(/[;\s]+/)
+                        .map((p) => p.trim())
+                        .filter((p) => p !== "");
+                      void saveSettings({ ...ui.settings, proxies });
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="sound"
+                    checked={ui.settings.soundEnabled}
+                    onCheckedChange={(v) =>
+                      void saveSettings({ ...ui.settings, soundEnabled: v })
+                    }
+                  />
+                  <Label htmlFor="sound">提示音</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="openbag"
+                    checked={ui.settings.openBagOnHit}
+                    onCheckedChange={(v) =>
+                      void saveSettings({ ...ui.settings, openBagOnHit: v })
+                    }
+                  />
+                  <Label htmlFor="openbag">有货时打开购物袋</Label>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => void testNotify()}>
+                  <BellRing /> 测试提醒
+                </Button>
+              </div>
             </div>
 
-            <div className="grid min-w-64 flex-1 gap-1.5">
-              <Label htmlFor="bark" className="whitespace-nowrap">
-                Bark 推送地址
-              </Label>
-              <Input
-                id="bark"
-                className="select-text"
-                placeholder="https://api.day.app/你的Key，多个用分号分隔，留空不推送"
-                value={barkValue}
-                onChange={(e) => setBarkDraft(e.target.value)}
-                onBlur={() => {
-                  setBarkDraft(null);
-                  void saveSettings({ ...ui.settings, barkUrl: barkValue.trim() });
-                }}
-              />
+            <div className="grid min-w-96 grow-[3] basis-96 gap-1.5">
+              {/* 标题行和左栏的标签一样高，两栏的第一行输入框才能对齐。 */}
+              <div className="flex h-3.5 items-center gap-x-2">
+                <Label htmlFor="push-0" className="shrink-0 whitespace-nowrap">
+                  推送地址（可选）
+                </Label>
+                <span className="text-muted-foreground min-w-0 truncate text-xs leading-none">
+                  Bark 或飞书群机器人，一行一个，自动识别
+                </span>
+                {lastPushRow.trim() !== "" && (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="text-muted-foreground hover:text-foreground ml-auto h-3.5 shrink-0 gap-1 p-0 text-xs leading-none has-[>svg]:px-0 [&_svg]:size-3"
+                    onClick={() => setPushDraft([...cleanPushRows(visiblePushRows), ""])}
+                  >
+                    <Plus /> 添加推送地址
+                  </Button>
+                )}
+              </div>
+              {visiblePushRows.map((row, index) => {
+                const kind = savedPushKind.get(row.trim());
+                return (
+                  <div key={index} className="flex items-center gap-2">
+                    {/* 渠道标签占固定宽度：还没保存的行留空，输入框照样对齐。 */}
+                    <span className="flex w-12 shrink-0 justify-center">
+                      {kind !== undefined && (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          {PUSH_KIND_LABEL[kind]}
+                        </Badge>
+                      )}
+                    </span>
+                    <Input
+                      id={`push-${index}`}
+                      aria-label={`推送地址 ${index + 1}`}
+                      className="select-text"
+                      placeholder="粘贴 Bark 地址，或飞书群机器人的 webhook 地址"
+                      value={row}
+                      // 只有点「添加」新开的那一行自动聚焦；启动时的空行不抢焦点。
+                      autoFocus={pushDraft !== null && row === "" && index > 0}
+                      onChange={(e) => editPushRow(index, e.target.value)}
+                      onBlur={() => commitPushRows(visiblePushRows)}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`删除推送地址 ${index + 1}`}
+                      disabled={visiblePushRows.length === 1 && row === ""}
+                      onClick={() =>
+                        commitPushRows(visiblePushRows.filter((_, i) => i !== index))
+                      }
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                );
+              })}
+              {savedPush.some((p) => p.kind === "feishu") && (
+                // 飞书机器人最常见的配置错误是安全设置，只在真填了飞书地址时提醒。
+                <p className="text-muted-foreground pl-14 text-xs">
+                  飞书机器人的安全设置请选「自定义关键词」，填「有货」。
+                </p>
+              )}
             </div>
-
-            <div className="grid min-w-64 flex-1 gap-1.5">
-              <Label htmlFor="feishu" className="whitespace-nowrap">
-                飞书机器人 Webhook
-              </Label>
-              <Input
-                id="feishu"
-                className="select-text"
-                // 关键词写在最前：输入框窄，后半句会被截掉，而装机器人时最容易
-                // 选错的就是安全设置。完整说明挂在 title 上，悬停可见。
-                placeholder="关键词填「有货」，粘贴 webhook 地址，多个用分号分隔"
-                title="飞书群 → 设置 → 群机器人 → 添加自定义机器人。安全设置只支持「自定义关键词」，填「有货」；签名校验不支持。多个群的地址用分号分隔，留空不推送。"
-                value={feishuValue}
-                onChange={(e) => setFeishuDraft(e.target.value)}
-                onBlur={() => {
-                  setFeishuDraft(null);
-                  void saveSettings({ ...ui.settings, feishuWebhook: feishuValue.trim() });
-                }}
-              />
-            </div>
-
-            <div className="grid min-w-64 flex-1 gap-1.5">
-              <Label htmlFor="proxies" className="whitespace-nowrap">
-                代理地址（可选）
-              </Label>
-              <Input
-                id="proxies"
-                className="select-text"
-                placeholder="http://user:pass@host:port;socks5://host:port，多个用分号分隔"
-                value={proxiesValue}
-                onChange={(e) => setProxiesDraft(e.target.value)}
-                onBlur={() => {
-                  setProxiesDraft(null);
-                  // 每个代理是一条额外的出口线路：Apple 的配额按出口 IP 计，
-                  // 多一条线路多一份配额，被拦时自动换下一条。后端会再校验一遍。
-                  const proxies = proxiesValue
-                    .split(/[;\s]+/)
-                    .map((p) => p.trim())
-                    .filter((p) => p !== "");
-                  void saveSettings({ ...ui.settings, proxies });
-                }}
-              />
-            </div>
-
-            <div className="flex items-center gap-2 pb-2">
-              <Switch
-                id="sound"
-                checked={ui.settings.soundEnabled}
-                onCheckedChange={(v) =>
-                  void saveSettings({ ...ui.settings, soundEnabled: v })
-                }
-              />
-              <Label htmlFor="sound">提示音</Label>
-            </div>
-
-            <div className="flex items-center gap-2 pb-2">
-              <Switch
-                id="openbag"
-                checked={ui.settings.openBagOnHit}
-                onCheckedChange={(v) =>
-                  void saveSettings({ ...ui.settings, openBagOnHit: v })
-                }
-              />
-              <Label htmlFor="openbag">有货时打开购物袋</Label>
-            </div>
-
-            <Button variant="ghost" size="sm" className="mb-1" onClick={() => void testNotify()}>
-              <BellRing /> 测试提醒
-            </Button>
           </div>
         </Panel>
 

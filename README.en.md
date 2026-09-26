@@ -153,7 +153,7 @@ No, and no. It only checks stock and alerts you, and at most opens your shopping
 
 ### How do I get alerts on my phone?
 
-Install [Bark](https://github.com/Finb/Bark) on your iPhone, paste the push URL it gives you into the “Bark push URL” field in settings, and click “Test alert” to confirm the whole chain works. To reach several phones, put their URLs in the same field separated by semicolons. On Android, or to alert a Feishu group, add a custom bot to the group with the keyword “有货” as its security setting and paste its webhook URL into the “飞书机器人 Webhook” field; see the [desktop guide](docs/desktop.md#飞书群机器人推送). A failed push never changes the stock verdict.
+Install [Bark](https://github.com/Finb/Bark) on your iPhone, paste the push URL it gives you into the “推送地址” (push addresses) list in settings, and click “Test alert” to confirm the whole chain works. On Android, or to alert a Feishu group, add a custom bot to the group with the keyword “有货” as its security setting and paste its webhook URL into the same list; see the [desktop guide](docs/desktop.md#飞书群机器人推送). The app tells Bark and Feishu addresses apart on its own; to reach several phones or groups, click “添加推送地址” (add push address) and enter one per line. A failed push never changes the stock verdict.
 
 ### Why is the default polling interval 30 seconds?
 
