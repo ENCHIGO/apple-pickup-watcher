@@ -195,7 +195,8 @@ export function connect(): Promise<void> {
   starting = (async () => {
     unlisteners = await Promise.all([
       listen<WatcherEvent>(EVENT_CHANNEL, (e) => applyEvent(e.payload)),
-      listen<string>(NOTICE_CHANNEL, (e) => pushLog(`启动提示：${e.payload}`)),
+      // 这条通道不只在启动时用：发提醒失败、打开购物袋失败也走这里，前缀不能写死成「启动」。
+      listen<string>(NOTICE_CHANNEL, (e) => pushLog(`提示：${e.payload}`)),
     ]);
 
     const [regions, categories, settings, rows, running] = await Promise.all([

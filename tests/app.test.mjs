@@ -75,11 +75,17 @@ function renderApp() {
   const isAddPush = (element) => element.type === "Button" &&
     Array.isArray(element.props.children) && element.props.children.includes(" 添加推送地址");
   return {
-    proxies: () => control((element) => element?.props?.id === "proxies"),
+    proxyRow: (index) => control((element) => element?.props?.id === `proxy-${index}`),
+    proxyValues: () => all((element) => /^proxy-\d+$/.test(element?.props?.id ?? "")).map((element) => element.props.value),
+    removeProxy: (index) => control((element) => element?.props?.["aria-label"] === `删除代理地址 ${index + 1}`),
+    rejectedProxies: () => all((element) => element.type === "Badge" && element.props.children === "未生效").length,
+    addProxy: () => control((element) => element.type === "Button" &&
+      Array.isArray(element.props.children) && element.props.children.includes(" 添加代理")),
     pushRow: (index) => control((element) => element?.props?.id === `push-${index}`),
     pushValues: () => all(isPushInput).map((element) => element.props.value),
     // 渠道标签按行的顺序排列；还没保存的行没有标签。
-    pushLabels: () => all((element) => element.type === "Badge").map((element) => element.props.children),
+    pushLabels: () => all((element) => element.type === "Badge" && element.props.children !== "未生效")
+      .map((element) => element.props.children),
     removePush: (index) => control((element) => element?.props?.["aria-label"] === `删除推送地址 ${index + 1}`),
     addPush: () => control(isAddPush),
     hasAddPush: () => all(isAddPush).length > 0,
@@ -296,13 +302,25 @@ test("the add button stays disabled until at least one store is selected", () =>
   assert.equal(app.addButton().disabled, false);
 });
 
-test("proxy addresses are split on semicolons and saved as a list, and old settings without the field read as empty", () => {
+test("proxy addresses are one per row, saved as a list, and a row the backend drops is marked", () => {
   const app = renderApp();
-  assert.equal(app.proxies().value, "", "老设置没有 proxies 字段，输入框应当是空的而不是报错");
-  app.proxies().onChange({ target: { value: " http://a:8080 ; socks5://b:1080  " } });
-  assert.equal(app.proxies().value, " http://a:8080 ; socks5://b:1080  ");
-  app.proxies().onBlur();
-  assert.deepEqual(app.saved.at(-1).proxies, ["http://a:8080", "socks5://b:1080"]);
-  app.state.settings = { ...app.state.settings, proxies: ["http://c:1"] };
-  assert.equal(app.proxies().value, "http://c:1", "没在编辑时跟随后端保存的列表");
+  assert.deepEqual(app.proxyValues(), [""], "老设置没有 proxies 字段，应当是一个空行而不是报错");
+  app.proxyRow(0).onChange({ target: { value: " socks5://127.0.0.1:1081 ; http://a:8080 " } });
+  app.proxyRow(0).onBlur();
+  assert.deepEqual(app.saved.at(-1).proxies, ["socks5://127.0.0.1:1081", "http://a:8080"]);
+  assert.deepEqual(app.proxyValues(), ["socks5://127.0.0.1:1081", "http://a:8080"]);
+  assert.equal(app.rejectedProxies(), 0);
+  // 后端只留下能解析的地址：留不下的那一行要标出来，不能看着像生效了。
+  app.addProxy().onClick();
+  app.proxyRow(2).onChange({ target: { value: "ftp://x:21" } });
+  app.proxyRow(2).onBlur();
+  // 模拟后端把解析不了的那条丢掉。
+  app.state.settings = { ...app.state.settings, proxies: ["socks5://127.0.0.1:1081", "http://a:8080"] };
+  assert.equal(app.rejectedProxies(), 1);
+  // 删掉它：剩下的两条和后端已存的一样，不必再写盘。
+  const saves = app.saved.length;
+  app.removeProxy(2).onClick();
+  assert.deepEqual(app.proxyValues(), ["socks5://127.0.0.1:1081", "http://a:8080"]);
+  assert.equal(app.rejectedProxies(), 0);
+  assert.equal(app.saved.length, saves);
 });
