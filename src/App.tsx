@@ -271,7 +271,8 @@ export default function App() {
   // 推送地址：Bark 和飞书是同一个列表，一行一个。null 表示还没动过，跟着后端走；
   // 动过之后以这份为准，保持用户填写的顺序，渠道标签按后端的归类显示。
   const [pushDraft, setPushDraft] = useState<string[] | null>(null);
-  const [proxiesDraft, setProxiesDraft] = useState<string | null>(null);
+  // 代理地址和推送地址一样一行一个，草稿的规矩也相同，见 pushDraft。
+  const [proxyDraft, setProxyDraft] = useState<string[] | null>(null);
   const [intervalDraft, setIntervalDraft] = useState<number | null>(null);
   // 设置改一次就放着不动，折起来把纵向空间还给表格；记住上次的选择。
   const [settingsOpen, setSettingsOpen] = useState(readSettingsOpen());
@@ -307,7 +308,24 @@ export default function App() {
     }
   }
   // 旧设置文件没有 proxies 字段，读上来是 undefined，当作空列表。
-  const proxiesValue = proxiesDraft ?? (ui.settings.proxies ?? []).join(";");
+  const savedProxies = ui.settings.proxies ?? [];
+  const proxyRows = proxyDraft ?? savedProxies;
+  const visibleProxyRows = proxyRows.length > 0 ? proxyRows : [""];
+  const lastProxyRow = visibleProxyRows[visibleProxyRows.length - 1] ?? "";
+
+  function editProxyRow(index: number, value: string) {
+    setProxyDraft(visibleProxyRows.map((row, i) => (i === index ? value : row)));
+  }
+
+  // 每个代理是一条额外的出口线路：Apple 的配额按出口 IP 计，多一条线路多一份配额，
+  // 被拦时自动换下一条。后端只留能解析的地址，留不下的那行会标「未生效」。
+  function commitProxyRows(rows: string[]) {
+    const proxies = cleanPushRows(rows);
+    setProxyDraft(proxies);
+    if (!samePushUrls(proxies, savedProxies)) {
+      void saveSettings({ ...ui.settings, proxies });
+    }
+  }
   const intervalValue = intervalDraft ?? ui.settings.intervalSeconds;
 
   const storeOptions = useMemo(
@@ -654,16 +672,78 @@ export default function App() {
               和别的设置叠成一列的话，默认窗口高度下监控列表会被挤得看不见。 */}
           <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
             <div className="grid min-w-80 grow-[2] basis-80 gap-3">
-              <div className="flex items-end gap-3">
-                <div className="grid gap-1.5">
+              <div className="grid gap-1.5">
+                {/* 标题行和右栏「推送地址」一样高，两栏的输入框才能对齐。 */}
+                <div className="flex h-3.5 items-center gap-x-2">
+                  <Label htmlFor="proxy-0" className="shrink-0 whitespace-nowrap">
+                    代理地址（可选）
+                  </Label>
+                  <span className="text-muted-foreground min-w-0 truncate text-xs leading-none">
+                    http / https / socks5，一行一个
+                  </span>
+                  {lastProxyRow.trim() !== "" && (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="text-muted-foreground hover:text-foreground ml-auto h-3.5 shrink-0 gap-1 p-0 text-xs leading-none has-[>svg]:px-0 [&_svg]:size-3"
+                      onClick={() => setProxyDraft([...cleanPushRows(visibleProxyRows), ""])}
+                    >
+                      <Plus /> 添加代理
+                    </Button>
+                  )}
+                </div>
+                {visibleProxyRows.map((row, index) => {
+                  // 保存后后端没留下这一行：地址解析不了，这条线路不存在。
+                  const rejected =
+                    proxyDraft !== null && row.trim() !== "" && !savedProxies.includes(row.trim());
+                  return (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        id={`proxy-${index}`}
+                        aria-label={`代理地址 ${index + 1}`}
+                        aria-invalid={rejected || undefined}
+                        className="select-text"
+                        placeholder="socks5://127.0.0.1:1080 或 http://user:pass@host:port"
+                        value={row}
+                        autoFocus={proxyDraft !== null && row === "" && index > 0}
+                        onChange={(e) => editProxyRow(index, e.target.value)}
+                        onBlur={() => commitProxyRows(visibleProxyRows)}
+                      />
+                      {rejected && (
+                        <Badge
+                          variant="outline"
+                          className="text-destructive border-destructive/40 shrink-0"
+                          title="地址格式不对，这条线路没有生效。支持 http、https、socks5、socks5h，例如 socks5://127.0.0.1:1080"
+                        >
+                          未生效
+                        </Badge>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`删除代理地址 ${index + 1}`}
+                        disabled={visibleProxyRows.length === 1 && row === ""}
+                        onClick={() =>
+                          commitProxyRows(visibleProxyRows.filter((_, i) => i !== index))
+                        }
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <div className="flex items-center gap-2">
                   <Label htmlFor="interval" className="whitespace-nowrap">
-                    查询间隔（秒）
+                    查询间隔
                   </Label>
                   <Input
                     id="interval"
                     type="number"
                     min={5}
-                    className="w-24 select-text"
+                    className="h-8 w-20 select-text"
                     value={intervalValue}
                     onChange={(e) => setIntervalDraft(e.target.valueAsNumber)}
                     onBlur={() => {
@@ -672,32 +752,8 @@ export default function App() {
                       void setIntervalSeconds(s);
                     }}
                   />
+                  <span className="text-muted-foreground text-sm">秒</span>
                 </div>
-                <div className="grid min-w-0 flex-1 gap-1.5">
-                  <Label htmlFor="proxies" className="whitespace-nowrap">
-                    代理地址（可选）
-                  </Label>
-                  <Input
-                    id="proxies"
-                    className="select-text"
-                    placeholder="http://user:pass@host:port;socks5://host:port，多个用分号分隔"
-                    value={proxiesValue}
-                    onChange={(e) => setProxiesDraft(e.target.value)}
-                    onBlur={() => {
-                      setProxiesDraft(null);
-                      // 每个代理是一条额外的出口线路：Apple 的配额按出口 IP 计，
-                      // 多一条线路多一份配额，被拦时自动换下一条。后端会再校验一遍。
-                      const proxies = proxiesValue
-                        .split(/[;\s]+/)
-                        .map((p) => p.trim())
-                        .filter((p) => p !== "");
-                      void saveSettings({ ...ui.settings, proxies });
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                 <div className="flex items-center gap-2">
                   <Switch
                     id="sound"
@@ -718,9 +774,6 @@ export default function App() {
                   />
                   <Label htmlFor="openbag">有货时打开购物袋</Label>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => void testNotify()}>
-                  <BellRing /> 测试提醒
-                </Button>
               </div>
             </div>
 
@@ -743,6 +796,15 @@ export default function App() {
                     <Plus /> 添加推送地址
                   </Button>
                 )}
+                {/* 测试的就是这些推送（连同系统通知和提示音），放在它们的标题旁边。 */}
+                <Button
+                  variant="link"
+                  size="sm"
+                  className={`text-muted-foreground hover:text-foreground h-3.5 shrink-0 gap-1 p-0 text-xs leading-none has-[>svg]:px-0 [&_svg]:size-3 ${lastPushRow.trim() !== "" ? "" : "ml-auto"}`}
+                  onClick={() => void testNotify()}
+                >
+                  <BellRing /> 测试提醒
+                </Button>
               </div>
               {visiblePushRows.map((row, index) => {
                 const kind = savedPushKind.get(row.trim());

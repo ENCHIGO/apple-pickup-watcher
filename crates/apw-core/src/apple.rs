@@ -423,6 +423,8 @@ enum RouteAvailability {
 struct Route {
     /// 给日志和请求记录看的名字：`direct`，或 `proxy#1`（不含账号密码）。
     label: String,
+    /// 代理线路的地址，去掉了账号密码，出错时告诉用户是哪个代理连不上；直连为 `None`。
+    endpoint: Option<String>,
     http: Http,
     warm: Mutex<HashMap<String, WarmState>>,
     blocks: Mutex<BlockTracker>,
@@ -433,6 +435,7 @@ impl Route {
     fn build(config: &ClientConfig, label: String, proxy: Option<&str>) -> Result<Self, ApiError> {
         Ok(Self {
             label,
+            endpoint: proxy.map(redact_proxy),
             http: Http::build(config, proxy)?,
             warm: Mutex::new(HashMap::new()),
             blocks: Mutex::new(BlockTracker::default()),
@@ -499,6 +502,48 @@ fn redact_proxy(proxy: &str) -> String {
             _ => format!("{}://…", url.scheme()),
         },
         Err(_) => "（无法解析的地址）".into(),
+    }
+}
+
+/// 代理线路这一轮出的网络错误，写成用户能照着排查的话。
+///
+/// 底层库连不上代理时只说一句 `client error (ProxyConnect)`，用户看不出是代理
+/// 软件没开、端口填错，还是代理自己的出口不通。这里点名是哪个代理、该查什么，
+/// 原始报错接在后面备查。
+fn describe_proxy_failure(route: &Route, err: &ApiError) -> String {
+    let raw = match err {
+        ApiError::Transport(detail) => detail.as_str(),
+        _ => "",
+    };
+    let at = route.endpoint.as_deref().unwrap_or("代理");
+    if raw.contains("ProxyConnect") {
+        format!(
+            "线路 {}：连不上代理 {at}，请检查代理软件是否在运行、地址和端口是否填对（原始报错：{raw}）",
+            route.label
+        )
+    } else {
+        format!("线路 {}（{at}）：{err}", route.label)
+    }
+}
+
+/// 一轮里试过的线路都失败时，把每条线路的结果合成一条错误。
+///
+/// 错误的种类保持不变：只要有一条线路是被 Apple 拦下的，就仍按「被拦截」报，
+/// 界面上「换条网络」的建议照样出现；全是网络错误才按网络错误报。只试了一条
+/// 线路时原样返回，单线路的提示和以前一字不差。
+fn summarize_round(last: ApiError, outcomes: &[String]) -> ApiError {
+    if outcomes.len() < 2 {
+        return last;
+    }
+    let text = outcomes.join("；");
+    if matches!(last, ApiError::Blocked(_)) || outcomes.iter().any(|o| o.contains("已进入冷却"))
+    {
+        ApiError::Blocked(text)
+    } else {
+        match last {
+            ApiError::Transport(_) => ApiError::Transport(text),
+            other => other,
+        }
     }
 }
 
@@ -1046,13 +1091,16 @@ impl AppleClient {
         let multi = attempts > 1;
         let mut tried: Vec<String> = Vec::new();
         let mut last_err: Option<ApiError> = None;
+        // 本轮每条线路各自的下场。全部失败时一起报出去：只报最后一条，用户会以为
+        // 前面那几条根本没用上（#37 里就有人问「为什么一直看不到 proxy#1」）。
+        let mut outcomes: Vec<String> = Vec::new();
 
         // 每条线路本次最多试一次：被拦或代理不通就换下一条，全试完才把最后的错误
         // 交出去。只有直连时和以前完全一样：一次请求，被拦就冷却。
         for _ in 0..attempts {
             let (route, probing) = match self.pick_route(region, &tried).await {
                 Ok(picked) => picked,
-                Err(err) => return Err(last_err.unwrap_or(err)),
+                Err(err) => return Err(summarize_round(last_err.unwrap_or(err), &outcomes)),
             };
             tried.push(route.label.clone());
 
@@ -1082,10 +1130,12 @@ impl AppleClient {
                     } else {
                         String::new()
                     };
-                    last_err = Some(ApiError::Blocked(format!(
+                    let text = format!(
                         "{detail}；{who}已进入冷却，{}后自动重试一次",
                         human_duration(cooldown)
-                    )));
+                    );
+                    outcomes.push(text.clone());
+                    last_err = Some(ApiError::Blocked(text));
                 }
                 // 代理连不上、握手失败之类：这条线路的问题，换一条；直连的网络错误
                 // 则照旧直接报出去（换代理解决不了本机断网）。
@@ -1093,7 +1143,9 @@ impl AppleClient {
                     if probing {
                         self.end_probe(&route, region).await;
                     }
-                    last_err = Some(ApiError::Transport(format!("线路 {}：{err}", route.label)));
+                    let text = describe_proxy_failure(&route, &err);
+                    outcomes.push(text.clone());
+                    last_err = Some(ApiError::Transport(text));
                 }
                 Err(err) => {
                     if probing {
@@ -1103,7 +1155,8 @@ impl AppleClient {
                 }
             }
         }
-        Err(last_err.unwrap_or_else(|| ApiError::Transport("没有可用的线路".into())))
+        let last = last_err.unwrap_or_else(|| ApiError::Transport("没有可用的线路".into()));
+        Err(summarize_round(last, &outcomes))
     }
 
     /// 探测与 `region` 之间实际协商出来的 HTTP 版本。

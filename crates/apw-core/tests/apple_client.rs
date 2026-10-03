@@ -782,11 +782,16 @@ async fn 代理连不上时换下一条线路且报的是代理的错() {
         .pickup_message(region, "R101", &part)
         .await
         .expect_err("直连被拦、代理不通");
-    assert!(matches!(err, ApiError::Transport(_)), "{err}");
+    // 直连是被 Apple 拦下的，整轮仍按「被拦截」报，界面才会给出换网络的建议。
+    assert!(matches!(err, ApiError::Blocked(_)), "{err}");
+    let text = err.to_string();
+    // 两条线路的下场都要写出来，不能只剩最后一条（#37）。
+    assert!(text.contains("线路 direct 已进入冷却"), "{text}");
     assert!(
-        err.to_string().contains("proxy#1"),
-        "要说清是哪条线路不通：{err}"
+        text.contains("线路 proxy#1"),
+        "要说清是哪条线路不通：{text}"
     );
+    assert!(text.contains("127.0.0.1"), "要说清是哪个代理地址：{text}");
     let routes = pickup_routes(&client.recent_requests().await);
     assert_eq!(routes[0], ("direct".to_string(), "blocked".to_string()));
     assert_eq!(routes[1].0, "proxy#1");
