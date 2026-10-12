@@ -748,3 +748,136 @@ fn 给目标补取货地点只动查得到的那些() {
     assert_eq!(targets[3].pickup_location, None, "不认识的地区保持原样");
     assert_eq!(targets.len(), 4, "补地点不能增删目标");
 }
+
+// ---------------------------------------------------------------------------
+// Mac 的标准配置（issue #47）：升级内存、存储的配置只在各自的配置页上有零件号
+// ---------------------------------------------------------------------------
+
+#[test]
+fn 配置链接拆出分组内存与存储() {
+    use apple_catalog::parse_config_slug;
+    let s = |g: &str, m: &str, st: &str| Some((g.to_string(), m.to_string(), st.to_string()));
+    assert_eq!(
+        parse_config_slug("14-inch-silver-m5-chip-24gb-memory-1tb-storage"),
+        s("14-inch-silver-m5-chip", "24GB", "1TB")
+    );
+    // iMac 的内存、存储在中间，后面还跟着别的选项。
+    assert_eq!(
+        parse_config_slug("24-inch-blue-m4-chip-16gb-memory-256gb-storage-standard-glass-stand"),
+        s("24-inch-blue-m4-chip-standard-glass-stand", "16GB", "256GB")
+    );
+    assert_eq!(
+        parse_config_slug("m5-chip-512gb-storage"),
+        s("m5-chip", "", "512GB")
+    );
+    assert_eq!(parse_config_slug("14-inch-silver-m5-chip"), None);
+    // 香港站的链接是本地化的，还做了百分号编码：只认容量，不认 memory、storage 这些词。
+    assert_eq!(
+        parse_config_slug(
+            "14-%E5%90%8B-silver-apple-m5-%E6%99%B6%E7%89%87-24gb-%E8%A8%98%E6%86%B6%E9%AB%94-1tb-%E5%84%B2%E5%AD%98%E7%A9%BA%E9%96%93"
+        ),
+        s("14-吋-silver-apple-m5-晶片", "24GB", "1TB")
+    );
+    // `%` 后面不是十六进制、甚至紧跟中文，也不能崩。
+    assert_eq!(
+        parse_config_slug("a-%-%E5-吋%-16gb-x-1tb-y"),
+        s("a-%-\u{fffd}-吋%", "16GB", "1TB")
+    );
+}
+
+#[test]
+fn 购买页上的配置链接去重排序且只认带存储的() {
+    let page = br#"<a href="/shop/buy-mac/macbook-pro/a-24gb-memory-1tb-storage?x=1">
+        <a href="/shop/buy-mac/macbook-pro/a-16gb-memory-1tb-storage">
+        <a href="/shop/buy-mac/macbook-pro/a-16gb-memory-1tb-storage">
+        <a href="/shop/buy-mac/macbook-pro/compare">
+        <a href="/shop/buy-mac/macbook-air/b-16gb-memory-1tb-storage">"#;
+    assert_eq!(
+        apple_catalog::config_links(page, "macbook-pro"),
+        ["a-16gb-memory-1tb-storage", "a-24gb-memory-1tb-storage"]
+    );
+}
+
+#[test]
+fn 配置页的零件号取自统计数据() {
+    let page = br#"..."products":[{"sku":"MDE64","partNumber":"MDE64CH/A","price":{"fullPrice":17499.00}}]..."#;
+    assert_eq!(
+        apple_catalog::config_page_part(page).as_deref(),
+        Some("MDE64CH/A")
+    );
+    assert_eq!(
+        apple_catalog::config_page_part(br#""products":[{"sku":"X","partNumber":"NOTAPART"}]"#),
+        None
+    );
+    assert_eq!(apple_catalog::config_page_part(b"<html></html>"), None);
+}
+
+/// 快照里的一页 MacBook Pro：购买页上只有默认配置，升级款由 `configs` 补上。
+fn mac_page_with_configs() -> String {
+    r#"{
+      "products": [
+        {"btrOrFdPartNumber": "MDE54CH/A", "dimensions": {"chassis-dimensionScreensize": "14inch", "chassis-dimensionColor": "silver"}},
+        {"btrOrFdPartNumber": "MGE44CH/A", "dimensions": {"chassis-dimensionScreensize": "16inch", "chassis-dimensionColor": "silver"}}
+      ],
+      "mainDisplayValues": {
+        "chassis-dimensionScreensize": {"14inch": {"header": "14 英寸"}, "16inch": {"header": "16 英寸"}},
+        "chassis-dimensionColor": {"silver": {"header": "银色"}}
+      },
+      "configs": [
+        {"part": "MDE54CH/A", "group": "14-silver-m5", "memory": "16GB", "storage": "1TB"},
+        {"part": "MJ3E4CH/A", "group": "14-silver-m5", "memory": "32GB", "storage": "1TB"},
+        {"part": "MDE64CH/A", "group": "14-silver-m5", "memory": "24GB", "storage": "1TB"},
+        {"part": "ZZZZ1CH/A", "group": "no-base-in-catalog", "memory": "48GB", "storage": "2TB"}
+      ]
+    }"#
+    .to_string()
+}
+
+#[test]
+fn 标准配置展开进目录且默认配置也标出内存与存储() {
+    let products = apple_catalog::parse_product_selection(
+        mac_page_with_configs().as_bytes(),
+        Category::Mac,
+        "macbook-pro",
+    )
+    .expect("解析");
+    let rows: Vec<(&str, &str, &str)> = products
+        .iter()
+        .map(|p| {
+            (
+                p.part_number.as_str(),
+                p.title.as_str(),
+                p.capacity.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            (
+                "MDE54CH/A",
+                "MacBook Pro 14 英寸 银色 16GB 统一内存 1TB 固态硬盘",
+                "1TB"
+            ),
+            // 升级款紧跟在默认配置后面，照抄它的规格，按内存从小到大。
+            (
+                "MDE64CH/A",
+                "MacBook Pro 14 英寸 银色 24GB 统一内存 1TB 固态硬盘",
+                "1TB"
+            ),
+            (
+                "MJ3E4CH/A",
+                "MacBook Pro 14 英寸 银色 32GB 统一内存 1TB 固态硬盘",
+                "1TB"
+            ),
+            // 没有配置信息的机型原样保留。
+            ("MGE44CH/A", "MacBook Pro 16 英寸 银色", ""),
+        ],
+        "找不到默认配置可照抄的那一组整组跳过，不拼一个说不清机型的名字"
+    );
+    assert!(
+        products
+            .iter()
+            .all(|p| p.category == Category::Mac && p.family == "macbook-pro")
+    );
+}

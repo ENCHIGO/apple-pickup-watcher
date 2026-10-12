@@ -24,6 +24,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -243,6 +244,69 @@ def watch_companion(page: bytes):
                     return part.strip()
 
 
+# ---- Mac 的标准配置（issue #47）----
+#
+# 与 Rust 侧 apple_catalog.rs 里的 config_links / parse_config_slug /
+# config_page_part 同一套规则：内存、存储升级过的标准配置在购买页的商品数据里
+# 没有条目，零件号只在各自的配置页上。两边必须一致，否则同一台机器会「在线能选、
+# 离线选不到」。
+
+
+def config_links(page: bytes, slug: str) -> list:
+    text = page.decode("utf-8", "replace")
+    needle = f"/shop/buy-mac/{slug}/"
+    links = set()
+    for match in re.finditer(re.escape(needle) + r"([A-Za-z0-9%\-]+)", text):
+        if parse_config_slug(match.group(1)) is not None:
+            links.add(match.group(1))
+    return sorted(links)
+
+
+def _size(token: str, units) -> bool:
+    return any(token.endswith(u) and token[: -len(u)].isdigit() for u in units)
+
+
+def _capacity(token: str) -> str:
+    for unit in ("tb", "gb"):
+        if token.endswith(unit):
+            return token[: -len(unit)] + unit.upper()
+    return token
+
+
+def parse_config_slug(link: str):
+    """(group, memory, storage)，认不出存储时返回 None。
+
+    链接文字随地区本地化（香港站是 24gb-記憶體-1tb-儲存空間，还带百分号编码），
+    所以只认容量：最后一个「数字 + GB/TB」是存储，往前隔一个词的「数字 + GB」是内存，
+    容量后紧跟的词一并去掉。与 Rust 侧 parse_config_slug 一致。
+    """
+    tokens = urllib.parse.unquote(link).split("-")
+    sizes = [i for i, tok in enumerate(tokens) if _size(tok, ("gb", "tb"))]
+    if not sizes:
+        return None
+    at = sizes[-1]
+    drop = {at}
+    if at + 1 < len(tokens) and tokens[at + 1]:
+        drop.add(at + 1)
+    memory = ""
+    if at >= 2 and _size(tokens[at - 2], ("gb",)) and not _size(tokens[at - 1], ("gb", "tb")):
+        drop.update({at - 2, at - 1})
+        memory = _capacity(tokens[at - 2])
+    group = "-".join(tok for i, tok in enumerate(tokens) if i not in drop)
+    return group, memory, _capacity(tokens[at])
+
+
+def config_page_part(page: bytes):
+    text = page.decode("utf-8", "replace")
+    at = text.find('"products":[{"sku":"')
+    if at < 0:
+        return None
+    window = text[at : at + 300]
+    match = re.search(r'"partNumber":"([^"]+)"', window)
+    part = match.group(1).strip() if match else None
+    return part if looks_like_part_number(part) else None
+
+
 def trim(data: dict):
     """只留下 Rust 侧真正会读的字段。"""
     kept_products = []
@@ -397,6 +461,24 @@ def self_test() -> int:
     assert watch_companion(b"<script>var bandSelectionBootstrapV2 = {};</script>") is None
 
     print("自检通过")
+    # Mac 标准配置：链接分组、内存与存储、配置页零件号，口径与 Rust 侧一致。
+    assert parse_config_slug("14-inch-silver-m5-chip-24gb-memory-1tb-storage") == (
+        "14-inch-silver-m5-chip", "24GB", "1TB"), "MacBook Pro 链接"
+    assert parse_config_slug("24-inch-blue-m4-chip-16gb-memory-256gb-storage-standard-glass-stand") == (
+        "24-inch-blue-m4-chip-standard-glass-stand", "16GB", "256GB"), "iMac 链接，内存存储在中间"
+    assert parse_config_slug("m5-chip-512gb-storage") == ("m5-chip", "", "512GB"), "只有存储"
+    assert parse_config_slug("14-inch-silver-m5-chip") is None, "没有存储的链接不算配置"
+    hk = "14-%E5%90%8B-silver-apple-m5-%E6%99%B6%E7%89%87-24gb-%E8%A8%98%E6%86%B6%E9%AB%94-1tb-%E5%84%B2%E5%AD%98%E7%A9%BA%E9%96%93"
+    assert parse_config_slug(hk) == ("14-吋-silver-apple-m5-晶片", "24GB", "1TB"), parse_config_slug(hk)
+    page = b'<a href="/shop/buy-mac/macbook-pro/a-16gb-memory-1tb-storage">x</a>' \
+        b'<a href="/shop/buy-mac/macbook-pro/a-24gb-memory-1tb-storage?x=1">y</a>' \
+        b'<a href="/shop/buy-mac/macbook-pro/a-16gb-memory-1tb-storage">dup</a>'
+    assert config_links(page, "macbook-pro") == [
+        "a-16gb-memory-1tb-storage", "a-24gb-memory-1tb-storage"], config_links(page, "macbook-pro")
+    analytics = b'"products":[{"sku":"MDE64","partNumber":"MDE64CH/A","price":{"fullPrice":17499.00}}]'
+    assert config_page_part(analytics) == "MDE64CH/A"
+    assert config_page_part(b'"products":[{"sku":"X","partNumber":"NOTAPART"}]') is None
+
     return 0
 
 
@@ -442,6 +524,23 @@ def main() -> int:
                     print(f"  !! {locale} {slug} 没有找到表带零件号", file=sys.stderr)
                     continue
                 trimmed["companionPart"] = companion
+
+            if category == "mac":
+                configs = []
+                for link in config_links(page, slug):
+                    group, memory, storage = parse_config_slug(link)
+                    time.sleep(DELAY_SECONDS)
+                    try:
+                        part = config_page_part(fetch(f"{url}/{link}", accept_language))
+                    except (urllib.error.URLError, OSError) as err:
+                        # 少一个升级款不影响整页：默认配置照常可用。
+                        print(f"  {slug}/{link}: {err}", file=sys.stderr)
+                        continue
+                    if part:
+                        configs.append({"part": part, "group": group, "memory": memory, "storage": storage})
+                if configs:
+                    configs.sort(key=lambda c: c["part"])
+                    trimmed["configs"] = configs
 
             pages.append({"category": category, "family": slug, "data": trimmed})
             print(f"  {locale} {slug}: {len(trimmed['products'])} 个型号")

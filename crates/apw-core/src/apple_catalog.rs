@@ -15,7 +15,7 @@
 //! 每次请求都 `gorequest.New()` 造一个新客户端，连接池完全无法复用，空闲连接
 //! 持续堆积，配合它 500ms 一轮的轮询，几小时就能涨到十几 GB 内存。
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::Duration;
 
 use serde::Deserialize;
@@ -86,7 +86,11 @@ pub async fn fetch_products(
     }
 
     let page = fetch_page(http, region, family).await?;
-    let products = parse_buy_page(&page, family.category, family.slug)?;
+    let mut products = parse_buy_page(&page, family.category, family.slug)?;
+    if family.category == Category::Mac && !products.is_empty() {
+        let configs = fetch_config_variants(http, region, family, &page).await;
+        apply_config_variants(&mut products, &configs);
+    }
     if products.is_empty() {
         // 页面拿到了、JSON 也截出来了，却一个商品都没有，说明字段名变了。
         // 这必须报错：静默返回空列表会让上层用一份空目录覆盖掉可用的兜底数据。
@@ -264,6 +268,252 @@ fn looks_like_part_number(value: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || *b == b'/')
         && bytes[0].is_ascii_alphanumeric()
         && bytes[bytes.len() - 1].is_ascii_alphanumeric()
+}
+
+// ---------------------------------------------------------------------------
+// Mac 的标准配置（issue #47）
+// ---------------------------------------------------------------------------
+//
+// Mac 购买页的商品数据里，每个「尺寸 × 芯片 × 屏幕 × 颜色」只有一个默认配置带
+// 零件号；内存、存储升级过的标准配置（例如 24GB + 1TB）在那里没有条目。它们的
+// 零件号只写在各自的配置页上，而取货接口照样认 —— 2026-10 实测，24GB 款与默认
+// 款在同一家店都查得到。所以这里顺着购买页上的配置链接把它们找回来。
+//
+// 纯定制（自选更大硬盘之类）不在这些链接里，没有零件号，本来也不能到店取货。
+
+/// 同时抓几张配置页。MacBook Pro 一页就有二十几个配置，一张张串着抓要等很久。
+const CONFIG_FETCH_CONCURRENCY: usize = 4;
+
+/// Mac 的一个标准配置。
+///
+/// 在线抓取时由 [`fetch_config_variants`] 现场拼出来；离线快照里由
+/// `data/generate.py` 写进每页数据的 `configs` 字段。两边产出同样的结构，交给同一个
+/// [`apply_config_variants`] 展开，在线和离线的目录才会一致。
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigVariant {
+    /// 这个配置的零件号。
+    pub part: String,
+    /// 配置链接去掉内存、存储那一段后剩下的部分。同组的配置只差内存和存储，
+    /// 其中一个是购买页上已有的默认配置，其余的照抄它的规格。
+    pub group: String,
+    /// 统一内存，如 `24GB`；链接里没写内存时为空。
+    #[serde(default)]
+    pub memory: String,
+    /// 存储容量，如 `1TB`。
+    #[serde(default)]
+    pub storage: String,
+}
+
+/// 购买页上指向各标准配置页的链接，返回链接的最后一段，去重并排好序。
+///
+/// 链接形如 `/shop/buy-mac/macbook-pro/14-inch-silver-…-24gb-memory-1tb-storage`；
+/// iMac 的内存、存储在中间，后面还跟着 `-standard-glass-stand`。只留能读出存储的。
+pub fn config_links(page: &[u8], slug: &str) -> Vec<String> {
+    let text = String::from_utf8_lossy(page);
+    let needle = format!("/shop/buy-mac/{slug}/");
+    let mut links: Vec<String> = Vec::new();
+    let mut from = 0;
+    while let Some(at) = text[from..].find(&needle) {
+        let start = from + at + needle.len();
+        let end = text[start..]
+            // 本地化的链接带百分号编码（香港站 `14-%E5%90%8B-…`），大写十六进制也要收。
+            .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '%'))
+            .map_or(text.len(), |n| start + n);
+        let link = &text[start..end];
+        if parse_config_slug(link).is_some() && !links.iter().any(|l| l == link) {
+            links.push(link.to_string());
+        }
+        from = end.max(start);
+    }
+    links.sort();
+    links
+}
+
+/// 从配置链接里读出分组键、内存与存储：`(group, memory, storage)`。
+///
+/// 链接的文字随地区本地化（中国大陆 `24gb-memory-1tb-storage`、香港
+/// `24gb-記憶體-1tb-儲存空間`，还做了百分号编码），所以不认 memory、storage 这些词，
+/// 只认容量：解码后最后一个「数字 + GB/TB」是存储，往前隔一个词还有一个「数字 + GB」
+/// 就是内存。容量后面紧跟的那个词一并去掉，剩下的就是分组键。
+pub fn parse_config_slug(link: &str) -> Option<(String, String, String)> {
+    let decoded = percent_decode(link);
+    let tokens: Vec<&str> = decoded.split('-').collect();
+    let is_size = |t: &str, units: &[&str]| {
+        units.iter().any(|u| {
+            t.strip_suffix(u)
+                .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+        })
+    };
+    let at = tokens.iter().rposition(|t| is_size(t, &["gb", "tb"]))?;
+    let mut drop = vec![at];
+    if at + 1 < tokens.len() && !tokens[at + 1].is_empty() {
+        drop.push(at + 1);
+    }
+    let memory =
+        if at >= 2 && is_size(tokens[at - 2], &["gb"]) && !is_size(tokens[at - 1], &["gb", "tb"]) {
+            drop.extend([at - 2, at - 1]);
+            normalize_capacity(tokens[at - 2])
+        } else {
+            String::new()
+        };
+    let group: Vec<&str> = tokens
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !drop.contains(i))
+        .map(|(_, t)| *t)
+        .collect();
+    Some((group.join("-"), memory, normalize_capacity(tokens[at])))
+}
+
+/// 解开链接里的 `%XX`。解不开的原样保留。
+fn percent_decode(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        // 按字节取那两位十六进制：按字符串切片的话，`%` 后面紧跟中文就会切在
+        // 字符中间而崩溃。
+        let hex = (bytes[i] == b'%' && i + 2 < bytes.len())
+            .then(|| std::str::from_utf8(&bytes[i + 1..i + 3]).ok())
+            .flatten()
+            .and_then(|h| u8::from_str_radix(h, 16).ok());
+        if let Some(byte) = hex {
+            out.push(byte);
+            i += 3;
+            continue;
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// 配置页上这个配置自己的零件号，取自页面统计数据里的
+/// `"products":[{"sku":…,"partNumber":…}]`。取不到返回 `None`。
+pub fn config_page_part(page: &[u8]) -> Option<String> {
+    let text = String::from_utf8_lossy(page);
+    let at = text.find("\"products\":[{\"sku\":\"")?;
+    let window = &text[at..text.len().min(at + 300)];
+    let key = "\"partNumber\":\"";
+    let start = window.find(key)? + key.len();
+    let end = window[start..].find('"')? + start;
+    let part = window[start..end].trim();
+    looks_like_part_number(part).then(|| part.to_string())
+}
+
+/// 顺着购买页上的配置链接，把每个标准配置的零件号找出来。
+///
+/// 某张配置页抓不到或认不出，只是少一个升级款，不影响整页：默认配置照常可用。
+async fn fetch_config_variants(
+    http: &reqwest::Client,
+    region: &Region,
+    family: &Family,
+    page: &[u8],
+) -> Vec<ConfigVariant> {
+    use futures_util::stream::{self, StreamExt};
+
+    let base = region.buy_page_url(family);
+    let base = base.trim_end_matches('/');
+    let jobs = config_links(page, family.slug)
+        .into_iter()
+        .filter_map(|link| {
+            let (group, memory, storage) = parse_config_slug(&link)?;
+            Some((format!("{base}/{link}"), group, memory, storage))
+        });
+    let mut configs: Vec<ConfigVariant> = stream::iter(jobs)
+        .map(|(url, group, memory, storage)| async move {
+            let page =
+                crate::apple::with_retry(MAX_RETRIES, || fetch_page_once(http, &url, region))
+                    .await
+                    .ok()?;
+            Some(ConfigVariant {
+                part: config_page_part(&page)?,
+                group,
+                memory,
+                storage,
+            })
+        })
+        .buffer_unordered(CONFIG_FETCH_CONCURRENCY)
+        .filter_map(|c| async move { c })
+        .collect()
+        .await;
+    configs.sort_by(|a, b| a.part.cmp(&b.part));
+    configs
+}
+
+/// 标题末尾补上的内存与存储。文案照 Apple 中文站的叫法。
+fn config_label(config: &ConfigVariant) -> String {
+    match (config.memory.is_empty(), config.storage.is_empty()) {
+        (false, false) => format!("{} 统一内存 {} 固态硬盘", config.memory, config.storage),
+        (true, false) => format!("{} 固态硬盘", config.storage),
+        (false, true) => format!("{} 统一内存", config.memory),
+        (true, true) => String::new(),
+    }
+}
+
+/// 把标准配置展开进商品列表。
+///
+/// 每组里购买页上已有的那个（默认配置）在标题后补上内存与存储；其余的照抄它的
+/// 规格、换上自己的零件号，排在它后面。一组里一个已有的都找不到，就不知道该
+/// 照抄谁，整组跳过 —— 宁可少几个升级款，也不拼一个连机型都说不清的名字。
+pub fn apply_config_variants(products: &mut Vec<Product>, configs: &[ConfigVariant]) {
+    if configs.is_empty() {
+        return;
+    }
+    let index: HashMap<String, usize> = products
+        .iter()
+        .enumerate()
+        .map(|(i, p)| (p.part_number.clone(), i))
+        .collect();
+    let mut groups: BTreeMap<&str, Vec<&ConfigVariant>> = BTreeMap::new();
+    for config in configs {
+        groups
+            .entry(config.group.as_str())
+            .or_default()
+            .push(config);
+    }
+
+    let mut labels: HashMap<usize, &ConfigVariant> = HashMap::new();
+    let mut extras: BTreeMap<usize, Vec<Product>> = BTreeMap::new();
+    let mut seen: HashSet<String> = index.keys().cloned().collect();
+    for members in groups.values() {
+        let Some(&base) = members.iter().find_map(|c| index.get(&c.part)) else {
+            continue;
+        };
+        for config in members {
+            if let Some(&at) = index.get(&config.part) {
+                labels.insert(at, config);
+            } else if seen.insert(config.part.clone()) {
+                let mut variant = products[base].clone();
+                variant.part_number = config.part.clone();
+                variant.title = join_non_empty(&[variant.title, config_label(config)]);
+                variant.capacity = config.storage.clone();
+                extras.entry(base).or_default().push(variant);
+            }
+        }
+    }
+
+    let mut out = Vec::with_capacity(products.len() + extras.values().map(Vec::len).sum::<usize>());
+    for (i, mut product) in products.drain(..).enumerate() {
+        if let Some(config) = labels.get(&i) {
+            product.title = join_non_empty(&[product.title, config_label(config)]);
+            if product.capacity.is_empty() {
+                product.capacity = config.storage.clone();
+            }
+        }
+        out.push(product);
+        if let Some(mut more) = extras.remove(&i) {
+            more.sort_by(|a, b| {
+                capacity_rank(&a.capacity)
+                    .cmp(&capacity_rank(&b.capacity))
+                    .then_with(|| a.title.cmp(&b.title))
+            });
+            out.extend(more);
+        }
+    }
+    *products = out;
+    disambiguate_titles(products);
 }
 
 /// 取一个 HTML 页面，失败按 [`ApiError`] 的口径分类。
@@ -510,6 +760,10 @@ pub(crate) struct ProductSelection {
     /// 没有这个键，那条路由 [`parse_buy_page`] 从页面别处补。
     #[serde(default)]
     companion_part: Option<String>,
+    /// 内嵌快照里由 `data/generate.py` 补上的 Mac 标准配置，见 [`ConfigVariant`]。
+    /// 在线抓取的那条路由 [`fetch_products`] 现场抓配置页补。
+    #[serde(default)]
+    configs: Option<Vec<ConfigVariant>>,
 }
 
 /// 维度键 → 取值 → 展示条目。
@@ -779,6 +1033,9 @@ impl ProductSelection {
         }
 
         disambiguate_titles(&mut products);
+        if let Some(configs) = &self.configs {
+            apply_config_variants(&mut products, configs);
+        }
         products
     }
 
