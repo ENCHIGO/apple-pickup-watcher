@@ -2128,7 +2128,189 @@
             "header": "15 英寸<as-footnote data-id=\"44f08ef71d826230346d1877a39f2b01\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MDH74CH/A",
+          "group": "13-inch-silver-m5-chip-10-core-cpu-8-core-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDH84CH/A",
+          "group": "13-inch-silver-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDH94CH/A",
+          "group": "13-inch-silver-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHA4CH/A",
+          "group": "13-inch-starlight-m5-chip-10-core-cpu-8-core-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDHC4CH/A",
+          "group": "13-inch-starlight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHD4CH/A",
+          "group": "13-inch-starlight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHE4CH/A",
+          "group": "13-inch-midnight-m5-chip-10-core-cpu-8-core-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDHF4CH/A",
+          "group": "13-inch-midnight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHG4CH/A",
+          "group": "13-inch-midnight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHH4CH/A",
+          "group": "13-inch-sky-blue-m5-chip-10-core-cpu-8-core-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDHJ4CH/A",
+          "group": "13-inch-sky-blue-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHK4CH/A",
+          "group": "13-inch-sky-blue-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDV94CH/A",
+          "group": "15-inch-silver-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDVA4CH/A",
+          "group": "15-inch-silver-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVC4CH/A",
+          "group": "15-inch-silver-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVD4CH/A",
+          "group": "15-inch-starlight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDVE4CH/A",
+          "group": "15-inch-starlight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVF4CH/A",
+          "group": "15-inch-starlight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVH4CH/A",
+          "group": "15-inch-midnight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDVK4CH/A",
+          "group": "15-inch-midnight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVN4CH/A",
+          "group": "15-inch-midnight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVQ4CH/A",
+          "group": "15-inch-sky-blue-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDVT4CH/A",
+          "group": "15-inch-sky-blue-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVU4CH/A",
+          "group": "15-inch-sky-blue-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGP74CH/A",
+          "group": "13-inch-starlight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGP84CH/A",
+          "group": "13-inch-midnight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGP94CH/A",
+          "group": "13-inch-sky-blue-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGPC4CH/A",
+          "group": "15-inch-starlight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGPD4CH/A",
+          "group": "15-inch-midnight-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGPE4CH/A",
+          "group": "15-inch-sky-blue-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        }
+      ]
     }
   },
   {
@@ -2317,7 +2499,153 @@
             "header": "16 英寸<as-footnote data-id=\"fa5423e6a3aa736ff5e090e8a14ea9fc\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote> <div class=\"form-label-small\">可选配 M5&nbsp;Pro 或 M5&nbsp;Max 芯片。</div>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MDE14CH/A",
+          "group": "14-inch-space-black-standard-display-apple-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDE34CH/A",
+          "group": "14-inch-space-black-standard-display-apple-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDE54CH/A",
+          "group": "14-inch-silver-standard-display-apple-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDE64CH/A",
+          "group": "14-inch-silver-standard-display-apple-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MEQJ4CH/A",
+          "group": "14-inch-space-black-nano-texture-display-apple-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGDN4CH/A",
+          "group": "14-inch-silver-standard-display-apple-m5-pro-chip-15-core-cpu-16-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGDP4CH/A",
+          "group": "14-inch-silver-standard-display-apple-m5-pro-chip-18-core-cpu-20-core-gpu",
+          "memory": "24GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGDQ4CH/A",
+          "group": "14-inch-silver-standard-display-apple-m5-max-chip-18-core-cpu-32-core-gpu",
+          "memory": "36GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGDR4CH/A",
+          "group": "14-inch-space-black-standard-display-apple-m5-pro-chip-15-core-cpu-16-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGDT4CH/A",
+          "group": "14-inch-space-black-standard-display-apple-m5-pro-chip-18-core-cpu-20-core-gpu",
+          "memory": "24GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGDU4CH/A",
+          "group": "14-inch-space-black-standard-display-apple-m5-max-chip-18-core-cpu-32-core-gpu",
+          "memory": "36GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGE44CH/A",
+          "group": "16-inch-silver-standard-display-apple-m5-pro-chip-18-core-cpu-20-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGE64CH/A",
+          "group": "16-inch-silver-standard-display-apple-m5-pro-chip-18-core-cpu-20-core-gpu",
+          "memory": "48GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGE74CH/A",
+          "group": "16-inch-silver-standard-display-apple-m5-max-chip-18-core-cpu-32-core-gpu",
+          "memory": "36GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGE94CH/A",
+          "group": "16-inch-silver-standard-display-apple-m5-max-chip-18-core-cpu-40-core-gpu",
+          "memory": "48GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGEA4CH/A",
+          "group": "16-inch-space-black-standard-display-apple-m5-pro-chip-18-core-cpu-20-core-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGEC4CH/A",
+          "group": "16-inch-space-black-standard-display-apple-m5-pro-chip-18-core-cpu-20-core-gpu",
+          "memory": "48GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGED4CH/A",
+          "group": "16-inch-space-black-standard-display-apple-m5-max-chip-18-core-cpu-32-core-gpu",
+          "memory": "36GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGEE4CH/A",
+          "group": "16-inch-space-black-standard-display-apple-m5-max-chip-18-core-cpu-40-core-gpu",
+          "memory": "48GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGXX4CH/A",
+          "group": "14-inch-space-black-nano-texture-display-apple-m5-pro-chip-18-core-cpu-20-core-gpu",
+          "memory": "48GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MJ3D4CH/A",
+          "group": "14-inch-space-black-standard-display-apple-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "32GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MJ3E4CH/A",
+          "group": "14-inch-silver-standard-display-apple-m5-chip-10-core-cpu-10-core-gpu",
+          "memory": "32GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MJLV4CH/A",
+          "group": "14-inch-silver-standard-display-apple-m5-pro-chip-15-core-cpu-16-core-gpu",
+          "memory": "24GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MJLW4CH/A",
+          "group": "14-inch-space-black-standard-display-apple-m5-pro-chip-15-core-cpu-16-core-gpu",
+          "memory": "24GB",
+          "storage": "2TB"
+        }
+      ]
     }
   },
   {
@@ -2413,7 +2741,57 @@
             "header": "512GB\n妙控键盘 (带有触控&nbsp;ID)"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MHFA4CH/A",
+          "group": "silver",
+          "memory": "",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHFC4CH/A",
+          "group": "silver",
+          "memory": "",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHFD4CH/A",
+          "group": "citrus",
+          "memory": "",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHFE4CH/A",
+          "group": "citrus",
+          "memory": "",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHFF4CH/A",
+          "group": "indigo",
+          "memory": "",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHFG4CH/A",
+          "group": "indigo",
+          "memory": "",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHFH4CH/A",
+          "group": "blush",
+          "memory": "",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHFJ4CH/A",
+          "group": "blush",
+          "memory": "",
+          "storage": "512GB"
+        }
+      ]
     }
   },
   {
@@ -2501,7 +2879,111 @@
             "header": "M4 芯片、两个雷雳端口<div class=\"form-label-small\">8&nbsp;核中央处理器、8&nbsp;核图形处理器、16&nbsp;核神经网络引擎</div>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MCR24CH/A",
+          "group": "24-inch-silver-m4-chip-10-core-cpu-10-core-gpu-standard-glass-stand",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MD2Q4CH/A",
+          "group": "24-inch-green-m4-chip-10-core-cpu-10-core-gpu-standard-glass-stand",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MD2T4CH/A",
+          "group": "24-inch-blue-m4-chip-10-core-cpu-10-core-gpu-standard-glass-stand",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MD2U4CH/A",
+          "group": "24-inch-pink-m4-chip-10-core-cpu-10-core-gpu-standard-glass-stand",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MD3H4CH/A",
+          "group": "24-inch-silver-m4-chip-10-core-cpu-10-core-gpu-nano-texture-glass-stand",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUC3CH/A",
+          "group": "24-inch-silver-m4-chip-8-core-cpu-8-core-gpu-stand",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUE3CH/A",
+          "group": "24-inch-green-m4-chip-8-core-cpu-8-core-gpu-stand",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUF3CH/A",
+          "group": "24-inch-blue-m4-chip-8-core-cpu-8-core-gpu-stand",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUG3CH/A",
+          "group": "24-inch-pink-m4-chip-8-core-cpu-8-core-gpu-stand",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUU3CH/A",
+          "group": "24-inch-silver-m4-chip-10-core-cpu-10-core-gpu-standard-glass-stand",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUV3CH/A",
+          "group": "24-inch-silver-m4-chip-10-core-cpu-10-core-gpu-standard-glass-stand",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MWUY3CH/A",
+          "group": "24-inch-green-m4-chip-10-core-cpu-10-core-gpu-standard-glass-stand",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWV03CH/A",
+          "group": "24-inch-green-m4-chip-10-core-cpu-10-core-gpu-standard-glass-stand",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MWV13CH/A",
+          "group": "24-inch-blue-m4-chip-10-core-cpu-10-core-gpu-standard-glass-stand",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWV33CH/A",
+          "group": "24-inch-blue-m4-chip-10-core-cpu-10-core-gpu-standard-glass-stand",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MWV43CH/A",
+          "group": "24-inch-pink-m4-chip-10-core-cpu-10-core-gpu-standard-glass-stand",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWV53CH/A",
+          "group": "24-inch-pink-m4-chip-10-core-cpu-10-core-gpu-standard-glass-stand",
+          "memory": "16GB",
+          "storage": "512GB"
+        }
+      ]
     }
   },
   {
@@ -2538,7 +3020,45 @@
             "header": "<span class=\"rf-dsupgrade-block\">15&nbsp;核中央处理器、</span><span class=\"rf-dsupgrade-block\">16&nbsp;核图形处理器</span>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MHQK4CH/A",
+          "group": "m6-chip-12-core-cpu-12-core-gpu",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHQL4CH/A",
+          "group": "m6-chip-12-core-cpu-12-core-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHQM4CH/A",
+          "group": "m6-chip-12-core-cpu-12-core-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHQN4CH/A",
+          "group": "m5-pro-chip-15-core-cpu-16-core-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHQU4CH/A",
+          "group": "m5-pro-chip-18-core-cpu-20-core-gpu",
+          "memory": "64GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MHQV4CH/A",
+          "group": "m6-chip-12-core-cpu-12-core-gpu",
+          "memory": "32GB",
+          "storage": "1TB"
+        }
+      ]
     }
   },
   {
@@ -2578,7 +3098,27 @@
             "header": "<span class=\"rf-dsupgrade-block\">30&nbsp;核中央处理器、</span><span class=\"rf-dsupgrade-block\">64&nbsp;核图形处理器</span>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MHL64CH/A",
+          "group": "m5-max-chip-18-core-cpu-32-core-gpu",
+          "memory": "36GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHL74CH/A",
+          "group": "m5-ultra-chip-30-core-cpu-64-core-gpu",
+          "memory": "96GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MHQJ4CH/A",
+          "group": "m5-max-chip-18-core-cpu-40-core-gpu",
+          "memory": "64GB",
+          "storage": "1TB"
+        }
+      ]
     }
   },
   {
@@ -3113,7 +3653,7 @@
           }
         }
       },
-      "companionPart": "MKDY4FE/A"
+      "companionPart": "MK7C4FE/A"
     }
   },
   {

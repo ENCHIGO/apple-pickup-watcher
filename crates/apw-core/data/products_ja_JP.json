@@ -2936,7 +2936,189 @@
             "header": "15インチ<as-footnote data-id=\"44f08ef71d826230346d1877a39f2b01\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MDH74J/A",
+          "group": "13インチ-silver-m5-チップ-10コアcpu-8コアgpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDH84J/A",
+          "group": "13インチ-silver-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDH94J/A",
+          "group": "13インチ-silver-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHA4J/A",
+          "group": "13インチ-スターライト-m5-チップ-10コアcpu-8コアgpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDHC4J/A",
+          "group": "13インチ-スターライト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHD4J/A",
+          "group": "13インチ-スターライト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHE4J/A",
+          "group": "13インチ-ミッドナイト-m5-チップ-10コアcpu-8コアgpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDHF4J/A",
+          "group": "13インチ-ミッドナイト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHG4J/A",
+          "group": "13インチ-ミッドナイト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHH4J/A",
+          "group": "13インチ-スカイブルー-m5-チップ-10コアcpu-8コアgpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDHJ4J/A",
+          "group": "13インチ-スカイブルー-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHK4J/A",
+          "group": "13インチ-スカイブルー-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDV94J/A",
+          "group": "15インチ-silver-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDVA4J/A",
+          "group": "15インチ-silver-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVC4J/A",
+          "group": "15インチ-silver-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVD4J/A",
+          "group": "15インチ-スターライト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDVE4J/A",
+          "group": "15インチ-スターライト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVF4J/A",
+          "group": "15インチ-スターライト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVH4J/A",
+          "group": "15インチ-ミッドナイト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDVK4J/A",
+          "group": "15インチ-ミッドナイト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVN4J/A",
+          "group": "15インチ-ミッドナイト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVQ4J/A",
+          "group": "15インチ-スカイブルー-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDVT4J/A",
+          "group": "15インチ-スカイブルー-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVU4J/A",
+          "group": "15インチ-スカイブルー-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGP74J/A",
+          "group": "13インチ-スターライト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGP84J/A",
+          "group": "13インチ-ミッドナイト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGP94J/A",
+          "group": "13インチ-スカイブルー-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGPC4J/A",
+          "group": "15インチ-スターライト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGPD4J/A",
+          "group": "15インチ-ミッドナイト-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGPE4J/A",
+          "group": "15インチ-スカイブルー-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        }
+      ]
     }
   },
   {
@@ -3125,7 +3307,153 @@
             "header": "16インチ<as-footnote data-id=\"fa5423e6a3aa736ff5e090e8a14ea9fc\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote> <div class=\"form-label-small\">M5 ProまたはM5 Maxチップとの組み合わせで選択できます。</div>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MDE14J/A",
+          "group": "14インチ-space-black-標準ディスプレイ-apple-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDE34J/A",
+          "group": "14インチ-space-black-標準ディスプレイ-apple-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDE54J/A",
+          "group": "14インチ-silver-標準ディスプレイ-apple-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDE64J/A",
+          "group": "14インチ-silver-標準ディスプレイ-apple-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MEQJ4J/A",
+          "group": "14インチ-space-black-nano-textureディスプレイ-apple-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGDN4J/A",
+          "group": "14インチ-silver-標準ディスプレイ-apple-m5-pro-チップ-15コアcpu-16コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGDP4J/A",
+          "group": "14インチ-silver-標準ディスプレイ-apple-m5-pro-チップ-18コアcpu-20コアgpu",
+          "memory": "24GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGDQ4J/A",
+          "group": "14インチ-silver-標準ディスプレイ-apple-m5-max-チップ-18コアcpu-32コアgpu",
+          "memory": "36GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGDR4J/A",
+          "group": "14インチ-space-black-標準ディスプレイ-apple-m5-pro-チップ-15コアcpu-16コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGDT4J/A",
+          "group": "14インチ-space-black-標準ディスプレイ-apple-m5-pro-チップ-18コアcpu-20コアgpu",
+          "memory": "24GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGDU4J/A",
+          "group": "14インチ-space-black-標準ディスプレイ-apple-m5-max-チップ-18コアcpu-32コアgpu",
+          "memory": "36GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGE44J/A",
+          "group": "16インチ-silver-標準ディスプレイ-apple-m5-pro-チップ-18コアcpu-20コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGE64J/A",
+          "group": "16インチ-silver-標準ディスプレイ-apple-m5-pro-チップ-18コアcpu-20コアgpu",
+          "memory": "48GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGE74J/A",
+          "group": "16インチ-silver-標準ディスプレイ-apple-m5-max-チップ-18コアcpu-32コアgpu",
+          "memory": "36GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGE94J/A",
+          "group": "16インチ-silver-標準ディスプレイ-apple-m5-max-チップ-18コアcpu-40コアgpu",
+          "memory": "48GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGEA4J/A",
+          "group": "16インチ-space-black-標準ディスプレイ-apple-m5-pro-チップ-18コアcpu-20コアgpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGEC4J/A",
+          "group": "16インチ-space-black-標準ディスプレイ-apple-m5-pro-チップ-18コアcpu-20コアgpu",
+          "memory": "48GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGED4J/A",
+          "group": "16インチ-space-black-標準ディスプレイ-apple-m5-max-チップ-18コアcpu-32コアgpu",
+          "memory": "36GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGEE4J/A",
+          "group": "16インチ-space-black-標準ディスプレイ-apple-m5-max-チップ-18コアcpu-40コアgpu",
+          "memory": "48GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGXX4J/A",
+          "group": "14インチ-space-black-nano-textureディスプレイ-apple-m5-pro-チップ-18コアcpu-20コアgpu",
+          "memory": "48GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MJ3D4J/A",
+          "group": "14インチ-space-black-標準ディスプレイ-apple-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "32GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MJ3E4J/A",
+          "group": "14インチ-silver-標準ディスプレイ-apple-m5-チップ-10コアcpu-10コアgpu",
+          "memory": "32GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MJLV4J/A",
+          "group": "14インチ-silver-標準ディスプレイ-apple-m5-pro-チップ-15コアcpu-16コアgpu",
+          "memory": "24GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MJLW4J/A",
+          "group": "14インチ-space-black-標準ディスプレイ-apple-m5-pro-チップ-15コアcpu-16コアgpu",
+          "memory": "24GB",
+          "storage": "2TB"
+        }
+      ]
     }
   },
   {
@@ -3221,7 +3549,57 @@
             "header": "512GB\nTouch&nbsp;ID搭載Magic Keyboard"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MHFA4J/A",
+          "group": "silver",
+          "memory": "",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHFC4J/A",
+          "group": "silver",
+          "memory": "",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHFD4J/A",
+          "group": "シトラス",
+          "memory": "",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHFE4J/A",
+          "group": "シトラス",
+          "memory": "",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHFF4J/A",
+          "group": "インディゴ",
+          "memory": "",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHFG4J/A",
+          "group": "インディゴ",
+          "memory": "",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHFH4J/A",
+          "group": "ブラッシュ",
+          "memory": "",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHFJ4J/A",
+          "group": "ブラッシュ",
+          "memory": "",
+          "storage": "512GB"
+        }
+      ]
     }
   },
   {
@@ -3309,7 +3687,111 @@
             "header": "M4チップ、\n<span class=\"nowrap\">Thunderboltポート</span>\nx&nbsp;2<div class=\"form-label-small\">8コアCPU、8コアGPU、16コアNeural Engine</div>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MCR24J/A",
+          "group": "24インチ-silver-m4-チップ-10コアcpu-10コアgpu-標準ガラス-スタンド",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MD2Q4J/A",
+          "group": "24インチ-グリーン-m4-チップ-10コアcpu-10コアgpu-標準ガラス-スタンド",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MD2T4J/A",
+          "group": "24インチ-blue-m4-チップ-10コアcpu-10コアgpu-標準ガラス-スタンド",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MD2U4J/A",
+          "group": "24インチ-ピンク-m4-チップ-10コアcpu-10コアgpu-標準ガラス-スタンド",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MD3H4J/A",
+          "group": "24インチ-silver-m4-チップ-10コアcpu-10コアgpu-nano-textureガラス-スタンド",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUC3J/A",
+          "group": "24インチ-silver-m4-チップ-8コアcpu-8コアgpu-スタンド",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUE3J/A",
+          "group": "24インチ-グリーン-m4-チップ-8コアcpu-8コアgpu-スタンド",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUF3J/A",
+          "group": "24インチ-blue-m4-チップ-8コアcpu-8コアgpu-スタンド",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUG3J/A",
+          "group": "24インチ-ピンク-m4-チップ-8コアcpu-8コアgpu-スタンド",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUU3J/A",
+          "group": "24インチ-silver-m4-チップ-10コアcpu-10コアgpu-標準ガラス-スタンド",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUV3J/A",
+          "group": "24インチ-silver-m4-チップ-10コアcpu-10コアgpu-標準ガラス-スタンド",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MWUY3J/A",
+          "group": "24インチ-グリーン-m4-チップ-10コアcpu-10コアgpu-標準ガラス-スタンド",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWV03J/A",
+          "group": "24インチ-グリーン-m4-チップ-10コアcpu-10コアgpu-標準ガラス-スタンド",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MWV13J/A",
+          "group": "24インチ-blue-m4-チップ-10コアcpu-10コアgpu-標準ガラス-スタンド",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWV33J/A",
+          "group": "24インチ-blue-m4-チップ-10コアcpu-10コアgpu-標準ガラス-スタンド",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MWV43J/A",
+          "group": "24インチ-ピンク-m4-チップ-10コアcpu-10コアgpu-標準ガラス-スタンド",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWV53J/A",
+          "group": "24インチ-ピンク-m4-チップ-10コアcpu-10コアgpu-標準ガラス-スタンド",
+          "memory": "16GB",
+          "storage": "512GB"
+        }
+      ]
     }
   },
   {
@@ -3346,7 +3828,45 @@
             "header": "<span class=\"rf-dsupgrade-block\">15コアCPU、</span><span class=\"rf-dsupgrade-block\">16コアGPU</span>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MHQK4J/A",
+          "group": "m6-チップ-12コアcpu-12コアgpu",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHQL4J/A",
+          "group": "m6-チップ-12コアcpu-12コアgpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHQM4J/A",
+          "group": "m6-チップ-12コアcpu-12コアgpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHQN4J/A",
+          "group": "m5-pro-チップ-15コアcpu-16コアgpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHQU4J/A",
+          "group": "m5-pro-チップ-18コアcpu-20コアgpu",
+          "memory": "64GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MHQV4J/A",
+          "group": "m6-チップ-12コアcpu-12コアgpu",
+          "memory": "32GB",
+          "storage": "1TB"
+        }
+      ]
     }
   },
   {
@@ -3386,7 +3906,27 @@
             "header": "<span class=\"rf-dsupgrade-block\">30コアCPU、</span><span class=\"rf-dsupgrade-block\">64コアGPU</span>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MHL64J/A",
+          "group": "m5-max-チップ-18コアcpu-32コアgpu",
+          "memory": "36GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHL74J/A",
+          "group": "m5-ultra-チップ-30コアcpu-64コアgpu",
+          "memory": "96GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MHQJ4J/A",
+          "group": "m5-max-チップ-18コアcpu-40コアgpu",
+          "memory": "64GB",
+          "storage": "1TB"
+        }
+      ]
     }
   },
   {
@@ -3781,7 +4321,7 @@
           }
         }
       },
-      "companionPart": "MJUY4FE/A"
+      "companionPart": "MJVK4FE/A"
     }
   },
   {
@@ -3888,7 +4428,7 @@
           }
         }
       },
-      "companionPart": "MJVK4FE/A"
+      "companionPart": "MJUA4FE/A"
     }
   },
   {
@@ -3980,7 +4520,7 @@
           }
         }
       },
-      "companionPart": "MJN94FE/A"
+      "companionPart": "MJN84FE/A"
     }
   },
   {

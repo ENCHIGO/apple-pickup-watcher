@@ -2128,7 +2128,189 @@
             "header": "15 吋<as-footnote data-id=\"44f08ef71d826230346d1877a39f2b01\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;註腳&nbsp;</span>1</sup></as-footnote>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MDH74ZP/A",
+          "group": "13-吋-silver-m5-晶片-10-核心-cpu-8-核心-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDH84ZP/A",
+          "group": "13-吋-silver-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDH94ZP/A",
+          "group": "13-吋-silver-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHA4ZP/A",
+          "group": "13-吋-星光色-m5-晶片-10-核心-cpu-8-核心-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDHC4ZP/A",
+          "group": "13-吋-星光色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHD4ZP/A",
+          "group": "13-吋-星光色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHE4ZP/A",
+          "group": "13-吋-午夜暗色-m5-晶片-10-核心-cpu-8-核心-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDHF4ZP/A",
+          "group": "13-吋-午夜暗色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHG4ZP/A",
+          "group": "13-吋-午夜暗色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHH4ZP/A",
+          "group": "13-吋-天藍色-m5-晶片-10-核心-cpu-8-核心-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDHJ4ZP/A",
+          "group": "13-吋-天藍色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDHK4ZP/A",
+          "group": "13-吋-天藍色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDV94ZP/A",
+          "group": "15-吋-silver-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDVA4ZP/A",
+          "group": "15-吋-silver-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVC4ZP/A",
+          "group": "15-吋-silver-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVD4ZP/A",
+          "group": "15-吋-星光色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDVE4ZP/A",
+          "group": "15-吋-星光色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVF4ZP/A",
+          "group": "15-吋-星光色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVH4ZP/A",
+          "group": "15-吋-午夜暗色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDVK4ZP/A",
+          "group": "15-吋-午夜暗色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVN4ZP/A",
+          "group": "15-吋-午夜暗色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVQ4ZP/A",
+          "group": "15-吋-天藍色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MDVT4ZP/A",
+          "group": "15-吋-天藍色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDVU4ZP/A",
+          "group": "15-吋-天藍色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGP74ZP/A",
+          "group": "13-吋-星光色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGP84ZP/A",
+          "group": "13-吋-午夜暗色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGP94ZP/A",
+          "group": "13-吋-天藍色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGPC4ZP/A",
+          "group": "15-吋-星光色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGPD4ZP/A",
+          "group": "15-吋-午夜暗色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MGPE4ZP/A",
+          "group": "15-吋-天藍色-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        }
+      ]
     }
   },
   {
@@ -2317,7 +2499,153 @@
             "header": "16 吋<as-footnote data-id=\"fa5423e6a3aa736ff5e090e8a14ea9fc\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;註腳&nbsp;</span>1</sup></as-footnote> <div class=\"form-label-small\">可選配 M5 Pro 或 M5 Max 晶片。</div>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MDE14ZP/A",
+          "group": "14-吋-space-black-標準顯示器-apple-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDE34ZP/A",
+          "group": "14-吋-space-black-標準顯示器-apple-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDE54ZP/A",
+          "group": "14-吋-silver-標準顯示器-apple-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MDE64ZP/A",
+          "group": "14-吋-silver-標準顯示器-apple-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MEQJ4ZP/A",
+          "group": "14-吋-space-black-納米紋理顯示器-apple-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "16GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGDN4ZP/A",
+          "group": "14-吋-silver-標準顯示器-apple-m5-pro-晶片-15-核心-cpu-16-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGDP4ZP/A",
+          "group": "14-吋-silver-標準顯示器-apple-m5-pro-晶片-18-核心-cpu-20-核心-gpu",
+          "memory": "24GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGDQ4ZP/A",
+          "group": "14-吋-silver-標準顯示器-apple-m5-max-晶片-18-核心-cpu-32-核心-gpu",
+          "memory": "36GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGDR4ZP/A",
+          "group": "14-吋-space-black-標準顯示器-apple-m5-pro-晶片-15-核心-cpu-16-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGDT4ZP/A",
+          "group": "14-吋-space-black-標準顯示器-apple-m5-pro-晶片-18-核心-cpu-20-核心-gpu",
+          "memory": "24GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGDU4ZP/A",
+          "group": "14-吋-space-black-標準顯示器-apple-m5-max-晶片-18-核心-cpu-32-核心-gpu",
+          "memory": "36GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGE44ZP/A",
+          "group": "16-吋-silver-標準顯示器-apple-m5-pro-晶片-18-核心-cpu-20-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGE64ZP/A",
+          "group": "16-吋-silver-標準顯示器-apple-m5-pro-晶片-18-核心-cpu-20-核心-gpu",
+          "memory": "48GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGE74ZP/A",
+          "group": "16-吋-silver-標準顯示器-apple-m5-max-晶片-18-核心-cpu-32-核心-gpu",
+          "memory": "36GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGE94ZP/A",
+          "group": "16-吋-silver-標準顯示器-apple-m5-max-晶片-18-核心-cpu-40-核心-gpu",
+          "memory": "48GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGEA4ZP/A",
+          "group": "16-吋-space-black-標準顯示器-apple-m5-pro-晶片-18-核心-cpu-20-核心-gpu",
+          "memory": "24GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGEC4ZP/A",
+          "group": "16-吋-space-black-標準顯示器-apple-m5-pro-晶片-18-核心-cpu-20-核心-gpu",
+          "memory": "48GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MGED4ZP/A",
+          "group": "16-吋-space-black-標準顯示器-apple-m5-max-晶片-18-核心-cpu-32-核心-gpu",
+          "memory": "36GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGEE4ZP/A",
+          "group": "16-吋-space-black-標準顯示器-apple-m5-max-晶片-18-核心-cpu-40-核心-gpu",
+          "memory": "48GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MGXX4ZP/A",
+          "group": "14-吋-space-black-納米紋理顯示器-apple-m5-pro-晶片-18-核心-cpu-20-核心-gpu",
+          "memory": "48GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MJ3D4ZP/A",
+          "group": "14-吋-space-black-標準顯示器-apple-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "32GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MJ3E4ZP/A",
+          "group": "14-吋-silver-標準顯示器-apple-m5-晶片-10-核心-cpu-10-核心-gpu",
+          "memory": "32GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MJLV4ZP/A",
+          "group": "14-吋-silver-標準顯示器-apple-m5-pro-晶片-15-核心-cpu-16-核心-gpu",
+          "memory": "24GB",
+          "storage": "2TB"
+        },
+        {
+          "part": "MJLW4ZP/A",
+          "group": "14-吋-space-black-標準顯示器-apple-m5-pro-晶片-15-核心-cpu-16-核心-gpu",
+          "memory": "24GB",
+          "storage": "2TB"
+        }
+      ]
     }
   },
   {
@@ -2413,7 +2741,57 @@
             "header": "512GB\n精妙鍵盤配備 Touch&nbsp;ID"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MHFA4ZP/A",
+          "group": "silver",
+          "memory": "",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHFC4ZP/A",
+          "group": "silver",
+          "memory": "",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHFD4ZP/A",
+          "group": "橘黃色",
+          "memory": "",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHFE4ZP/A",
+          "group": "橘黃色",
+          "memory": "",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHFF4ZP/A",
+          "group": "靛藍色",
+          "memory": "",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHFG4ZP/A",
+          "group": "靛藍色",
+          "memory": "",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHFH4ZP/A",
+          "group": "胭脂色",
+          "memory": "",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHFJ4ZP/A",
+          "group": "胭脂色",
+          "memory": "",
+          "storage": "512GB"
+        }
+      ]
     }
   },
   {
@@ -2501,7 +2879,105 @@
             "header": "M4 晶片配備兩個 Thunderbolt 連接埠<div class=\"form-label-small\">8 核心 CPU、8 核心 GPU、16&nbsp;核心神經網絡引擎</div>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MCR24ZP/A",
+          "group": "24-吋-silver-m4-晶片-10-核心-cpu-10-核心-gpu-標準玻璃-座架",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MD2Q4ZP/A",
+          "group": "24-吋-綠色-m4-晶片-10-核心-cpu-10-核心-gpu-標準玻璃-座架",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MD2U4ZP/A",
+          "group": "24-吋-粉紅色-m4-晶片-10-核心-cpu-10-核心-gpu-標準玻璃-座架",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MD3H4ZP/A",
+          "group": "24-吋-silver-m4-晶片-10-核心-cpu-10-核心-gpu-納米紋理玻璃-座架",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUC3ZP/A",
+          "group": "24-吋-silver-m4-晶片-8-核心-cpu-8-核心-gpu-座架",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUE3ZP/A",
+          "group": "24-吋-綠色-m4-晶片-8-核心-cpu-8-核心-gpu-座架",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUF3ZP/A",
+          "group": "24-吋-blue-m4-晶片-8-核心-cpu-8-核心-gpu-座架",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUG3ZP/A",
+          "group": "24-吋-粉紅色-m4-晶片-8-核心-cpu-8-核心-gpu-座架",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUU3ZP/A",
+          "group": "24-吋-silver-m4-晶片-10-核心-cpu-10-核心-gpu-標準玻璃-座架",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWUV3ZP/A",
+          "group": "24-吋-silver-m4-晶片-10-核心-cpu-10-核心-gpu-標準玻璃-座架",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MWUY3ZP/A",
+          "group": "24-吋-綠色-m4-晶片-10-核心-cpu-10-核心-gpu-標準玻璃-座架",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWV03ZP/A",
+          "group": "24-吋-綠色-m4-晶片-10-核心-cpu-10-核心-gpu-標準玻璃-座架",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MWV13ZP/A",
+          "group": "24-吋-blue-m4-晶片-10-核心-cpu-10-核心-gpu-標準玻璃-座架",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWV33ZP/A",
+          "group": "24-吋-blue-m4-晶片-10-核心-cpu-10-核心-gpu-標準玻璃-座架",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MWV43ZP/A",
+          "group": "24-吋-粉紅色-m4-晶片-10-核心-cpu-10-核心-gpu-標準玻璃-座架",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MWV53ZP/A",
+          "group": "24-吋-粉紅色-m4-晶片-10-核心-cpu-10-核心-gpu-標準玻璃-座架",
+          "memory": "16GB",
+          "storage": "512GB"
+        }
+      ]
     }
   },
   {
@@ -2538,7 +3014,45 @@
             "header": "<span class=\"rf-dsupgrade-block\">15 核心 CPU、</span><span class=\"rf-dsupgrade-block\">16 核心 GPU</span>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MHQK4ZP/A",
+          "group": "m6-晶片-12-核心-cpu-12-核心-gpu",
+          "memory": "16GB",
+          "storage": "256GB"
+        },
+        {
+          "part": "MHQL4ZP/A",
+          "group": "m6-晶片-12-核心-cpu-12-核心-gpu",
+          "memory": "16GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHQM4ZP/A",
+          "group": "m6-晶片-12-核心-cpu-12-核心-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHQN4ZP/A",
+          "group": "m5-pro-晶片-15-核心-cpu-16-核心-gpu",
+          "memory": "24GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHQU4ZP/A",
+          "group": "m5-pro-晶片-18-核心-cpu-20-核心-gpu",
+          "memory": "64GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MHQV4ZP/A",
+          "group": "m6-晶片-12-核心-cpu-12-核心-gpu",
+          "memory": "32GB",
+          "storage": "1TB"
+        }
+      ]
     }
   },
   {
@@ -2578,7 +3092,27 @@
             "header": "<span class=\"rf-dsupgrade-block\">30 核心 CPU、</span><span class=\"rf-dsupgrade-block\">64&nbsp;核心 GPU</span>"
           }
         }
-      }
+      },
+      "configs": [
+        {
+          "part": "MHL64ZP/A",
+          "group": "m5-max-晶片-18-核心-cpu-32-核心-gpu",
+          "memory": "36GB",
+          "storage": "512GB"
+        },
+        {
+          "part": "MHL74ZP/A",
+          "group": "m5-ultra-晶片-30-核心-cpu-64-核心-gpu",
+          "memory": "96GB",
+          "storage": "1TB"
+        },
+        {
+          "part": "MHQJ4ZP/A",
+          "group": "m5-max-晶片-18-核心-cpu-40-核心-gpu",
+          "memory": "64GB",
+          "storage": "1TB"
+        }
+      ]
     }
   },
   {
