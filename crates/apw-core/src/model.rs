@@ -272,6 +272,14 @@ const DEFAULT_FAMILIES: &[Family] = &[
         slug: "iphone-air",
     },
     Family {
+        category: Category::Iphone,
+        slug: "iphone-17e",
+    },
+    Family {
+        category: Category::Iphone,
+        slug: "iphone-16",
+    },
+    Family {
         category: Category::Ipad,
         slug: "ipad-pro",
     },
