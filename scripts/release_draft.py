@@ -23,6 +23,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime, timezone
 
 # Updater platform key -> suffix of the installer asset that serves it. The key set
@@ -134,10 +135,17 @@ def create(repo, tag, body_file, target):
     else:
         print(f"复用已有草稿 {tag}（id {release_id}）")
     # Re-check: if anything else raced us into a second draft, stop here rather
-    # than letting four builds split their uploads again.
-    if choose_draft(list_releases(repo), tag) != release_id:
-        raise ReleaseError(f"{tag} 的草稿在创建后出现了变化，请检查 Releases 页面")
-    return release_id
+    # than letting four builds split their uploads again. The release list lags a
+    # freshly created draft by a few seconds, so wait for ours to show up;
+    # choose_draft raises on its own if a second draft appears.
+    for attempt in range(6):
+        seen = choose_draft(list_releases(repo), tag)
+        if seen == release_id:
+            return release_id
+        if seen is not None:
+            raise ReleaseError(f"{tag} 出现了另一个草稿（id {seen}），请检查 Releases 页面")
+        time.sleep(5)
+    raise ReleaseError(f"{tag} 的草稿（id {release_id}）创建后一直没出现在列表里")
 
 
 def finalize(repo, tag, release_id):
