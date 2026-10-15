@@ -50,6 +50,8 @@ FAMILIES = [
     ("iphone", "iphone-duo"),
     ("iphone", "iphone-17"),
     ("iphone", "iphone-air"),
+    ("iphone", "iphone-17e"),
+    ("iphone", "iphone-16"),
     ("ipad", "ipad-pro"),
     ("ipad", "ipad-air"),
     ("ipad", "ipad"),
