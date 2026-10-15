@@ -70,7 +70,7 @@ python3 crates/apw-core/data/generate.py
 
 `main` 按仓库分支保护规则通过 PR 更新；当前要求 Linux 和 macOS 检查通过。规则以 GitHub 设置为准，不为普通发布关闭保护。
 
-桌面版本更新需同步 `Cargo.toml`、工作区 crate 的 `Cargo.lock` 版本、`package.json` 和 `src-tauri/tauri.conf.json`。`v*` 标签触发桌面打包并创建 Release 草稿，手动触发仅构建。所有平台产物就绪并核对后再发布草稿。
+桌面版本更新需同步 `Cargo.toml`、工作区 crate 的 `Cargo.lock` 版本、`package.json` 和 `src-tauri/tauri.conf.json`。`v*` 标签触发桌面打包：先由一个作业建好唯一的 Release 草稿（`scripts/release_draft.py create`），四个平台再往这个草稿上传，最后由收尾作业用草稿里的签名文件重建 `latest.json`，下载地址写成 `releases/download/<标签>/<文件名>`，缺任何一个平台就让作业失败（`scripts/release_draft.py finalize`）。收尾作业通过后再人工发布草稿，不需要再手动改写 `latest.json`。手动触发默认只构建；填 `rehearsal_tag`（必须含 rehearsal，例如 `gh workflow run release.yml -f rehearsal_tag=v0.0.0-rehearsal`）会把上面整套流程演练一遍，留下的草稿看完删掉即可。改动发布流水线后先演练一次。
 
 桌面更新签名使用 `TAURI_SIGNING_PRIVATE_KEY` 和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 两个仓库 Secret。缺少密钥时工作流按配置输出未签名安装包；应用内更新需要与内嵌公钥匹配的签名。私钥应离线备份，不提交到仓库。
 
