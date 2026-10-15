@@ -4,8 +4,14 @@ name: Release
 #
 # 两条触发路径：
 #   1. push 一个 v* 标签 —— 正式发版，会创建 GitHub Release（草稿，见下面 releaseDraft 的说明）。
-#   2. 手动 workflow_dispatch —— 只构建、不发布，用来验证这条流水线本身还能跑通。
-#      改动了这个文件之后请先手动跑一次，别拿真实发版当测试。
+#   2. 手动 workflow_dispatch —— 默认只构建、不碰 Release，产物挂成 workflow artifact。
+#      填了 rehearsal_tag（必须含 rehearsal，例如 v0.0.0-rehearsal）就完整演练一遍：
+#      建草稿、四个平台上传、收尾重建 latest.json，最后留下一个草稿，看完删掉即可。
+#      改动了这个文件之后请先演练一次，别拿真实发版当测试。
+#
+# 草稿只由 release 作业建一次，四个构建作业用 releaseId 往里传，finalize 作业最后
+# 重建 latest.json。v0.6.2 之前是四个作业各自「找不到就创建」，同一秒里建出了两个
+# 草稿，各装一半安装包、各带半份 latest.json，四个作业却都显示成功。
 #
 # 关于「草稿」：产物是四个作业并行上传的，同时 tauri-action 会把各平台的签名信息
 # 合并进同一个 latest.json。如果 Release 一创建就是公开的，GitHub 会立刻把它标成
@@ -19,6 +25,15 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      rehearsal_tag:
+        description: "演练用的标签，必须含 rehearsal（例如 v0.0.0-rehearsal）；留空只构建"
+        required: false
+        default: ""
+
+env:
+  # 推标签时就是那个标签；手动演练时是 rehearsal_tag；手动空跑时为空。
+  RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.rehearsal_tag }}
 
 # 默认只读；需要写 Release 的权限在 build 作业里单独提权。
 permissions:
@@ -31,8 +46,81 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # 先把唯一的草稿建好（已有就复用），四个构建作业再用 releaseId 往里传。
+  release:
+    name: 创建草稿
+    if: github.event_name == 'push' || inputs.rehearsal_tag != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      id: ${{ steps.create.outputs.id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: 演练标签必须含 rehearsal
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          case "$RELEASE_TAG" in
+            *rehearsal*) ;;
+            *) echo "::error::演练标签必须含 rehearsal，免得建出一个看起来像正式版本的草稿：$RELEASE_TAG"; exit 1 ;;
+          esac
+      - name: 创建或复用草稿
+        id: create
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Release 说明只在这里写一次。别在里面写 ${{ }}，会被当成表达式求值。
+          RELEASE_BODY: |
+            ### 下载哪一个
+
+            | 系统 | 文件 |
+            | --- | --- |
+            | macOS（Apple Silicon）| `*_aarch64.dmg` |
+            | macOS（Intel）| `*_x64.dmg` |
+            | Windows | `*-setup.exe`（推荐）或 `*_x64_en-US.msi` |
+            | Linux | `*_amd64.deb` 或 `*_amd64.AppImage` |
+
+            ### macOS：首次打开被拦下
+
+            安装包没有经过 Apple 公证，Gatekeeper 会提示「已损坏，无法打开」。
+            这不是文件真的坏了。把应用拖进「应用程序」后执行一次：
+
+            ```sh
+            xattr -cr "/Applications/Apple Pickup Watcher.app"
+            ```
+
+            之后就能正常启动，这条命令只需要执行一次。
+
+            ### Linux：运行库要求
+
+            产物在 Ubuntu 24.04 上构建，需要 glibc ≥ 2.39，更老的发行版请自行从源码编译。
+
+            - `.deb`：`sudo apt install ./apple-pickup-watcher_*_amd64.deb` 会自动拉齐依赖。
+              手动装的话需要 `libwebkit2gtk-4.1-0`、`libayatana-appindicator3-1`（托盘图标）、
+              以及 ALSA 运行库 `libasound2t64`（播放到货提示音要用）。
+            - `.AppImage`：需要系统里有 FUSE 2（Ubuntu 24.04 上是 `libfuse2t64`）。
+              不想装的话可以用 `./apple-pickup-watcher_*.AppImage --appimage-extract-and-run` 运行。
+
+            ### 关于自动更新
+
+            应用会向本仓库的 Releases 查询新版本。如果本次发布的资产里没有 `latest.json`，
+            说明构建时仓库未配置更新签名密钥，这个版本只能手动下载升级。
+
+            ### 许可与来源
+
+            本项目基于 [hteen/apple-store-helper](https://github.com/hteen/apple-store-helper) 修改，
+            以 GPL-3.0 发布。详见仓库内的 `LICENSE` 与 `NOTICE`。
+        run: |
+          printf '%s' "$RELEASE_BODY" > "$RUNNER_TEMP/body.md"
+          python3 scripts/release_draft.py create --tag "$RELEASE_TAG" --body-file "$RUNNER_TEMP/body.md" --target "$GITHUB_SHA"
+
   build:
     name: ${{ matrix.label }}
+    needs: release
+    # release 作业被跳过（手动空跑）时照样构建；它失败时不构建。
+    if: ${{ !cancelled() && (needs.release.result == 'success' || needs.release.result == 'skipped') }}
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: write
@@ -197,25 +285,15 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          # 手动触发时这三项留空 —— tauri-action 的约定是：tagName / releaseName /
-          # releaseId 都不给，就只构建、不碰 Release。正好用来空跑验证流水线。
-          tagName: ${{ github.event_name == 'push' && github.ref_name || '' }}
-          releaseName: ${{ github.event_name == 'push' && github.ref_name || '' }}
+          # 往 release 作业建好的那一个草稿里传；手动空跑时为空，tauri-action
+          # 的约定是 releaseId、tagName 都不给就只构建、不碰 Release。
+          # 刻意不给 tagName：给了它就会自己「找不到就创建」，四个作业同时找，
+          # v0.6.2 就是这样建出了两个草稿。
+          releaseId: ${{ needs.release.outputs.id }}
 
-          # 先发草稿，人工确认四个平台都齐了再发布。理由见文件开头。
-          #
-          # 假设：四个作业并行地「找不到就创建」同一个 Release，靠的是 tauri-action
-          # 自己的去重。这是官方 README 里给出的矩阵写法，理论上仍有极小概率同时创建
-          # 出两个草稿。真遇到了（Releases 里出现两条同名草稿）再拆一个前置作业专门
-          # 建 Release、后续作业用 releaseId 引用即可 —— 但那样 latest.json 里的下载
-          # 地址会退化成 releases/latest/download/<bundle>，代价更大，所以先不这么做。
-          releaseDraft: true
-          prerelease: false
-
-          # 生成并上传 updater 用的 latest.json。tauri.conf.json 里的 endpoint 指向
-          # releases/latest/download/latest.json，靠的就是这个文件。
-          # 四个作业会各自往同一个 latest.json 里合并自己平台的条目，action 内部对
-          # 这个文件有重试逻辑，不需要我们串行化。
+          # 各平台把自己的条目合并进 latest.json。这是「读出来、改、删掉、再传」，
+          # 两个作业同时做会互相覆盖，所以最后由 finalize 作业从 .sig 重建一遍；
+          # 这里照样上传，是为了让 .sig 和条目都先落进草稿。
           uploadUpdaterJson: true
 
           # Windows 上 targets: "all" 会同时产出 .msi 和 setup.exe(NSIS)，
@@ -226,7 +304,7 @@ jobs:
           # 手动空跑时没有 Release 可传，把产物挂成 workflow artifact，
           # 否则这次运行什么都拿不到、也就验证不了打包结果。
           # 默认命名是 [platform]-[arch]-[bundle]，四个作业不会撞名。
-          uploadWorkflowArtifacts: ${{ github.event_name == 'workflow_dispatch' }}
+          uploadWorkflowArtifacts: ${{ needs.release.outputs.id == '' }}
 
           # 刻意保持默认的 0。retryAttempts 会连**构建**一起重试，编译错误重来一遍
           # 只是白烧十几分钟。latest.json 的上传冲突 action 内部本来就自带一次重试。
@@ -234,45 +312,22 @@ jobs:
 
           args: ${{ steps.signing.outputs.sign == 'false' && '--no-sign' || '' }}
 
-          # 四个作业传的是同一段文字，后跑完的作业会用它覆盖 Release 说明，
-          # 内容一致所以结果是幂等的。改这里记得别引入 ${{ }}，会被当成表达式求值。
-          releaseBody: |
-            ### 下载哪一个
-
-            | 系统 | 文件 |
-            | --- | --- |
-            | macOS（Apple Silicon）| `*_aarch64.dmg` |
-            | macOS（Intel）| `*_x64.dmg` |
-            | Windows | `*-setup.exe`（推荐）或 `*_x64_en-US.msi` |
-            | Linux | `*_amd64.deb` 或 `*_amd64.AppImage` |
-
-            ### macOS：首次打开被拦下
-
-            安装包没有经过 Apple 公证，Gatekeeper 会提示「已损坏，无法打开」。
-            这不是文件真的坏了。把应用拖进「应用程序」后执行一次：
-
-            ```sh
-            xattr -cr "/Applications/Apple Pickup Watcher.app"
-            ```
-
-            之后就能正常启动，这条命令只需要执行一次。
-
-            ### Linux：运行库要求
-
-            产物在 Ubuntu 24.04 上构建，需要 glibc ≥ 2.39，更老的发行版请自行从源码编译。
-
-            - `.deb`：`sudo apt install ./apple-pickup-watcher_*_amd64.deb` 会自动拉齐依赖。
-              手动装的话需要 `libwebkit2gtk-4.1-0`、`libayatana-appindicator3-1`（托盘图标）、
-              以及 ALSA 运行库 `libasound2t64`（播放到货提示音要用）。
-            - `.AppImage`：需要系统里有 FUSE 2（Ubuntu 24.04 上是 `libfuse2t64`）。
-              不想装的话可以用 `./apple-pickup-watcher_*.AppImage --appimage-extract-and-run` 运行。
-
-            ### 关于自动更新
-
-            应用会向本仓库的 Releases 查询新版本。如果本次发布的资产里没有 `latest.json`，
-            说明构建时仓库未配置更新签名密钥，这个版本只能手动下载升级。
-
-            ### 许可与来源
-
-            本项目基于 [hteen/apple-store-helper](https://github.com/hteen/apple-store-helper) 修改，
-            以 GPL-3.0 发布。详见仓库内的 `LICENSE` 与 `NOTICE`。
+  # 四个平台都传完之后，用草稿里的 .sig 重建 latest.json：地址写成
+  # releases/download/<tag>/<文件名>，少任何一个平台就让作业失败。
+  # 发布仍然由人在 Releases 页面点 “Publish release”。
+  finalize:
+    name: 重建更新清单
+    needs: [release, build]
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.build.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: 重建 latest.json 并检查平台是否齐全
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/release_draft.py finalize --tag "$RELEASE_TAG" --release-id "${{ needs.release.outputs.id }}"
