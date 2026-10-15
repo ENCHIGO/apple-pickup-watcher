@@ -98,13 +98,17 @@ def build_manifest(assets, signatures, tag, repository, version, notes, pub_date
 # ---- GitHub I/O -------------------------------------------------------------
 
 
-def gh(*args, data=None):
-    result = subprocess.run(
-        ["gh", *args], input=data, capture_output=True, check=False
-    )
-    if result.returncode != 0:
-        raise ReleaseError(f"gh {' '.join(args)} 失败：{result.stderr.decode(errors='replace')}")
-    return result.stdout
+def gh(*args, data=None, attempts=3):
+    """Run gh; retry transient failures. Pass attempts=1 for calls that must not repeat."""
+    for attempt in range(attempts):
+        result = subprocess.run(
+            ["gh", *args], input=data, capture_output=True, check=False
+        )
+        if result.returncode == 0:
+            return result.stdout
+        if attempt + 1 < attempts:
+            time.sleep(5)
+    raise ReleaseError(f"gh {' '.join(args)} 失败：{result.stderr.decode(errors='replace')}")
 
 
 def gh_json(*args):
@@ -130,7 +134,7 @@ def create(repo, tag, body_file, target):
             {"tag_name": tag, "name": tag, "body": body, "draft": True,
              "prerelease": False, "target_commitish": target}
         ).encode()
-        release_id = json.loads(gh("api", "-X", "POST", f"repos/{repo}/releases", "--input", "-", data=payload))["id"]
+        release_id = json.loads(gh("api", "-X", "POST", f"repos/{repo}/releases", "--input", "-", data=payload, attempts=1))["id"]
         print(f"已创建草稿 {tag}（id {release_id}）")
     else:
         print(f"复用已有草稿 {tag}（id {release_id}）")
@@ -163,7 +167,9 @@ def finalize(repo, tag, release_id):
 
     signatures = {name: download(name).decode() for name in by_name if name.endswith(".sig")}
     previous = json.loads(download(MANIFEST)) if MANIFEST in by_name else {}
-    version = previous.get("version") or tag.lstrip("v")
+    # Version comes from the checked-out tauri.conf.json, so a rerun still knows it
+    # even if an earlier attempt already deleted the old latest.json.
+    version = app_version()
     manifest = build_manifest(
         by_name, signatures, tag, repo, version,
         notes=release.get("body") or "",
@@ -179,13 +185,27 @@ def finalize(repo, tag, release_id):
             json.dump(manifest, fh, indent=2, ensure_ascii=False)
         if MANIFEST in by_name:
             gh("api", "-X", "DELETE", f"repos/{repo}/releases/assets/{by_name[MANIFEST]['id']}")
-        with open(path, "rb") as fh:
-            gh("api", "-X", "POST",
-               f"https://uploads.github.com/repos/{repo}/releases/{release_id}/assets?name={MANIFEST}",
-               "-H", "Content-Type: application/json", "--input", "-", data=fh.read())
+        # Pass a file path, not stdin: the uploads endpoint needs a Content-Length,
+        # and gh only sends one for a file ("Bad Content-Length (HTTP 400)" otherwise).
+        for attempt in range(3):
+            try:
+                gh("api", "-X", "POST",
+                   f"https://uploads.github.com/repos/{repo}/releases/{release_id}/assets?name={MANIFEST}",
+                   "-H", "Content-Type: application/json", "--input", path, attempts=1)
+                break
+            except ReleaseError:
+                if attempt == 2:
+                    raise
+                time.sleep(5)
     for key, entry in sorted(manifest["platforms"].items()):
         print(f"  {key:24} {entry['url'].rsplit('/', 1)[1]}")
     print(f"latest.json：{manifest['version']}，{len(manifest['platforms'])} 个平台")
+
+
+def app_version():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, "src-tauri", "tauri.conf.json"), encoding="utf-8") as fh:
+        return json.load(fh)["version"]
 
 
 def main(argv=None):
