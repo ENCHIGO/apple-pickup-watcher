@@ -1360,6 +1360,285 @@
     }
   },
   {
+    "category": "iphone",
+    "family": "iphone-17e",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MHRN4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MHRN4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MHRN4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MHRP4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MHRP4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MHRP4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MHRQ4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "soft_pink"
+        },
+        {
+          "partNumber": "MHRQ4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "soft_pink"
+        },
+        {
+          "partNumber": "MHRQ4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "soft_pink"
+        },
+        {
+          "partNumber": "MHRR4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MHRR4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MHRR4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MHRT4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MHRT4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MHRT4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MHRU4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "soft_pink"
+        },
+        {
+          "partNumber": "MHRU4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "soft_pink"
+        },
+        {
+          "partNumber": "MHRU4J/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "soft_pink"
+        }
+      ],
+      "displayValues": {
+        "dimensionColor": {
+          "black": {
+            "value": "ブラック"
+          },
+          "soft_pink": {
+            "value": "ソフトピンク"
+          },
+          "white": {
+            "value": "ホワイト"
+          }
+        },
+        "dimensionCapacity": {
+          "256gb": {
+            "value": "256<small>GB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          },
+          "512gb": {
+            "value": "512<small>GB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "iphone",
+    "family": "iphone-16",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MYDQ3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MYDQ3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MYDQ3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MYDR3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MYDR3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MYDR3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MYDT3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "pink"
+        },
+        {
+          "partNumber": "MYDT3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "pink"
+        },
+        {
+          "partNumber": "MYDT3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "pink"
+        },
+        {
+          "partNumber": "MYDU3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "ultramarine"
+        },
+        {
+          "partNumber": "MYDU3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "ultramarine"
+        },
+        {
+          "partNumber": "MYDU3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "ultramarine"
+        },
+        {
+          "partNumber": "MYDV3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "teal"
+        },
+        {
+          "partNumber": "MYDV3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "teal"
+        },
+        {
+          "partNumber": "MYDV3J/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "teal"
+        }
+      ],
+      "displayValues": {
+        "dimensionScreensize": {
+          "6_1inch": {
+            "value": "iPhone&nbsp;16\n<span class=\"form-label-small\">6.1インチディスプレイ<as-footnote data-id=\"8054edc379d142293eb3940b1a8ea8d1\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>2</sup></as-footnote><br /><br />128GBストレージ搭載</span>"
+          }
+        },
+        "dimensionColor": {
+          "black": {
+            "value": "ブラック"
+          },
+          "pink": {
+            "value": "ピンク"
+          },
+          "teal": {
+            "value": "ティール"
+          },
+          "ultramarine": {
+            "value": "ウルトラマリン"
+          },
+          "white": {
+            "value": "ホワイト"
+          }
+        },
+        "dimensionCapacity": {
+          "128gb": {
+            "value": "128<small>GB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
     "category": "ipad",
     "family": "ipad-pro",
     "data": {

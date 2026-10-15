@@ -552,6 +552,143 @@
     }
   },
   {
+    "category": "iphone",
+    "family": "iphone-17e",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MHU44CH/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MHU54CH/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MHU64CH/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "soft_pink"
+        },
+        {
+          "partNumber": "MHU74CH/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MHU94CH/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MHUA4CH/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "soft_pink"
+        }
+      ],
+      "displayValues": {
+        "dimensionColor": {
+          "black": {
+            "value": "黑色"
+          },
+          "soft_pink": {
+            "value": "浅粉色"
+          },
+          "white": {
+            "value": "白色"
+          }
+        },
+        "dimensionCapacity": {
+          "256gb": {
+            "value": "256<small>GB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          },
+          "512gb": {
+            "value": "512<small>GB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "iphone",
+    "family": "iphone-16",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MYEV3CH/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MYEW3CH/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MYEX3CH/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "pink"
+        },
+        {
+          "partNumber": "MYEY3CH/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "ultramarine"
+        },
+        {
+          "partNumber": "MYF03CH/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "teal"
+        }
+      ],
+      "displayValues": {
+        "dimensionScreensize": {
+          "6_1inch": {
+            "value": "iPhone&nbsp;16\n<span class=\"form-label-small\">6.1 英寸显示屏<as-footnote data-id=\"8054edc379d142293eb3940b1a8ea8d1\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>2</sup></as-footnote><br /><br />配备 128GB 存储容量</span>"
+          }
+        },
+        "dimensionColor": {
+          "black": {
+            "value": "黑色"
+          },
+          "pink": {
+            "value": "粉色"
+          },
+          "teal": {
+            "value": "深青色"
+          },
+          "ultramarine": {
+            "value": "群青色"
+          },
+          "white": {
+            "value": "白色"
+          }
+        },
+        "dimensionCapacity": {
+          "128gb": {
+            "value": "128<small>GB</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;脚注&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
     "category": "ipad",
     "family": "ipad-pro",
     "data": {
