@@ -1,0 +1,3325 @@
+[
+  {
+    "category": "iphone",
+    "family": "iphone-18-pro",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MJRP4F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJRQ4F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJRR4F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJRT4F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJRU4F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJRV4F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJRW4F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJRX4F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJRY4F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJT04F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJT14F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJT24F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJT34F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJT44F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJT54F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJT64F/A",
+          "familyType": "iphone18pro",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_3inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJXN4F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJXP4F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJXQ4F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJXR4F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJXT4F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJXU4F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJXV4F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJXW4F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJXX4F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJXY4F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJY04F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJY14F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        },
+        {
+          "partNumber": "MJY24F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MJY34F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MJY44F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "burgundy"
+        },
+        {
+          "partNumber": "MJY54F/A",
+          "familyType": "iphone18promax",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "6_9inch",
+          "dimensionColor": "glacier"
+        }
+      ],
+      "displayValues": {
+        "dimensionScreensize": {
+          "6_3inch": {
+            "value": "iPhone&nbsp;18&nbsp;Pro\n<span class=\"form-label-small\">Écran de 6,3&nbsp;pouces<as-footnote data-id=\"8054edc379d142293eb3940b1a8ea8d1\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote></span>"
+          },
+          "6_9inch": {
+            "value": "iPhone&nbsp;18&nbsp;Pro&nbsp;Max\n<span class=\"form-label-small\">Écran de 6,9&nbsp;pouces<as-footnote data-id=\"8054edc379d142293eb3940b1a8ea8d1\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote></span>"
+          }
+        },
+        "dimensionColor": {
+          "black": {
+            "value": "Noir"
+          },
+          "burgundy": {
+            "value": "Bordeaux"
+          },
+          "glacier": {
+            "value": "Glacier"
+          },
+          "silver": {
+            "value": "Argent"
+          }
+        },
+        "dimensionCapacity": {
+          "1tb": {
+            "value": "1<small> To</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          },
+          "256gb": {
+            "value": "256 <small>Go</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          },
+          "2tb": {
+            "value": "2<small> To</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          },
+          "512gb": {
+            "value": "512 <small>Go</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "iphone",
+    "family": "iphone-duo",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MK2D4F/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK2E4F/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK2F4F/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK2G4F/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK2H4F/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "1tb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK2J4F/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "1tb",
+          "dimensionColor": "nightsky"
+        },
+        {
+          "partNumber": "MK2K4F/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "2tb",
+          "dimensionColor": "starwhite"
+        },
+        {
+          "partNumber": "MK2L4F/A",
+          "familyType": "iphoneduo",
+          "dimensionCapacity": "2tb",
+          "dimensionColor": "nightsky"
+        }
+      ],
+      "displayValues": {
+        "dimensionColor": {
+          "nightsky": {
+            "value": "Ciel nocturne"
+          },
+          "starwhite": {
+            "value": "Blanc stellaire"
+          }
+        },
+        "dimensionCapacity": {
+          "1tb": {
+            "value": "1<small> To</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>\n"
+          },
+          "256gb": {
+            "value": "256 <small>Go</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          },
+          "2tb": {
+            "value": "2<small> To</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          },
+          "512gb": {
+            "value": "512 <small>Go</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "iphone",
+    "family": "iphone-17",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MG6J4F/A",
+          "familyType": "iphone17",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MG6K4F/A",
+          "familyType": "iphone17",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MG6L4F/A",
+          "familyType": "iphone17",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "mistblue"
+        },
+        {
+          "partNumber": "MG6M4F/A",
+          "familyType": "iphone17",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "lavender"
+        },
+        {
+          "partNumber": "MG6N4F/A",
+          "familyType": "iphone17",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "sage"
+        },
+        {
+          "partNumber": "MG6P4F/A",
+          "familyType": "iphone17",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MG6Q4F/A",
+          "familyType": "iphone17",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MG6T4F/A",
+          "familyType": "iphone17",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "mistblue"
+        },
+        {
+          "partNumber": "MG6U4F/A",
+          "familyType": "iphone17",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "lavender"
+        },
+        {
+          "partNumber": "MG6V4F/A",
+          "familyType": "iphone17",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "sage"
+        }
+      ],
+      "displayValues": {
+        "dimensionColor": {
+          "black": {
+            "value": "Noir"
+          },
+          "lavender": {
+            "value": "Lavande"
+          },
+          "mistblue": {
+            "value": "Brume"
+          },
+          "sage": {
+            "value": "Sauge"
+          },
+          "white": {
+            "value": "Blanc"
+          }
+        },
+        "dimensionCapacity": {
+          "256gb": {
+            "value": "256 <small>Go</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          },
+          "512gb": {
+            "value": "512 <small>Go</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "iphone",
+    "family": "iphone-air",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MG2L4F/A",
+          "familyType": "iphoneair",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MG2M4F/A",
+          "familyType": "iphoneair",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "cloudwhite"
+        },
+        {
+          "partNumber": "MG2N4F/A",
+          "familyType": "iphoneair",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "lightgold"
+        },
+        {
+          "partNumber": "MG2P4F/A",
+          "familyType": "iphoneair",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "skyblue"
+        },
+        {
+          "partNumber": "MG2Q4F/A",
+          "familyType": "iphoneair",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MG2T4F/A",
+          "familyType": "iphoneair",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "cloudwhite"
+        },
+        {
+          "partNumber": "MG2U4F/A",
+          "familyType": "iphoneair",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "lightgold"
+        },
+        {
+          "partNumber": "MG2V4F/A",
+          "familyType": "iphoneair",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "skyblue"
+        },
+        {
+          "partNumber": "MG2W4F/A",
+          "familyType": "iphoneair",
+          "dimensionCapacity": "1tb",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MG2X4F/A",
+          "familyType": "iphoneair",
+          "dimensionCapacity": "1tb",
+          "dimensionColor": "cloudwhite"
+        },
+        {
+          "partNumber": "MG2Y4F/A",
+          "familyType": "iphoneair",
+          "dimensionCapacity": "1tb",
+          "dimensionColor": "lightgold"
+        },
+        {
+          "partNumber": "MG304F/A",
+          "familyType": "iphoneair",
+          "dimensionCapacity": "1tb",
+          "dimensionColor": "skyblue"
+        }
+      ],
+      "displayValues": {
+        "dimensionColor": {
+          "cloudwhite": {
+            "value": "Blanc nuage"
+          },
+          "lightgold": {
+            "value": "Or clair"
+          },
+          "skyblue": {
+            "value": "Bleu ciel"
+          },
+          "spaceblack": {
+            "value": "Noir&nbsp;sidéral"
+          }
+        },
+        "dimensionCapacity": {
+          "1tb": {
+            "value": "1<small> To</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>\n"
+          },
+          "256gb": {
+            "value": "256 <small>Go</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          },
+          "512gb": {
+            "value": "512 <small>Go</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "iphone",
+    "family": "iphone-17e",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MHRV4F/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MHRW4F/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MHRX4F/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "256gb",
+          "dimensionColor": "soft_pink"
+        },
+        {
+          "partNumber": "MHRY4F/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MHU04F/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MHU34F/A",
+          "familyType": "iphone17e",
+          "dimensionCapacity": "512gb",
+          "dimensionColor": "soft_pink"
+        }
+      ],
+      "displayValues": {
+        "dimensionColor": {
+          "black": {
+            "value": "Noir"
+          },
+          "soft_pink": {
+            "value": "Rose pastel"
+          },
+          "white": {
+            "value": "Blanc"
+          }
+        },
+        "dimensionCapacity": {
+          "256gb": {
+            "value": "256 <small>Go</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          },
+          "512gb": {
+            "value": "512 <small>Go</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "iphone",
+    "family": "iphone-16",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MYE73ZD/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "black"
+        },
+        {
+          "partNumber": "MYE93ZD/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "white"
+        },
+        {
+          "partNumber": "MYEA3ZD/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "pink"
+        },
+        {
+          "partNumber": "MYEC3ZD/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "ultramarine"
+        },
+        {
+          "partNumber": "MYED3ZD/A",
+          "familyType": "iphone16",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "6_1inch",
+          "dimensionColor": "teal"
+        }
+      ],
+      "displayValues": {
+        "dimensionScreensize": {
+          "6_1inch": {
+            "value": "iPhone&nbsp;16\n<span class=\"form-label-small\">Écran de 6,1&nbsp;pouces<as-footnote data-id=\"8054edc379d142293eb3940b1a8ea8d1\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote><br /><br />Capacité de stockage de 128&nbsp;Go</span>"
+          }
+        },
+        "dimensionColor": {
+          "black": {
+            "value": "Noir"
+          },
+          "pink": {
+            "value": "Rose"
+          },
+          "teal": {
+            "value": "Sarcelle"
+          },
+          "ultramarine": {
+            "value": "Outremer"
+          },
+          "white": {
+            "value": "Blanc"
+          }
+        },
+        "dimensionCapacity": {
+          "128gb": {
+            "value": "128 <small>Go</small><as-footnote data-id=\"6c341d797a26c8d39cc2f0a6925a8d4e\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "ipad",
+    "family": "ipad-pro",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MDWK4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MDWL4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MDWM4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MDWN4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MDWP4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MDWQ4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MDWR4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MDWT4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MDWU4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MDWV4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MDWW4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MDWX4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MDYJ4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MDYK4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MDYL4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MDYM4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MDYN4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MDYP4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MDYQ4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MDYR4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MDYT4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MDYU4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MDYV4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "MDYW4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "ME2N4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "ME2P4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "ME2Q4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "ME2T4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "ME2U4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "ME2V4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "ME2W4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "ME2X4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "ME2Y4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "ME6A4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "ME6C4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "ME6D4TY/A",
+          "familyType": "ipadpro11_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "11inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "ME7W4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "ME7X4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "ME7Y4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "ME8C4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "ME8D4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "ME8F4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "ME8G4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "ME8H4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "ME8J4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "ME8K4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "glossy",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "ME8M4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "spaceblack"
+        },
+        {
+          "partNumber": "ME8N4TY/A",
+          "familyType": "ipadpro13_m5_2025",
+          "dimensionCapacity": "2tb",
+          "dimensionScreensize": "13inch",
+          "dimensionFinish": "matte",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        }
+      ],
+      "displayValues": {
+        "dimensionScreensize": {
+          "11inch": {
+            "value": "Modèle 11&nbsp;pouces<div class=\"form-label-small\">Écran Ultra Retina&nbsp;XDR</div>"
+          },
+          "13inch": {
+            "value": "Modèle 13&nbsp;pouces<div class=\"form-label-small\">Écran Ultra Retina&nbsp;XDR</div>"
+          }
+        },
+        "dimensionColor": {
+          "silver": {
+            "value": "Argent"
+          },
+          "spaceblack": {
+            "value": "Noir&nbsp;sidéral"
+          }
+        },
+        "dimensionCapacity": {
+          "1tb": {
+            "value": "1&nbsp;<small>To</small> de stockage<as-footnote data-id=\"e5a7a109be4b57ed5106570bd8020b91\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote>\n<div class=\"typography-caption\">16&nbsp;Go de mémoire</div>\n<div class=\"form-label-small\">Puce&nbsp;M5&nbsp;:<br />CPU 10&nbsp;cœurs, GPU 10&nbsp;cœurs</div>"
+          },
+          "256gb": {
+            "value": "256&nbsp;<small>Go</small> de stockage<as-footnote data-id=\"e5a7a109be4b57ed5106570bd8020b91\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote>\n<div class=\"typography-caption\">12&nbsp;Go de mémoire</div>\n<div class=\"form-label-small\">Puce&nbsp;M5&nbsp;:<br />CPU 9&nbsp;cœurs, GPU 10&nbsp;cœurs</div>"
+          },
+          "2tb": {
+            "value": "2&nbsp;<small>To</small> de stockage<as-footnote data-id=\"e5a7a109be4b57ed5106570bd8020b91\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote>\n<div class=\"typography-caption\">16&nbsp;Go de mémoire</div>\n<div class=\"form-label-small\">Puce&nbsp;M5&nbsp;:<br />CPU 10&nbsp;cœurs, GPU 10&nbsp;cœurs</div>"
+          },
+          "512gb": {
+            "value": "512&nbsp;<small>Go</small> de stockage<as-footnote data-id=\"e5a7a109be4b57ed5106570bd8020b91\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote>\n<div class=\"typography-caption\">12&nbsp;Go de mémoire</div>\n<div class=\"form-label-small\">Puce&nbsp;M5&nbsp;:<br />CPU 9&nbsp;cœurs, GPU 10&nbsp;cœurs</div>"
+          }
+        },
+        "dimensionFinish": {
+          "glossy": {
+            "value": "Verre standard"
+          },
+          "matte": {
+            "value": "Verre nano-texturé\n<div class=\"form-label-small\">Disponible sur les modèles avec 1&nbsp;To ou 2&nbsp;To de stockage</div>"
+          }
+        },
+        "dimensionConnection": {
+          "wifi": {
+            "value": "Wi-Fi<div class=\"form-label-small\">Tous les modèles d’iPad peuvent se connecter aux réseaux Wi-Fi pour vous permettre de garder le contact.&nbsp;</div>"
+          },
+          "wificell": {
+            "value": "Wi-Fi + Cellular<div class=\"form-label-small\">Le modèle Wi‑Fi&nbsp;+&nbsp;Cellular vous permet de disposer d’une connexion lorsque le réseau Wi‑Fi n’est pas disponible.</div>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "ipad",
+    "family": "ipad-air",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MH304TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH314TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH334TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH344TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH354TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH364TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH374TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH394TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH3A4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH3C4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH3D4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH3E4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH3G4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH3H4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH3J4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH3K4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH5N4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH5P4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH5Q4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH5T4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH5U4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH5V4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH5W4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH5X4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH5Y4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH604TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH614TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH624TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH634TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH644TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH654TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH784TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH794TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH7A4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH7C4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH7D4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH7E4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH7F4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH7G4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH7H4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH7J4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH7K4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH7L4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH7M4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH7N4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH7P4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH7Q4TY/A",
+          "familyType": "ipadair11_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "11inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH9D4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH9E4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH9F4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH9G4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "128gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH9H4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH9J4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH9K4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH9L4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "256gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH9M4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH9N4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH9P4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH9Q4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "512gb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MH9R4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MH9T4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MH9U4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MH9V4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MHDK4TY/A",
+          "familyType": "ipadair13_m4_2026",
+          "dimensionCapacity": "1tb",
+          "dimensionScreensize": "13inch",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "purple"
+        }
+      ],
+      "displayValues": {
+        "dimensionScreensize": {
+          "11inch": {
+            "value": "Modèle 11&nbsp;pouces"
+          },
+          "13inch": {
+            "value": "Modèle 13&nbsp;pouces"
+          }
+        },
+        "dimensionColor": {
+          "blue": {
+            "value": "Bleu"
+          },
+          "purple": {
+            "value": "Violet"
+          },
+          "space_gray": {
+            "value": "Gris sidéral"
+          },
+          "starlight": {
+            "value": "Lumière&nbsp;stellaire"
+          }
+        },
+        "dimensionCapacity": {
+          "128gb": {
+            "value": "128 <small>Go<as-footnote data-id=\"e5a7a109be4b57ed5106570bd8020b91\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote></small>"
+          },
+          "1tb": {
+            "value": "1<small>&nbsp;To<as-footnote data-id=\"e5a7a109be4b57ed5106570bd8020b91\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote></small>"
+          },
+          "256gb": {
+            "value": "256 <small>Go<as-footnote data-id=\"e5a7a109be4b57ed5106570bd8020b91\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote></small>"
+          },
+          "512gb": {
+            "value": "512 <small>Go<as-footnote data-id=\"e5a7a109be4b57ed5106570bd8020b91\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote></small>"
+          }
+        },
+        "dimensionConnection": {
+          "wifi": {
+            "value": "Wi-Fi<div class=\"form-label-small\">Tous les modèles d’iPad peuvent se connecter aux réseaux Wi-Fi pour vous permettre de garder le contact.&nbsp;</div>"
+          },
+          "wificell": {
+            "value": "Wi-Fi + Cellular<div class=\"form-label-small\">Le modèle Wi‑Fi&nbsp;+&nbsp;Cellular vous permet de disposer d’une connexion lorsque le réseau Wi‑Fi n’est pas disponible.</div>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "ipad",
+    "family": "ipad",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MD3Y4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MD4A4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MD4D4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "yellow"
+        },
+        {
+          "partNumber": "MD4E4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "pink"
+        },
+        {
+          "partNumber": "MD4G4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MD4H4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MD4J4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "yellow"
+        },
+        {
+          "partNumber": "MD4P4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "pink"
+        },
+        {
+          "partNumber": "MD4Q4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MD4Y4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MD5A4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "yellow"
+        },
+        {
+          "partNumber": "MD5C4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "pink"
+        },
+        {
+          "partNumber": "MD7F4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MD7G4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MD7H4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "yellow"
+        },
+        {
+          "partNumber": "MD7J4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "pink"
+        },
+        {
+          "partNumber": "MD7K4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MD7L4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MD7M4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "yellow"
+        },
+        {
+          "partNumber": "MD7N4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "pink"
+        },
+        {
+          "partNumber": "MD7P4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "silver"
+        },
+        {
+          "partNumber": "MD7Q4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MD7R4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "yellow"
+        },
+        {
+          "partNumber": "MD7T4TY/A",
+          "familyType": "ipada16_2025",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "pink"
+        }
+      ],
+      "displayValues": {
+        "dimensionColor": {
+          "blue": {
+            "value": "Bleu"
+          },
+          "pink": {
+            "value": "Rose"
+          },
+          "silver": {
+            "value": "Argent"
+          },
+          "yellow": {
+            "value": "Jaune"
+          }
+        },
+        "dimensionCapacity": {
+          "128gb": {
+            "value": "128 <small>Go<as-footnote data-id=\"bfdc3fa0145f0c58aa770d6d0542dbf2\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote></small>"
+          },
+          "256gb": {
+            "value": "256 <small>Go<as-footnote data-id=\"bfdc3fa0145f0c58aa770d6d0542dbf2\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote></small>"
+          },
+          "512gb": {
+            "value": "512 <small>Go<as-footnote data-id=\"bfdc3fa0145f0c58aa770d6d0542dbf2\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote></small>"
+          }
+        },
+        "dimensionConnection": {
+          "wifi": {
+            "value": "Wi-Fi<div class=\"form-label-small\">Tous les modèles d’iPad peuvent se connecter aux réseaux Wi-Fi pour vous permettre de garder le contact.&nbsp;</div>"
+          },
+          "wificell": {
+            "value": "Wi-Fi + Cellular<div class=\"form-label-small\">Le modèle Wi‑Fi&nbsp;+&nbsp;Cellular vous permet de disposer d’une connexion lorsque le réseau Wi‑Fi n’est pas disponible.</div>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "ipad",
+    "family": "ipad-mini",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MXN63NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MXN73NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MXN83NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MXN93NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MXNA3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MXNC3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MXND3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MXNE3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MXPN3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MXPP3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MXPQ3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MXPR3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "128gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MXPT3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MXPW3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MXPX3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MXPY3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "256gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MYGY3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MYH13NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MYH23NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MYH33NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wifi",
+          "dimensionColor": "purple"
+        },
+        {
+          "partNumber": "MYHC3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "space_gray"
+        },
+        {
+          "partNumber": "MYHD3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "blue"
+        },
+        {
+          "partNumber": "MYHE3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "starlight"
+        },
+        {
+          "partNumber": "MYHF3NF/A",
+          "familyType": "ipadmini_a17pro_2024",
+          "dimensionCapacity": "512gb",
+          "dimensionConnection": "wificell",
+          "dimensionColor": "purple"
+        }
+      ],
+      "displayValues": {
+        "dimensionColor": {
+          "blue": {
+            "value": "Bleu"
+          },
+          "purple": {
+            "value": "Violet"
+          },
+          "space_gray": {
+            "value": "Gris sidéral"
+          },
+          "starlight": {
+            "value": "Lumière&nbsp;stellaire"
+          }
+        },
+        "dimensionCapacity": {
+          "128gb": {
+            "value": "128 <small>Go<as-footnote data-id=\"e5a7a109be4b57ed5106570bd8020b91\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote></small>"
+          },
+          "256gb": {
+            "value": "256 <small>Go<as-footnote data-id=\"e5a7a109be4b57ed5106570bd8020b91\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote></small>"
+          },
+          "512gb": {
+            "value": "512 <small>Go<as-footnote data-id=\"e5a7a109be4b57ed5106570bd8020b91\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>2</sup></as-footnote></small>"
+          }
+        },
+        "dimensionConnection": {
+          "wifi": {
+            "value": "Wi-Fi<div class=\"form-label-small\">Tous les modèles d’iPad peuvent se connecter aux réseaux Wi-Fi pour vous permettre de garder le contact.&nbsp;</div>"
+          },
+          "wificell": {
+            "value": "Wi-Fi + Cellular<div class=\"form-label-small\">Le modèle Wi‑Fi&nbsp;+&nbsp;Cellular vous permet de disposer d’une connexion lorsque le réseau Wi‑Fi n’est pas disponible.</div>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "mac",
+    "family": "macbook-air",
+    "data": {
+      "products": [
+        {
+          "btrOrFdPartNumber": "MDH74FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "silver",
+            "processor-cpuCoreCount-gpuCoreCount": "10-8",
+            "chassis-dimensionScreensize": "13inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MDHA4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "starlight",
+            "processor-cpuCoreCount-gpuCoreCount": "10-8",
+            "chassis-dimensionScreensize": "13inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MDHE4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "midnight",
+            "processor-cpuCoreCount-gpuCoreCount": "10-8",
+            "chassis-dimensionScreensize": "13inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MDHH4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "skyblue",
+            "processor-cpuCoreCount-gpuCoreCount": "10-8",
+            "chassis-dimensionScreensize": "13inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MDV94FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "silver",
+            "processor-cpuCoreCount-gpuCoreCount": "10-10",
+            "chassis-dimensionScreensize": "15inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MDVD4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "starlight",
+            "processor-cpuCoreCount-gpuCoreCount": "10-10",
+            "chassis-dimensionScreensize": "15inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MDVH4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "midnight",
+            "processor-cpuCoreCount-gpuCoreCount": "10-10",
+            "chassis-dimensionScreensize": "15inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MDVQ4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "skyblue",
+            "processor-cpuCoreCount-gpuCoreCount": "10-10",
+            "chassis-dimensionScreensize": "15inch"
+          }
+        }
+      ],
+      "mainDisplayValues": {
+        "chassis-dimensionColor": {
+          "midnight": {
+            "header": "Minuit"
+          },
+          "silver": {
+            "header": "Argent"
+          },
+          "skyblue": {
+            "header": "Bleu ciel"
+          },
+          "starlight": {
+            "header": "Lumière&nbsp;stellaire"
+          }
+        },
+        "processor-cpuCoreCount-gpuCoreCount": {
+          "10-10": {
+            "header": "CPU 10&nbsp;cœurs, GPU 10&nbsp;cœurs, Neural&nbsp;Engine 16&nbsp;cœurs <div class=\"form-label-small\">Accélérez l’exécution des tâches exigeantes telles que le gaming et les projets créatifs grâce à une vitesse de traitement et de rendu graphique accrue.</div>"
+          },
+          "10-8": {
+            "header": "CPU 10&nbsp;cœurs, GPU 8&nbsp;cœurs, Neural&nbsp;Engine 16&nbsp;cœurs <div class=\"form-label-small\">Apporte rapidité et fluidité à tout ce que vous faites.</div>"
+          }
+        },
+        "chassis-dimensionScreensize": {
+          "13inch": {
+            "header": "13 pouces<as-footnote data-id=\"44f08ef71d826230346d1877a39f2b01\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          },
+          "15inch": {
+            "header": "15 pouces<as-footnote data-id=\"44f08ef71d826230346d1877a39f2b01\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "mac",
+    "family": "macbook-pro",
+    "data": {
+      "products": [
+        {
+          "btrOrFdPartNumber": "MDE14FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "spaceblack",
+            "processor-dimensionChip": "m5",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5-10-10",
+            "display-dimensionFinish": "standard",
+            "chassis-dimensionScreensize": "14inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MDE54FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "silver",
+            "processor-dimensionChip": "m5",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5-10-10",
+            "display-dimensionFinish": "standard",
+            "chassis-dimensionScreensize": "14inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MGDN4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "silver",
+            "processor-dimensionChip": "m5pro",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5pro-15-16",
+            "display-dimensionFinish": "standard",
+            "chassis-dimensionScreensize": "14inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MGDQ4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "silver",
+            "processor-dimensionChip": "m5max",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5max-18-32",
+            "display-dimensionFinish": "standard",
+            "chassis-dimensionScreensize": "14inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MGDR4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "spaceblack",
+            "processor-dimensionChip": "m5pro",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5pro-15-16",
+            "display-dimensionFinish": "standard",
+            "chassis-dimensionScreensize": "14inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MGDU4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "spaceblack",
+            "processor-dimensionChip": "m5max",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5max-18-32",
+            "display-dimensionFinish": "standard",
+            "chassis-dimensionScreensize": "14inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MGE44FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "silver",
+            "processor-dimensionChip": "m5pro",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5pro-18-20",
+            "display-dimensionFinish": "standard",
+            "chassis-dimensionScreensize": "16inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MGE74FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "silver",
+            "processor-dimensionChip": "m5max",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5max-18-32",
+            "display-dimensionFinish": "standard",
+            "chassis-dimensionScreensize": "16inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MGE94FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "silver",
+            "processor-dimensionChip": "m5max",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5max-18-40",
+            "display-dimensionFinish": "standard",
+            "chassis-dimensionScreensize": "16inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MGEA4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "spaceblack",
+            "processor-dimensionChip": "m5pro",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5pro-18-20",
+            "display-dimensionFinish": "standard",
+            "chassis-dimensionScreensize": "16inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MGED4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "spaceblack",
+            "processor-dimensionChip": "m5max",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5max-18-32",
+            "display-dimensionFinish": "standard",
+            "chassis-dimensionScreensize": "16inch"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MGEE4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "spaceblack",
+            "processor-dimensionChip": "m5max",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5max-18-40",
+            "display-dimensionFinish": "standard",
+            "chassis-dimensionScreensize": "16inch"
+          }
+        }
+      ],
+      "mainDisplayValues": {
+        "chassis-dimensionColor": {
+          "silver": {
+            "header": "Argent"
+          },
+          "spaceblack": {
+            "header": "Noir&nbsp;sidéral"
+          }
+        },
+        "processor-dimensionChip": {
+          "m5": {
+            "header": "Puce M5<div class=\"form-label-small\">Une vitesse inédite et de puissantes capacités d’IA embarquée pour les tâches personnelles, professionnelles et&nbsp;créatives que vous effectuez chaque&nbsp;jour.</div>"
+          },
+          "m5max": {
+            "header": "Puce M5&nbsp;Max<div class=\"form-label-small\">Notre puce la plus avancée à&nbsp;ce jour pour un ordinateur portable pro. Conçue pour gérer les workflows les plus extrêmes.</div>"
+          },
+          "m5pro": {
+            "header": "Puce M5&nbsp;Pro<div class=\"form-label-small\">Des performances accrues et des options de mémoire plus élevées pour les workflows les plus exigeants.</div>"
+          }
+        },
+        "processor-dimensionChip-cpuCoreCount-gpuCoreCount": {
+          "m5max-18-32": {
+            "header": "<span class=\"rf-dsupgrade-block\">CPU 18&nbsp;cœurs, </span><span class=\"rf-dsupgrade-block\">GPU 32&nbsp;cœurs</span>"
+          },
+          "m5max-18-40": {
+            "header": "<span class=\"rf-dsupgrade-block\">CPU 18&nbsp;cœurs, </span><span class=\"rf-dsupgrade-block\">GPU 40&nbsp;cœurs</span>\n<div class=\"form-label-small\">\n    Boostez votre vitesse de traitement et de rendu graphique, et optimisez l’exécution de tâches telles que les grands modèles de langage et la production de vidéos&nbsp;8K.</div>"
+          },
+          "m5pro-15-16": {
+            "header": "<span class=\"rf-dsupgrade-block\">CPU 15&nbsp;cœurs, </span><span class=\"rf-dsupgrade-block\">GPU 16&nbsp;cœurs</span>"
+          },
+          "m5pro-18-20": {
+            "header": "<span class=\"rf-dsupgrade-block\">CPU 18&nbsp;cœurs, </span><span class=\"rf-dsupgrade-block\">GPU 20&nbsp;cœurs</span>\n<div class=\"form-label-small\">\n    Boostez votre vitesse de traitement et de rendu graphique pour les tâches les plus exigeantes telles que le gaming, la programmation et les projets créatifs.\n</div>"
+          }
+        },
+        "display-dimensionFinish": {
+          "standard": {
+            "header": "Écran standard <div class=\"form-label-small\">Conçu pour garantir une réflectance faible et ainsi réduire les reflets, quel que soit votre environnement.</div>"
+          }
+        },
+        "chassis-dimensionScreensize": {
+          "14inch": {
+            "header": "14 pouces<as-footnote data-id=\"fa5423e6a3aa736ff5e090e8a14ea9fc\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote> <div class=\"form-label-small\">Disponible avec la puce&nbsp;M5, M5&nbsp;Pro ou M5&nbsp;Max.</div>"
+          },
+          "16inch": {
+            "header": "16 pouces<as-footnote data-id=\"fa5423e6a3aa736ff5e090e8a14ea9fc\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>1</sup></as-footnote> <div class=\"form-label-small\">Disponible avec la puce M5&nbsp;Pro ou M5&nbsp;Max.</div>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "mac",
+    "family": "macbook-neo",
+    "data": {
+      "products": [
+        {
+          "btrOrFdPartNumber": "MHFA4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "silver",
+            "storage-dimensionCapacity": "256gb",
+            "processor-cpuCoreCount-gpuCoreCount": "6-5"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MHFC4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "silver",
+            "storage-dimensionCapacity": "512gb",
+            "processor-cpuCoreCount-gpuCoreCount": "6-5"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MHFD4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "citrus",
+            "storage-dimensionCapacity": "256gb",
+            "processor-cpuCoreCount-gpuCoreCount": "6-5"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MHFE4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "citrus",
+            "storage-dimensionCapacity": "512gb",
+            "processor-cpuCoreCount-gpuCoreCount": "6-5"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MHFF4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "indigo",
+            "storage-dimensionCapacity": "256gb",
+            "processor-cpuCoreCount-gpuCoreCount": "6-5"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MHFG4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "indigo",
+            "storage-dimensionCapacity": "512gb",
+            "processor-cpuCoreCount-gpuCoreCount": "6-5"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MHFH4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "blush",
+            "storage-dimensionCapacity": "256gb",
+            "processor-cpuCoreCount-gpuCoreCount": "6-5"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MHFJ4FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "blush",
+            "storage-dimensionCapacity": "512gb",
+            "processor-cpuCoreCount-gpuCoreCount": "6-5"
+          }
+        }
+      ],
+      "mainDisplayValues": {
+        "chassis-dimensionColor": {
+          "blush": {
+            "header": "Rose poudré"
+          },
+          "citrus": {
+            "header": "Jaune agrume"
+          },
+          "indigo": {
+            "header": "Indigo"
+          },
+          "silver": {
+            "header": "Argent"
+          }
+        },
+        "storage-dimensionCapacity": {
+          "256gb": {
+            "header": "256&nbsp;Go\nMagic&nbsp;Keyboard"
+          },
+          "512gb": {
+            "header": "512&nbsp;Go\nMagic Keyboard avec Touch&nbsp;ID"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "mac",
+    "family": "imac",
+    "data": {
+      "products": [
+        {
+          "btrOrFdPartNumber": "MWUC3FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "silver",
+            "processor-cpuCoreCount-gpuCoreCount": "8-8"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MWUE3FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "green",
+            "processor-cpuCoreCount-gpuCoreCount": "8-8"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MWUF3FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "blue",
+            "processor-cpuCoreCount-gpuCoreCount": "8-8"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MWUG3FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "pink",
+            "processor-cpuCoreCount-gpuCoreCount": "8-8"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MWUU3FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "silver",
+            "processor-cpuCoreCount-gpuCoreCount": "10-10"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MWUY3FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "green",
+            "processor-cpuCoreCount-gpuCoreCount": "10-10"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MWV13FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "blue",
+            "processor-cpuCoreCount-gpuCoreCount": "10-10"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MWV43FN/A",
+          "dimensions": {
+            "chassis-dimensionColor": "pink",
+            "processor-cpuCoreCount-gpuCoreCount": "10-10"
+          }
+        }
+      ],
+      "mainDisplayValues": {
+        "chassis-dimensionColor": {
+          "blue": {
+            "header": "Bleu"
+          },
+          "green": {
+            "header": "Vert"
+          },
+          "pink": {
+            "header": "Rose"
+          },
+          "silver": {
+            "header": "Argent"
+          }
+        },
+        "processor-cpuCoreCount-gpuCoreCount": {
+          "10-10": {
+            "header": "Puce M4 avec quatre ports Thunderbolt<div class=\"form-label-small\">CPU 10&nbsp;cœurs, GPU 10&nbsp;cœurs, Neural&nbsp;Engine 16&nbsp;cœurs</div>"
+          },
+          "8-8": {
+            "header": "Puce M4 avec deux ports Thunderbolt<div class=\"form-label-small\">CPU 8&nbsp;cœurs, GPU 8&nbsp;cœurs, Neural&nbsp;Engine 16&nbsp;cœurs</div>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "mac",
+    "family": "mac-mini",
+    "data": {
+      "products": [
+        {
+          "btrOrFdPartNumber": "MHQK4ZD/A",
+          "dimensions": {
+            "processor-dimensionChip": "m6",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m6-12-12"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MHQN4ZD/A",
+          "dimensions": {
+            "processor-dimensionChip": "m5pro",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5pro-15-16"
+          }
+        }
+      ],
+      "mainDisplayValues": {
+        "processor-dimensionChip": {
+          "m5pro": {
+            "header": "Puce M5&nbsp;Pro <div class=\"form-label-small\">Des performances accrues et des options de mémoire plus élevées pour les workflows exigeants.</div>"
+          },
+          "m6": {
+            "header": "Puce M6 <div class=\"form-label-small\">Ultra-rapide, offrant des performances de pointe pour les tâches personnelles, professionnelles et créatives que vous effectuez chaque&nbsp;jour.</div>"
+          }
+        },
+        "processor-dimensionChip-cpuCoreCount-gpuCoreCount": {
+          "m5pro-15-16": {
+            "header": "<span class=\"rf-dsupgrade-block\">CPU 15&nbsp;cœurs,  </span><span class=\"rf-dsupgrade-block\">GPU 16&nbsp;cœurs</span>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "mac",
+    "family": "mac-studio",
+    "data": {
+      "products": [
+        {
+          "btrOrFdPartNumber": "MHL64ZD/A",
+          "dimensions": {
+            "processor-dimensionChip": "m5max",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5max-18-32"
+          }
+        },
+        {
+          "btrOrFdPartNumber": "MHL74ZD/A",
+          "dimensions": {
+            "processor-dimensionChip": "m5ultra",
+            "processor-dimensionChip-cpuCoreCount-gpuCoreCount": "m5ultra-30-64"
+          }
+        }
+      ],
+      "mainDisplayValues": {
+        "processor-dimensionChip": {
+          "m5max": {
+            "header": "Puce M5&nbsp;Max <div class=\"form-label-small\">Vitesse et performances remarquables pour les projets créatifs et les workflows pro.</div>"
+          },
+          "m5ultra": {
+            "header": "Puce M5&nbsp;Ultra <div class=\"form-label-small\">Notre puce la plus puissante, offrant des performances sans précédent pour les workflows pro les plus exigeants.</div>"
+          }
+        },
+        "processor-dimensionChip-cpuCoreCount-gpuCoreCount": {
+          "m5max-18-32": {
+            "header": "<span class=\"rf-dsupgrade-block\">CPU 18&nbsp;cœurs,  </span><span class=\"rf-dsupgrade-block\">GPU 32&nbsp;cœurs</span>"
+          },
+          "m5ultra-30-64": {
+            "header": "<span class=\"rf-dsupgrade-block\">CPU 30&nbsp;cœurs,  </span><span class=\"rf-dsupgrade-block\">GPU 64&nbsp;cœurs</span>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "mac",
+    "family": "studio-display",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MFEW4FD/A",
+          "familyType": "studiodisplay",
+          "dimensionFinish": "glossy",
+          "dimensionStandType": "tiltheightadjuststand"
+        },
+        {
+          "partNumber": "MFEX4FD/A",
+          "familyType": "studiodisplay",
+          "dimensionFinish": "glossy",
+          "dimensionStandType": "tiltadjuststand"
+        },
+        {
+          "partNumber": "MFEY4FD/A",
+          "familyType": "studiodisplay",
+          "dimensionFinish": "glossy",
+          "dimensionStandType": "vesa"
+        },
+        {
+          "partNumber": "MFF04FD/A",
+          "familyType": "studiodisplay",
+          "dimensionFinish": "matte",
+          "dimensionStandType": "tiltheightadjuststand"
+        },
+        {
+          "partNumber": "MFF14FD/A",
+          "familyType": "studiodisplay",
+          "dimensionFinish": "matte",
+          "dimensionStandType": "tiltadjuststand"
+        },
+        {
+          "partNumber": "MFF24FD/A",
+          "familyType": "studiodisplay",
+          "dimensionFinish": "matte",
+          "dimensionStandType": "vesa"
+        }
+      ],
+      "displayValues": {
+        "dimensionFinish": {
+          "glossy": {
+            "value": "Verre standard"
+          },
+          "matte": {
+            "value": "Verre nano-texturé"
+          }
+        },
+        "dimensionStandType": {
+          "tiltadjuststand": {
+            "value": "Support à inclinaison réglable"
+          },
+          "tiltheightadjuststand": {
+            "value": "Support à&nbsp;inclinaison et hauteur réglables"
+          },
+          "vesa": {
+            "value": "Kit de montage VESA<div class=\"form-label-small\"><span>Support non&nbsp;inclus</span></div>"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "mac",
+    "family": "studio-display-xdr",
+    "data": {
+      "products": [
+        {
+          "partNumber": "MFEL4FD/A",
+          "familyType": "studiodisplayxdr",
+          "dimensionStandType": "tiltheightadjuststand",
+          "dimensionFinish": "glossy"
+        },
+        {
+          "partNumber": "MFEN4FD/A",
+          "familyType": "studiodisplayxdr",
+          "dimensionStandType": "vesa",
+          "dimensionFinish": "glossy"
+        },
+        {
+          "partNumber": "MFEP4FD/A",
+          "familyType": "studiodisplayxdr",
+          "dimensionStandType": "tiltheightadjuststand",
+          "dimensionFinish": "matte"
+        },
+        {
+          "partNumber": "MFEQ4FD/A",
+          "familyType": "studiodisplayxdr",
+          "dimensionStandType": "vesa",
+          "dimensionFinish": "matte"
+        }
+      ],
+      "displayValues": {
+        "dimensionStandType": {
+          "tiltheightadjuststand": {
+            "value": "Support à&nbsp;inclinaison et hauteur réglables"
+          },
+          "vesa": {
+            "value": "Kit de montage VESA<div class=\"form-label-small\"><span>Support non&nbsp;inclus</span></div>"
+          }
+        },
+        "dimensionFinish": {
+          "glossy": {
+            "value": "Verre standard"
+          },
+          "matte": {
+            "value": "Verre nano-texturé"
+          }
+        }
+      }
+    }
+  },
+  {
+    "category": "watch",
+    "family": "apple-watch",
+    "data": {
+      "products": [
+        {
+          "part": "MJFN4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "space_gray",
+            "watch_cases-dimensionConnection": "gps"
+          }
+        },
+        {
+          "part": "MJFP4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "black",
+            "watch_cases-dimensionConnection": "gps"
+          }
+        },
+        {
+          "part": "MJFQ4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "lightgold",
+            "watch_cases-dimensionConnection": "gps"
+          }
+        },
+        {
+          "part": "MJFR4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "darkbronze",
+            "watch_cases-dimensionConnection": "gps"
+          }
+        },
+        {
+          "part": "MJFT4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "space_gray",
+            "watch_cases-dimensionConnection": "gps"
+          }
+        },
+        {
+          "part": "MJFU4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "black",
+            "watch_cases-dimensionConnection": "gps"
+          }
+        },
+        {
+          "part": "MJFV4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "lightgold",
+            "watch_cases-dimensionConnection": "gps"
+          }
+        },
+        {
+          "part": "MJFW4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "darkbronze",
+            "watch_cases-dimensionConnection": "gps"
+          }
+        },
+        {
+          "part": "MJJD4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "space_gray",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJE4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "black",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJF4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "lightgold",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJG4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "darkbronze",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJH4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "space_gray",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJJ4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "black",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJK4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "lightgold",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJL4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "darkbronze",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJM4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "titanium",
+            "watch_cases-dimensionColor": "natural",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJN4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "titanium",
+            "watch_cases-dimensionColor": "radiantgold",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJP4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "titanium",
+            "watch_cases-dimensionColor": "natural",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJQ4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "titanium",
+            "watch_cases-dimensionColor": "radiantgold",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJT4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "ceramic",
+            "watch_cases-dimensionColor": "pearlwhite",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJU4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "ceramic",
+            "watch_cases-dimensionColor": "nightblue",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJV4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "ceramic",
+            "watch_cases-dimensionColor": "pearlwhite",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MJJW4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "ceramic",
+            "watch_cases-dimensionColor": "nightblue",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        }
+      ],
+      "displayValues": {
+        "watch_cases-dimensionCaseSize": {
+          "42mm": {
+            "header": "42&nbsp;mm"
+          },
+          "46mm": {
+            "header": "46&nbsp;mm"
+          }
+        },
+        "watch_cases-dimensionCaseMaterial": {
+          "aluminum": {
+            "header": "<span class=\"badge badge-no-scrim badge-tiny\">Nouvelles finitions</span>\n<div>Aluminium</div>\n<span class=\"form-label-small\">Choix entre GPS et GPS&nbsp;+&nbsp;Cellular</span>"
+          },
+          "ceramic": {
+            "header": "<span class=\"badge badge-no-scrim badge-tiny\">Nouveau</span>\n<div>Céramique</div>\n<span class=\"form-label-small\">Connectivité GPS&nbsp;+&nbsp;Cellular</span>"
+          },
+          "titanium": {
+            "header": "<span class=\"badge badge-no-scrim badge-tiny\">Nouvelle finition</span>\n<div>Titane</div>\n<span class=\"form-label-small\">Connectivité GPS&nbsp;+&nbsp;Cellular</span>"
+          }
+        },
+        "watch_cases-dimensionColor": {
+          "black": {
+            "text": "Noir"
+          },
+          "darkbronze": {
+            "text": "Bronze sombre"
+          },
+          "lightgold": {
+            "text": "Or clair"
+          },
+          "natural": {
+            "text": "Naturel"
+          },
+          "nightblue": {
+            "text": "Bleu nuit"
+          },
+          "pearlwhite": {
+            "text": "Blanc nacré"
+          },
+          "radiantgold": {
+            "text": "Or brillant"
+          },
+          "space_gray": {
+            "text": "Gris sidéral"
+          }
+        },
+        "watch_cases-dimensionConnection": {
+          "gps": {
+            "header": "GPS<div class=\"form-label-small\">Passez des appels et envoyez des messages lorsque votre iPhone est à proximité.</div>"
+          },
+          "gpscell": {
+            "header": "GPS + Cellular<div class=\"form-label-small\">Passez des appels et échangez des messages, juste avec votre Apple&nbsp;Watch. Un modèle GPS&nbsp;+&nbsp;Cellular est nécessaire pour utiliser Apple&nbsp;Watch pour vos enfants<as-footnote data-id=\"d147341b8b9c64e2c751b340cce2f9d4\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>※※</sup></as-footnote>.</div>"
+          }
+        }
+      },
+      "companionPart": "MJVK4ZM/A"
+    }
+  },
+  {
+    "category": "watch",
+    "family": "apple-watch-se",
+    "data": {
+      "products": [
+        {
+          "part": "MEHV4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "40mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "starlight",
+            "watch_cases-dimensionConnection": "gps"
+          }
+        },
+        {
+          "part": "MEHX4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "40mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "midnight",
+            "watch_cases-dimensionConnection": "gps"
+          }
+        },
+        {
+          "part": "MEP04ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "44mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "starlight",
+            "watch_cases-dimensionConnection": "gps"
+          }
+        },
+        {
+          "part": "MEP34ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "44mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "midnight",
+            "watch_cases-dimensionConnection": "gps"
+          }
+        },
+        {
+          "part": "MEQ14ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "40mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "starlight",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MEQ24ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "40mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "midnight",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MEQ34ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "44mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "starlight",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        },
+        {
+          "part": "MEQ44ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "44mm",
+            "watch_cases-dimensionCaseMaterial": "aluminum",
+            "watch_cases-dimensionColor": "midnight",
+            "watch_cases-dimensionConnection": "gpscell"
+          }
+        }
+      ],
+      "displayValues": {
+        "watch_cases-dimensionCaseSize": {
+          "40mm": {
+            "header": "40&nbsp;mm"
+          },
+          "44mm": {
+            "header": "44&nbsp;mm"
+          }
+        },
+        "watch_cases-dimensionColor": {
+          "midnight": {
+            "text": "Minuit"
+          },
+          "starlight": {
+            "text": "Lumière stellaire"
+          }
+        },
+        "watch_cases-dimensionConnection": {
+          "gps": {
+            "header": "GPS<div class=\"form-label-small\">Passez des appels et envoyez des messages lorsque votre iPhone est à proximité.</div>"
+          },
+          "gpscell": {
+            "header": "GPS + Cellular<div class=\"form-label-small\">Passez des appels et échangez des messages, juste avec votre Apple&nbsp;Watch. Un modèle GPS&nbsp;+&nbsp;Cellular est nécessaire pour utiliser Apple&nbsp;Watch pour vos enfants<as-footnote data-id=\"d147341b8b9c64e2c751b340cce2f9d4\" data-assigned=\"true\"><sup data-autom=\"footnote-sub\" class=\"as-footnote\"><span class=\"visuallyhidden\">&nbsp;Note de bas de page&nbsp;</span>※</sup></as-footnote>.</div>"
+          }
+        }
+      },
+      "companionPart": "MJVK4ZM/A"
+    }
+  },
+  {
+    "category": "watch",
+    "family": "apple-watch-ultra",
+    "data": {
+      "products": [
+        {
+          "part": "MJCR4QF/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "49mm",
+            "watch_cases-dimensionColor": "natural"
+          }
+        },
+        {
+          "part": "MJCT4QF/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "49mm",
+            "watch_cases-dimensionColor": "black"
+          }
+        }
+      ],
+      "displayValues": {
+        "watch_cases-dimensionColor": {
+          "black": {
+            "text": "Noir"
+          },
+          "natural": {
+            "text": "Naturel"
+          }
+        }
+      },
+      "companionPart": "MKF24ZM/A"
+    }
+  },
+  {
+    "category": "watch",
+    "family": "apple-watch-hermes",
+    "data": {
+      "products": [
+        {
+          "part": "MJJX4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "titanium",
+            "watch_cases-dimensionColor": "radiantgold"
+          }
+        },
+        {
+          "part": "MJJY4ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "42mm",
+            "watch_cases-dimensionCaseMaterial": "titanium",
+            "watch_cases-dimensionColor": "silver"
+          }
+        },
+        {
+          "part": "MJK04ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "titanium",
+            "watch_cases-dimensionColor": "radiantgold"
+          }
+        },
+        {
+          "part": "MJK14ZR/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "46mm",
+            "watch_cases-dimensionCaseMaterial": "titanium",
+            "watch_cases-dimensionColor": "silver"
+          }
+        }
+      ],
+      "displayValues": {
+        "watch_cases-dimensionCaseSize": {
+          "42mm": {
+            "header": "42&nbsp;mm"
+          },
+          "46mm": {
+            "header": "46&nbsp;mm"
+          }
+        },
+        "watch_cases-dimensionColor": {
+          "radiantgold": {
+            "text": "Or brillant"
+          },
+          "silver": {
+            "text": "Argent"
+          }
+        }
+      },
+      "companionPart": "MJN84ZM/A"
+    }
+  },
+  {
+    "category": "watch",
+    "family": "apple-watch-hermes-ultra",
+    "data": {
+      "products": [
+        {
+          "part": "MJCY4QF/A",
+          "dimensions": {
+            "watch_cases-dimensionCaseSize": "49mm",
+            "watch_cases-dimensionColor": "natural"
+          }
+        }
+      ],
+      "displayValues": {
+        "watch_cases-dimensionColor": {
+          "natural": {
+            "text": "Naturel"
+          }
+        }
+      },
+      "companionPart": "ML414ZM/A"
+    }
+  }
+]

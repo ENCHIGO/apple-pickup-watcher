@@ -79,6 +79,24 @@ const EMBEDDED_PRODUCTS: &[(&str, &str)] = &[
     ("en_SG", include_str!("../data/products_en_SG.json")),
     ("en_AU", include_str!("../data/products_en_AU.json")),
     ("en_MY", include_str!("../data/products_en_MY.json")),
+    ("ko_KR", include_str!("../data/products_ko_KR.json")),
+    ("th_TH", include_str!("../data/products_th_TH.json")),
+    ("en_IN", include_str!("../data/products_en_IN.json")),
+    ("en_AE", include_str!("../data/products_en_AE.json")),
+    ("en_US", include_str!("../data/products_en_US.json")),
+    ("en_CA", include_str!("../data/products_en_CA.json")),
+    ("es_MX", include_str!("../data/products_es_MX.json")),
+    ("en_GB", include_str!("../data/products_en_GB.json")),
+    ("de_DE", include_str!("../data/products_de_DE.json")),
+    ("fr_FR", include_str!("../data/products_fr_FR.json")),
+    ("it_IT", include_str!("../data/products_it_IT.json")),
+    ("es_ES", include_str!("../data/products_es_ES.json")),
+    ("nl_NL", include_str!("../data/products_nl_NL.json")),
+    ("fr_BE", include_str!("../data/products_fr_BE.json")),
+    ("de_AT", include_str!("../data/products_de_AT.json")),
+    ("fr_CH", include_str!("../data/products_fr_CH.json")),
+    ("sv_SE", include_str!("../data/products_sv_SE.json")),
+    ("tr_TR", include_str!("../data/products_tr_TR.json")),
 ];
 
 /// 内嵌的离线门店快照。所有地区都在这一个文件里。
@@ -567,6 +585,9 @@ struct RawAddress {
     state_name: String,
     #[serde(default)]
     postal_code: String,
+    /// 州的缩写（美国 `CA`、加拿大 `ON`）；多数地区是 null。
+    #[serde(default)]
+    state_code: Option<String>,
 }
 
 /// 解析内嵌门店快照，返回按地区分组的门店表。
@@ -596,6 +617,19 @@ fn load_stores(text: &str) -> Result<HashMap<String, Vec<Store>>, CatalogError> 
         }
         for raw in &region.stores {
             push_store(&mut stores, &mut seen, raw, region.has_states, "");
+        }
+
+        // 同城门店共用第一家店的邮编，见 Store::city_postal_code。按城市分，不按
+        // 省 / 州：英国的伦敦门店分在 Central London 和 Greater London 两组。
+        let mut first_postal: HashMap<String, String> = HashMap::new();
+        for store in &mut stores {
+            let postal = first_postal
+                .entry(store.city.clone())
+                .or_insert_with(|| store.postal_code.clone());
+            if postal.is_empty() {
+                *postal = store.postal_code.clone();
+            }
+            store.city_postal_code = postal.clone();
         }
 
         result.insert(region.locale.clone(), stores);
@@ -663,6 +697,14 @@ fn push_store(
         city: raw.address.city.trim().to_string(),
         state: state.to_string(),
         postal_code: raw.address.postal_code.trim().to_string(),
+        state_code: raw
+            .address
+            .state_code
+            .as_deref()
+            .unwrap_or_default()
+            .trim()
+            .to_string(),
+        city_postal_code: String::new(),
     });
 }
 

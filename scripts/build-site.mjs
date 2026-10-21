@@ -179,7 +179,7 @@ await writeFile(new URL("llms.txt", output), `# Apple Pickup Watcher
 ## Facts and limitations
 
 - Products: iPhone, iPad, Mac and Apple Watch. Individual models depend on the app catalog.
-- Regions: China mainland, Hong Kong, Taiwan, Japan, Singapore, Australia and Malaysia.
+- Regions: China mainland, Hong Kong, Taiwan, Japan, South Korea, Singapore, Malaysia, Thailand, India, UAE, Australia, United States, Canada, Mexico, United Kingdom, Germany, France, Italy, Spain, Netherlands, Belgium, Austria, Switzerland, Sweden and Türkiye (25 regions).
 - Platforms: macOS (Apple Silicon and Intel), Windows x64 and Linux x86_64.
 - Alerts: desktop notification, sound and optional Bark push. The app must stay running; the computer must stay awake and online.
 - Unknown or failed queries are not out-of-stock results. HTTP 541 alone does not establish its cause or inventory status.
