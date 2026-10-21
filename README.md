@@ -123,8 +123,8 @@ apw watch    --targets targets.json --until-in-stock --timeout 300          # �
 
 ## 支持范围
 
-- **品类**：iPhone（18 Pro / 18 Pro Max、Duo、17、Air）· iPad（Pro、Air、iPad、mini）· Mac（MacBook Air / Pro / Neo、iMac、Mac mini、Mac Studio、Studio Display）· Apple Watch（Series、SE、Ultra、Hermès）
-- **地区**：中国大陆 · 中国香港 · 中国台湾 · 日本 · 新加坡 · 澳大利亚 · 马来西亚
+- **品类**：iPhone（18 Pro / 18 Pro Max、Duo、17、Air、17e、16）· iPad（Pro、Air、iPad、mini）· Mac（MacBook Air / Pro / Neo、iMac、Mac mini、Mac Studio、Studio Display）· Apple Watch（Series、SE、Ultra、Hermès）
+- **地区**：中国大陆 · 中国香港 · 中国台湾 · 日本 · 韩国 · 新加坡 · 马来西亚 · 泰国 · 印度 · 阿联酋 · 澳大利亚 · 美国 · 加拿大 · 墨西哥 · 英国 · 德国 · 法国 · 意大利 · 西班牙 · 荷兰 · 比利时 · 奥地利 · 瑞士 · 瑞典 · 土耳其，共 25 个。巴西和中国澳门有直营店，但官网不提供到店取货查询，暂不支持。
 - **平台**：macOS（Apple Silicon / Intel）· Windows x64 · Linux x86_64
 
 具体型号和门店取决于内置目录与当地 Apple 在线商店；新增购买页的机型需要更新程序。支持某地区不代表每次查询都能成功。Apple Watch 按表壳监控，查询时会自动附带同页的一条表带零件号，因为 Apple 的取货接口只把「表壳 + 表带」当作可售组合（[说明](docs/desktop.md#apple-watch-按表壳监控)）。

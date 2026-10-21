@@ -32,7 +32,7 @@ fn offline_discovery_and_search_work_from_an_unrelated_directory() {
         .output()
         .unwrap();
     let regions = result(&output);
-    assert_eq!(regions["regions"].as_array().unwrap().len(), 7);
+    assert_eq!(regions["regions"].as_array().unwrap().len(), 25);
     let stores = result(&run(&["stores", "--locale", "zh_CN", "--search", "r359"]));
     assert_eq!(stores["stores"].as_array().unwrap().len(), 1);
     assert_eq!(stores["stores"][0]["number"], "R359");
@@ -65,7 +65,7 @@ fn schema_is_machine_readable_and_matches_discovered_commands() {
             .as_array()
             .unwrap()
             .len(),
-        7
+        25
     );
     for command in ["regions", "stores", "products", "check", "watch", "schema"] {
         assert!(
@@ -87,7 +87,7 @@ fn invalid_arguments_have_json_stderr_and_empty_stdout() {
         vec!["watch", "--interval", "1"],
         vec!["check", "--timeout", "0"],
         vec!["products", "--refresh"],
-        vec!["stores", "--locale", "de_DE"],
+        vec!["stores", "--locale", "pt_BR"],
         vec!["check", "--targets", "/apw-nonexistent-targets.json"],
         vec!["invalid-command"],
     ] {
@@ -146,7 +146,7 @@ fn exact_ids_are_validated_but_new_skus_are_not_rejected_by_stale_catalog() {
     assert_eq!(targets[0].product_name, "NEW123CH/A");
     assert_eq!(targets[0].store_title, "R999999");
     for bad in [
-        json!({"locale":"de_DE", "storeNumber":"R359", "partNumber":"MWUC3CH/A"}),
+        json!({"locale":"pt_BR", "storeNumber":"R359", "partNumber":"MWUC3CH/A"}),
         json!({"locale":"zh_CN", "storeNumber":"上海", "partNumber":"MWUC3CH/A"}),
         json!({"locale":"zh_CN", "storeNumber":"R359", "partNumber":"a|b"}),
         json!({"locale":"zh_CN", "storeNumber":"R359", "partNumber":"/A"}),

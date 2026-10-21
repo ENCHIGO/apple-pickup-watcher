@@ -678,7 +678,7 @@ async fn 地区认不出来时登记为故障而不是静默跳过() {
         FakeFetcher::new(|_, store, parts| Ok(ok_response(store, parts, Availability::InStock)));
     let (w, mut rx) = Watcher::spawn(fake.clone(), fast_config());
     let mut bad = target("R683", "MG724CH/A");
-    bad.locale = "de_DE".into();
+    bad.locale = "pt_BR".into();
     w.set_targets(vec![bad]).await;
     w.start().await;
     let events = wait_cycle(&mut rx).await;
@@ -688,7 +688,7 @@ async fn 地区认不出来时登记为故障而不是静默跳过() {
     let snap = w.snapshot().await;
     match &snap[0].availability {
         Availability::Unknown(UnknownReason::SchemaDrift { raw, .. }) => {
-            assert!(raw.contains("de_DE"));
+            assert!(raw.contains("pt_BR"));
         }
         other => panic!("无效地区应当登记成故障，实际为 {other:?}"),
     }

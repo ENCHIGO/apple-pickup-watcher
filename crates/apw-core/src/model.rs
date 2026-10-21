@@ -237,6 +237,23 @@ impl Region {
             "zh_HK" => "zh-HK,zh;q=0.9",
             "zh_TW" => "zh-TW,zh;q=0.9",
             "ja_JP" => "ja-JP,ja;q=0.9",
+            "ko_KR" => "ko-KR,ko;q=0.9",
+            "th_TH" => "th-TH,th;q=0.9",
+            "en_IN" => "en-IN,en;q=0.9",
+            "en_AE" => "en-AE,en;q=0.9",
+            "en_CA" => "en-CA,en;q=0.9",
+            "es_MX" => "es-MX,es;q=0.9",
+            "en_GB" => "en-GB,en;q=0.9",
+            "de_DE" => "de-DE,de;q=0.9",
+            "fr_FR" => "fr-FR,fr;q=0.9",
+            "it_IT" => "it-IT,it;q=0.9",
+            "es_ES" => "es-ES,es;q=0.9",
+            "nl_NL" => "nl-NL,nl;q=0.9",
+            "fr_BE" => "fr-BE,fr;q=0.9",
+            "de_AT" => "de-AT,de;q=0.9",
+            "fr_CH" => "fr-CH,fr;q=0.9",
+            "sv_SE" => "sv-SE,sv;q=0.9",
+            "tr_TR" => "tr-TR,tr;q=0.9",
             _ => "en-US,en;q=0.9",
         }
     }
@@ -247,8 +264,9 @@ impl Region {
 /// 新机型发布后只需在这里追加一行，商品目录会自动从 Apple 官网抓取，
 /// 不必像上游那样每代都手工从开发者工具里复制 `productSelectionData`。
 ///
-/// 七个地区共用同一张表：实测这些 slug 在每个站点都存在（见
-/// `tests/live.rs` 里的契约测试）。某个地区少了其中一页也不至于出事 ——
+/// 大多数地区共用同一张表：实测这些 slug 在这些站点都存在（见
+/// `tests/live.rs` 里的契约测试）；不卖 Hermès 表款的地区用 [`WITHOUT_HERMES`]。
+/// 某个地区少了其中一页也不至于出事 ——
 /// [`crate::catalog::Catalog::refresh_products`] 会保住其余页的结果，
 /// 只把失败的那几页报出来。
 const DEFAULT_FAMILIES: &[Family] = &[
@@ -352,6 +370,13 @@ const DEFAULT_FAMILIES: &[Family] = &[
     },
 ];
 
+/// 去掉 Hermès 两页的购买页表。
+///
+/// 印度、荷兰、比利时、奥地利、土耳其的官网不卖 Hermès 表款，那两页会跳回
+/// Apple Watch 首页（2026-10-21 实测）；留着它们，每次刷新都会报两页失败。
+/// 依赖 Hermès 两页排在 [`DEFAULT_FAMILIES`] 末尾，由测试钉住。
+const WITHOUT_HERMES: &[Family] = DEFAULT_FAMILIES.split_at(DEFAULT_FAMILIES.len() - 2).0;
+
 /// 内置地区表。
 ///
 /// 每个 `base_url` 都经过实际请求验证：以 `/shop/retail/pickup-message` 查询该地区
@@ -398,6 +423,114 @@ pub const REGIONS: &[Region] = &[
         locale: "en_MY",
         base_url: "https://www.apple.com/my",
         families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "대한민국",
+        locale: "ko_KR",
+        base_url: "https://www.apple.com/kr",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "ประเทศไทย",
+        locale: "th_TH",
+        base_url: "https://www.apple.com/th",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "India",
+        locale: "en_IN",
+        base_url: "https://www.apple.com/in",
+        families: WITHOUT_HERMES,
+    },
+    Region {
+        title: "United Arab Emirates",
+        locale: "en_AE",
+        base_url: "https://www.apple.com/ae",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "United States",
+        locale: "en_US",
+        base_url: "https://www.apple.com",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "Canada",
+        locale: "en_CA",
+        base_url: "https://www.apple.com/ca",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "México",
+        locale: "es_MX",
+        base_url: "https://www.apple.com/mx",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "United Kingdom",
+        locale: "en_GB",
+        base_url: "https://www.apple.com/uk",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "Deutschland",
+        locale: "de_DE",
+        base_url: "https://www.apple.com/de",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "France",
+        locale: "fr_FR",
+        base_url: "https://www.apple.com/fr",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "Italia",
+        locale: "it_IT",
+        base_url: "https://www.apple.com/it",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "España",
+        locale: "es_ES",
+        base_url: "https://www.apple.com/es",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "Nederland",
+        locale: "nl_NL",
+        base_url: "https://www.apple.com/nl",
+        families: WITHOUT_HERMES,
+    },
+    Region {
+        title: "Belgique",
+        locale: "fr_BE",
+        base_url: "https://www.apple.com/be-fr",
+        families: WITHOUT_HERMES,
+    },
+    Region {
+        title: "Österreich",
+        locale: "de_AT",
+        base_url: "https://www.apple.com/at",
+        families: WITHOUT_HERMES,
+    },
+    Region {
+        title: "Suisse",
+        locale: "fr_CH",
+        base_url: "https://www.apple.com/ch-fr",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "Sverige",
+        locale: "sv_SE",
+        base_url: "https://www.apple.com/se",
+        families: DEFAULT_FAMILIES,
+    },
+    Region {
+        title: "Türkiye",
+        locale: "tr_TR",
+        base_url: "https://www.apple.com/tr",
+        families: WITHOUT_HERMES,
     },
 ];
 
@@ -461,6 +594,13 @@ pub struct Store {
     /// 邮编，缺失为空。
     #[serde(skip)]
     pub postal_code: String,
+    /// 州的缩写，取数据源的 `address.stateCode`，如美国的 `CA`；缺失为空。
+    #[serde(skip)]
+    pub state_code: String,
+    /// 同城第一家店的邮编，由目录加载时补上；同城门店共用它，才能合并成一次
+    /// 按地点的查询（各店自己的邮编都不一样）。缺失为空。
+    #[serde(skip)]
+    pub city_postal_code: String,
 }
 
 impl Store {
@@ -476,6 +616,14 @@ impl Store {
     /// - 香港：「香港」；台湾、澳大利亚、马来西亚：城市名；新加坡：「Singapore」；
     /// - 日本：接口要求「市区町村或邮编」，数据源的城市是英文区名，用邮编最稳。
     ///
+    /// 2026-10-21 新增的地区：
+    /// - 美国、加拿大：`城市, 州缩写`。美国有同名城市分属几个州（Glendale 在
+    ///   加州、亚利桑那、威斯康星各有一家店），只写城市会查到别处；
+    /// - 韩国、泰国、墨西哥、英国、德国、法国、意大利、比利时、土耳其：接口不认
+    ///   英文城市名（「London」「Seoul」都返回零家店），认邮编。用同城第一家店的
+    ///   邮编，同城门店仍然合并成一次请求；实测响应覆盖了同城所有门店；
+    /// - 印度、阿联酋、西班牙、荷兰、奥地利、瑞士、瑞典：城市名。
+    ///
     /// 拼不出来返回 `None`，调用方退回按门店逐家查询。
     pub fn pickup_location(&self, locale: &str) -> Option<String> {
         let city = self.city.trim();
@@ -485,6 +633,15 @@ impl Store {
         match locale {
             "zh_CN" => (!state.is_empty() && !city.is_empty()).then(|| format!("{state} {city}")),
             "ja_JP" => pick(postal).or_else(|| pick(city)),
+            "en_US" | "en_CA" => {
+                let code = self.state_code.trim();
+                match (city.is_empty(), code.is_empty()) {
+                    (false, false) => Some(format!("{city}, {code}")),
+                    _ => pick(postal).or_else(|| pick(city)),
+                }
+            }
+            "ko_KR" | "th_TH" | "es_MX" | "en_GB" | "de_DE" | "fr_FR" | "it_IT" | "fr_BE"
+            | "tr_TR" => pick(self.city_postal_code.trim()).or_else(|| pick(postal)),
             _ => pick(city).or_else(|| pick(postal)),
         }
     }
@@ -557,6 +714,18 @@ mod tests {
     }
 
     #[test]
+    fn 不卖爱马仕的地区只少爱马仕两页() {
+        let kept: Vec<&str> = WITHOUT_HERMES.iter().map(|f| f.slug).collect();
+        let expected: Vec<&str> = DEFAULT_FAMILIES
+            .iter()
+            .map(|f| f.slug)
+            .filter(|slug| !slug.starts_with("apple-watch-hermes"))
+            .collect();
+        assert_eq!(kept, expected);
+        assert_eq!(kept.len() + 2, DEFAULT_FAMILIES.len());
+    }
+
+    #[test]
     fn 尚未查询不算故障() {
         assert!(!UnknownReason::NotYetChecked.is_failure());
         assert!(UnknownReason::RateLimited.is_failure());
@@ -587,7 +756,7 @@ mod tests {
 
     #[test]
     fn 地区表里每个站点都能拼出接口地址() {
-        assert_eq!(REGIONS.len(), 7);
+        assert_eq!(REGIONS.len(), 25);
         let cn = region_by_locale("zh_CN").expect("地区表里应当有中国大陆");
         assert_eq!(
             cn.pickup_message_url(),
@@ -595,7 +764,7 @@ mod tests {
         );
         // 中国大陆用独立域名，不能是 apple.com/cn —— 那正是上游拼错的地方。
         assert!(!cn.base_url.contains("apple.com/cn"));
-        assert!(region_by_locale("de_DE").is_none());
+        assert!(region_by_locale("pt_BR").is_none());
 
         for r in REGIONS {
             assert!(

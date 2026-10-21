@@ -123,8 +123,8 @@ apw watch    --targets targets.json --until-in-stock --timeout 300          # ke
 
 ## What’s covered
 
-- **Products**: iPhone (18 Pro / 18 Pro Max, Duo, 17, Air) · iPad (Pro, Air, iPad, mini) · Mac (MacBook Air / Pro / Neo, iMac, Mac mini, Mac Studio, Studio Display) · Apple Watch (Series, SE, Ultra, Hermès)
-- **Regions**: China mainland · Hong Kong · Taiwan · Japan · Singapore · Australia · Malaysia
+- **Products**: iPhone (18 Pro / 18 Pro Max, Duo, 17, Air, 17e, 16) · iPad (Pro, Air, iPad, mini) · Mac (MacBook Air / Pro / Neo, iMac, Mac mini, Mac Studio, Studio Display) · Apple Watch (Series, SE, Ultra, Hermès)
+- **Regions**: China mainland · Hong Kong · Taiwan · Japan · South Korea · Singapore · Malaysia · Thailand · India · UAE · Australia · United States · Canada · Mexico · United Kingdom · Germany · France · Italy · Spain · Netherlands · Belgium · Austria · Switzerland · Sweden · Türkiye (25 in total). Brazil and Macao have Apple Stores but no online pickup lookup, so they are not supported yet.
 - **Platforms**: macOS (Apple Silicon / Intel) · Windows x64 · Linux x86_64
 
 The exact models and stores depend on the built-in catalog and the regional Apple online store; models on newly added buy pages require an app update. Region support does not guarantee that every query succeeds. Apple Watch is monitored by case: each query automatically includes one band part number from the same buy page, because Apple’s pickup endpoint only treats “case + band” as a sellable kit ([details](docs/desktop.md#apple-watch-按表壳监控)).
