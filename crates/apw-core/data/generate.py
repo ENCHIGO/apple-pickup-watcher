@@ -7,6 +7,7 @@ crates/apw-core/src/apple_catalog.rs）。上游是把 productSelectionData 手�
 这个脚本把那一步变成可重复的操作。
 
     python3 crates/apw-core/data/generate.py              # 重新抓取并写入
+    python3 crates/apw-core/data/generate.py ko_KR en_US  # 只重抓这几个地区
     python3 crates/apw-core/data/generate.py --self-test  # 不联网，自检解析口径
 
 输出的每个元素是「一页购买页」：
@@ -32,17 +33,6 @@ UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
 )
-
-# 与 crates/apw-core/src/model.rs 的 REGIONS 保持一致。
-REGIONS = {
-    "zh_CN": ("https://www.apple.com.cn", "zh-CN,zh;q=0.9"),
-    "zh_HK": ("https://www.apple.com/hk-zh", "zh-HK,zh;q=0.9"),
-    "zh_TW": ("https://www.apple.com/tw", "zh-TW,zh;q=0.9"),
-    "ja_JP": ("https://www.apple.com/jp", "ja-JP,ja;q=0.9"),
-    "en_SG": ("https://www.apple.com/sg", "en-US,en;q=0.9"),
-    "en_AU": ("https://www.apple.com/au", "en-US,en;q=0.9"),
-    "en_MY": ("https://www.apple.com/my", "en-US,en;q=0.9"),
-}
 
 # 与 crates/apw-core/src/model.rs 的 DEFAULT_FAMILIES 保持一致。
 FAMILIES = [
@@ -71,6 +61,39 @@ FAMILIES = [
     ("watch", "apple-watch-hermes-ultra"),
 ]
 
+# 与 model.rs 的 WITHOUT_HERMES 一致：这些地区的官网不卖 Hermès 表款，
+# 购买页会跳回 Apple Watch 首页。
+WITHOUT_HERMES = [f for f in FAMILIES if not f[1].startswith("apple-watch-hermes")]
+
+# 与 crates/apw-core/src/model.rs 的 REGIONS 保持一致：locale -> (站点, Accept-Language, 购买页)。
+REGIONS = {
+    "zh_CN": ("https://www.apple.com.cn", "zh-CN,zh;q=0.9", FAMILIES),
+    "zh_HK": ("https://www.apple.com/hk-zh", "zh-HK,zh;q=0.9", FAMILIES),
+    "zh_TW": ("https://www.apple.com/tw", "zh-TW,zh;q=0.9", FAMILIES),
+    "ja_JP": ("https://www.apple.com/jp", "ja-JP,ja;q=0.9", FAMILIES),
+    "en_SG": ("https://www.apple.com/sg", "en-US,en;q=0.9", FAMILIES),
+    "en_AU": ("https://www.apple.com/au", "en-US,en;q=0.9", FAMILIES),
+    "en_MY": ("https://www.apple.com/my", "en-US,en;q=0.9", FAMILIES),
+    "ko_KR": ("https://www.apple.com/kr", "ko-KR,ko;q=0.9", FAMILIES),
+    "th_TH": ("https://www.apple.com/th", "th-TH,th;q=0.9", FAMILIES),
+    "en_IN": ("https://www.apple.com/in", "en-IN,en;q=0.9", WITHOUT_HERMES),
+    "en_AE": ("https://www.apple.com/ae", "en-AE,en;q=0.9", FAMILIES),
+    "en_US": ("https://www.apple.com", "en-US,en;q=0.9", FAMILIES),
+    "en_CA": ("https://www.apple.com/ca", "en-CA,en;q=0.9", FAMILIES),
+    "es_MX": ("https://www.apple.com/mx", "es-MX,es;q=0.9", FAMILIES),
+    "en_GB": ("https://www.apple.com/uk", "en-GB,en;q=0.9", FAMILIES),
+    "de_DE": ("https://www.apple.com/de", "de-DE,de;q=0.9", FAMILIES),
+    "fr_FR": ("https://www.apple.com/fr", "fr-FR,fr;q=0.9", FAMILIES),
+    "it_IT": ("https://www.apple.com/it", "it-IT,it;q=0.9", FAMILIES),
+    "es_ES": ("https://www.apple.com/es", "es-ES,es;q=0.9", FAMILIES),
+    "nl_NL": ("https://www.apple.com/nl", "nl-NL,nl;q=0.9", WITHOUT_HERMES),
+    "fr_BE": ("https://www.apple.com/be-fr", "fr-BE,fr;q=0.9", WITHOUT_HERMES),
+    "de_AT": ("https://www.apple.com/at", "de-AT,de;q=0.9", WITHOUT_HERMES),
+    "fr_CH": ("https://www.apple.com/ch-fr", "fr-CH,fr;q=0.9", FAMILIES),
+    "sv_SE": ("https://www.apple.com/se", "sv-SE,sv;q=0.9", FAMILIES),
+    "tr_TR": ("https://www.apple.com/tr", "tr-TR,tr;q=0.9", WITHOUT_HERMES),
+}
+
 BUY_PATH = {"iphone": "buy-iphone", "ipad": "buy-ipad", "mac": "buy-mac", "watch": "buy-watch"}
 
 MARKER = b"PRODUCT_SELECTION_BOOTSTRAP"
@@ -81,6 +104,7 @@ BAND_MARKER = b"bandSelectionBootstrap"
 # 请求之间的最小间隔。抓的是公开页面，但没有理由把自己送进风控。
 DELAY_SECONDS = 1.5
 RETRIES = 3
+RATE_LIMIT_PAUSE = 180
 
 
 def fetch(url: str, accept_language: str) -> bytes:
@@ -484,14 +508,21 @@ def self_test() -> int:
     return 0
 
 
-def main() -> int:
+def main(only: list) -> int:
     here = Path(__file__).resolve().parent
     failed = []
 
-    for locale, (base, accept_language) in REGIONS.items():
+    unknown = [locale for locale in only if locale not in REGIONS]
+    if unknown:
+        print(f"未知地区：{'、'.join(unknown)}", file=sys.stderr)
+        return 2
+
+    for locale, (base, accept_language, families) in REGIONS.items():
+        if only and locale not in only:
+            continue
         pages = []
         broken = False
-        for category, slug in FAMILIES:
+        for category, slug in families:
             url = f"{base}/shop/{BUY_PATH[category]}/{slug}"
             data, page = None, b""
             for attempt in range(RETRIES):
@@ -500,6 +531,9 @@ def main() -> int:
                     data = extract(page)
                 except (urllib.error.URLError, OSError) as err:
                     print(f"  {slug}: {err}", file=sys.stderr)
+                    if getattr(err, "code", None) == 541:
+                        # 541 是 Apple 按 IP 限流，几秒后重试只会继续 541。
+                        time.sleep(RATE_LIMIT_PAUSE)
                 if data is not None:
                     break
                 time.sleep(DELAY_SECONDS * (attempt + 2))
@@ -570,4 +604,5 @@ def main() -> int:
 if __name__ == "__main__":
     if "--self-test" in sys.argv:
         raise SystemExit(self_test())
-    raise SystemExit(main())
+    # 可以只给几个 locale，只重抓这几个地区：全量要一个多小时。
+    raise SystemExit(main([arg for arg in sys.argv[1:] if not arg.startswith("-")]))

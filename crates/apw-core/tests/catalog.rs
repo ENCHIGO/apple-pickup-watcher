@@ -47,9 +47,9 @@ const SELECTION: &str = r#"{
 // ---- 内嵌数据 ----
 
 #[test]
-fn 七个地区都能从内嵌数据读出商品与门店() {
+fn 每个地区都能从内嵌数据读出商品与门店() {
     let catalog = Catalog::new();
-    assert_eq!(REGIONS.len(), 7);
+    assert_eq!(REGIONS.len(), 25);
 
     for region in REGIONS {
         let products = catalog
@@ -233,7 +233,7 @@ fn 找不到时返回空值而不是崩掉() {
 fn 未知地区一律返回错误而不是崩掉() {
     let catalog = Catalog::new();
 
-    for locale in ["de_DE", "", "zh_cn", "../data/products_zh_CN.json"] {
+    for locale in ["pt_BR", "", "zh_cn", "../data/products_zh_CN.json"] {
         match catalog.products(locale) {
             Err(CatalogError::UnknownLocale { .. }) => {}
             other => panic!("地区 {locale:?} 的商品目录应当报「没有这个地区」，实际是 {other:?}"),
@@ -716,6 +716,28 @@ fn 门店能拼出各站点认的取货地点() {
     assert_eq!(location("en_MY", "R742").as_deref(), Some("Kuala Lumpur"));
     // 日本站只认市区町村或邮编，数据源的城市是英文区名，所以用邮编。
     assert_eq!(location("ja_JP", "R119").as_deref(), Some("150-0041"));
+    // 2026-10-21 在真实接口上验证过的写法。美国有三个 Glendale，必须带州缩写。
+    assert_eq!(location("en_US", "R247").as_deref(), Some("Glendale, AZ"));
+    assert_eq!(location("en_CA", "R120").as_deref(), Some("Toronto, ON"));
+    assert_eq!(location("es_ES", "R450").as_deref(), Some("Madrid"));
+    // 这些站点不认英文城市名，同城门店共用第一家店的邮编，才能合并查询。
+    let london: Vec<_> = ["R092", "R163", "R226", "R245", "R329", "R410", "R762"]
+        .iter()
+        .map(|n| location("en_GB", n))
+        .collect();
+    assert!(
+        london.iter().all(|l| l.as_deref() == Some("E20 1EQ")),
+        "{london:?}"
+    );
+    let seoul: Vec<_> = ["R691", "R692", "R738", "R747", "R751", "R764"]
+        .iter()
+        .map(|n| location("ko_KR", n))
+        .collect();
+    assert!(
+        seoul.iter().all(|l| l.as_deref() == Some("05551")),
+        "{seoul:?}"
+    );
+    assert_eq!(location("de_DE", "R045").as_deref(), Some("80331"));
 }
 
 #[test]
