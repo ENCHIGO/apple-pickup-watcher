@@ -36,6 +36,6 @@ pub fn document() -> Value {
             "watchDeadline": "Exit 4 even if earlier cycles were healthy; prior rows remain historical observations",
             "targetFlags": "--locale/--store/--part together, or --targets FILE/- exclusively; repeated stores and parts form a Cartesian product",
             "refresh": "Requires --category; in-memory only; failed pages keep embedded data and exit 3",
-            "availability": "Only in_stock confirms stock. unknown never means out_of_stock; not_yet_checked is pending",
+            "availability": "Only in_stock confirms stock. unknown never means out_of_stock; not_yet_checked is pending; pickup_not_open means pickup has not opened for the model yet",
             "limits": "--interval >= 5; bounded by default; only watch --timeout 0 is unlimited"}})
 }

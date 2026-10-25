@@ -37,6 +37,12 @@ fn 未知状态会扁平成两层判别字段() {
             json!({"kind": "unknown", "reason": "not_yet_checked"}),
         ),
         (
+            UnknownReason::PickupNotOpen {
+                raw: "default".into(),
+            },
+            json!({"kind": "unknown", "reason": "pickup_not_open", "raw": "default"}),
+        ),
+        (
             UnknownReason::Blocked {
                 detail: "HTTP 541".into(),
             },

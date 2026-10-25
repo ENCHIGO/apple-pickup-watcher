@@ -16,7 +16,8 @@ export type UnknownReason =
   | { reason: "rate_limited" }
   | { reason: "schema_drift"; field: string; raw: string }
   | { reason: "apple_error"; message: string }
-  | { reason: "transport"; detail: string };
+  | { reason: "transport"; detail: string }
+  | { reason: "pickup_not_open"; raw: string };
 
 export type Availability =
   | { kind: "in_stock" }
@@ -207,6 +208,13 @@ function describeUnknown(a: { kind: "unknown" } & UnknownReason): {
       return { label: "未知", tone: "unknown", detail: `Apple 返回错误：${a.message}` };
     case "transport":
       return { label: "未知", tone: "unknown", detail: `网络请求失败：${a.detail}` };
+    case "pickup_not_open":
+      // Apple 还没开放这个型号的到店取货（#61）。不是故障，也不是无货。
+      return {
+        label: "未开放取货",
+        tone: "pending",
+        detail: "Apple 还没开放这个型号的到店取货，常见于新机发售前；开放后会显示有货或无货",
+      };
     default:
       return assertNever(a);
   }
@@ -214,7 +222,7 @@ function describeUnknown(a: { kind: "unknown" } & UnknownReason): {
 
 /** 这一行的数据是否已经不可信。 */
 export function isUntrusted(a: Availability): boolean {
-  return a.kind === "unknown" && a.reason !== "not_yet_checked";
+  return a.kind === "unknown" && a.reason !== "not_yet_checked" && a.reason !== "pickup_not_open";
 }
 
 export function formatTime(ms: number | null): string {

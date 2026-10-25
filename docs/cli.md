@@ -125,7 +125,7 @@ apw watch --targets targets.json --until-in-stock --timeout 300
 
 | 类型 | 含义 |
 | --- | --- |
-| `stateChanged` | `state` 中的目标状态变化；`not_yet_checked` 表示尚未查询 |
+| `stateChanged` | `state` 中的目标状态变化；`not_yet_checked` 表示尚未查询；`pickup_not_open` 表示 Apple 还没开放该型号的到店取货（新机发售前常见），不是故障也不是无货 |
 | `inStock` | `state` 中的目标确认到货；持续有货不重复提醒 |
 | `cycleComplete` | `healthy` 与完整 `snapshot`，用来对齐全部状态和检查时间；`nextCheckInSecs` 是距下一轮的秒数，`paced` 为 true 表示这段等待是请求预算拉长的，不是 `--interval` |
 | `trouble` | `reason` 与可选 `advice`，说明监控故障 |
