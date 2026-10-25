@@ -28,6 +28,13 @@ fn 明确取值被正确翻译() {
         ("available", Availability::InStock),
         ("unavailable", Availability::OutOfStock),
         ("ineligible", Availability::OutOfStock),
+        // #61：iPhone Duo 开放取货前，Apple 对所有门店都给 default。
+        (
+            "default",
+            Availability::Unknown(UnknownReason::PickupNotOpen {
+                raw: "default".into(),
+            }),
+        ),
     ] {
         let raw = response(&part(display));
         let got = parse_pickup_message(raw.as_bytes(), "R683").expect("应当解析成功");

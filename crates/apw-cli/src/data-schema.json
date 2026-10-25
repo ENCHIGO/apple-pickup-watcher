@@ -28,7 +28,8 @@
             {"properties": {"reason": {"enum": ["not_yet_checked", "rate_limited"]}}},
             {"required": ["detail"], "properties": {"reason": {"enum": ["blocked", "transport"]}, "detail": {"type": "string"}}},
             {"required": ["field", "raw"], "properties": {"reason": {"const": "schema_drift"}, "field": {"type": "string"}, "raw": {"type": "string"}}},
-            {"required": ["message"], "properties": {"reason": {"const": "apple_error"}, "message": {"type": "string"}}}
+            {"required": ["message"], "properties": {"reason": {"const": "apple_error"}, "message": {"type": "string"}}},
+            {"required": ["raw"], "properties": {"reason": {"const": "pickup_not_open"}, "raw": {"type": "string"}}}
           ]
         }
       ]

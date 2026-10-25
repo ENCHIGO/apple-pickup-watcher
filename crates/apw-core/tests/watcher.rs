@@ -610,6 +610,44 @@ async fn 并发启停不会跑出两套循环() {
 }
 
 #[tokio::test]
+async fn 未开放取货的型号不当无货也不报接口变了() {
+    // #61：iPhone Duo 开放取货前，Apple 对所有门店都回 pickupDisplay = default。
+    // 旧版本把它当成结构不符，整店报「Apple 可能已调整接口」，还拖着退避。
+    let fake = FakeFetcher::new(|_, store, parts| {
+        Ok(ok_response(
+            store,
+            parts,
+            Availability::Unknown(UnknownReason::PickupNotOpen {
+                raw: "default".into(),
+            }),
+        ))
+    });
+    let (w, mut rx) = Watcher::spawn(fake.clone(), fast_config());
+    w.set_targets(vec![target("R575", "MK2M4CH/A")]).await;
+    w.start().await;
+    let events = wait_cycle(&mut rx).await;
+    w.stop().await;
+
+    let snap = w.snapshot().await;
+    assert!(matches!(
+        snap[0].availability,
+        Availability::Unknown(UnknownReason::PickupNotOpen { .. })
+    ));
+    assert_ne!(snap[0].availability, Availability::OutOfStock);
+    assert_eq!(snap[0].availability.label(), "未开放取货");
+    assert!(
+        !events.iter().any(|e| matches!(e, Event::Trouble { .. })),
+        "未开放取货不是故障，不该告警"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Event::CycleComplete { healthy: true, .. })),
+        "未开放取货的一轮应当算健康"
+    );
+}
+
+#[tokio::test]
 async fn 全部型号都缺失时判定为门店级失败() {
     // 请求成功但一个型号都对不上，说明这轮实质是废的。若还算成功，就不退避、
     // 不告警，程序会继续按原频率请求一个已经失效的结构。

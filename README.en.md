@@ -137,7 +137,7 @@ The `/shop/fulfillment-messages` endpoint it depends on no longer works and answ
 
 ### What is the difference between “unknown”, “pending”, and “out of stock”?
 
-“Pending” means the first query hasn’t completed yet. “Unknown” means this query did not produce a definite result, possibly because of blocking, rate limiting, a network failure, or a changed response shape. “Out of stock” means the query returned an explicit not-available-for-pickup result. Only the last one actually means there is no stock.
+“Pending” means the first query hasn’t completed yet. “Unknown” means this query did not produce a definite result, possibly because of blocking, rate limiting, a network failure, or a changed response shape. “Out of stock” means the query returned an explicit not-available-for-pickup result. Only the last one actually means there is no stock. Before a launch you may also see “未开放取货” (pickup not open): Apple has not opened in-store pickup for that model yet; it turns into in stock or out of stock once pickup opens.
 
 ### The app reports HTTP 541 or “request blocked”, but Apple’s website opens fine in my browser?
 
