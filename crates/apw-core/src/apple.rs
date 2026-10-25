@@ -2016,6 +2016,9 @@ pub fn availability_from(pickup_display: &str) -> Availability {
     match pickup_display.trim().to_ascii_lowercase().as_str() {
         "available" => Availability::InStock,
         "unavailable" | "ineligible" => Availability::OutOfStock,
+        "default" => Availability::Unknown(UnknownReason::PickupNotOpen {
+            raw: pickup_display.trim().to_string(),
+        }),
         other => Availability::Unknown(UnknownReason::SchemaDrift {
             field: "pickupDisplay".into(),
             raw: other.to_string(),

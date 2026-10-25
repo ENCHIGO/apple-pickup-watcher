@@ -57,6 +57,7 @@ impl Availability {
             Self::InStock => "有货",
             Self::OutOfStock => "无货",
             Self::Unknown(UnknownReason::NotYetChecked) => "待查询",
+            Self::Unknown(UnknownReason::PickupNotOpen { .. }) => "未开放取货",
             Self::Unknown(_) => "未知",
         }
     }
@@ -95,6 +96,13 @@ pub enum UnknownReason {
     AppleError { message: String },
     /// 网络层面的失败：连不上、超时、TLS 出错等。
     Transport { detail: String },
+    /// Apple 还没开放这个型号的到店取货，取货接口对它给出 `pickupDisplay =
+    /// "default"`。2026-10 iPhone Duo 开放取货前所有门店都是这样（#61），开放后
+    /// 同一门店变成 `unavailable` / `available`。
+    ///
+    /// 它不是故障：接口好好的，只是还没有库存答案。不能当成无货，也不该报
+    /// 「Apple 可能已调整接口」、拖慢别的门店。
+    PickupNotOpen { raw: String },
 }
 
 impl UnknownReason {
@@ -109,6 +117,9 @@ impl UnknownReason {
             }
             Self::AppleError { message } => format!("Apple 返回错误：{message}"),
             Self::Transport { detail } => format!("网络请求失败：{detail}"),
+            Self::PickupNotOpen { raw } => format!(
+                "Apple 还没开放这个型号的到店取货（pickupDisplay = {raw}），常见于新机发售前；开放后会显示有货或无货"
+            ),
         }
     }
 
@@ -116,7 +127,7 @@ impl UnknownReason {
     ///
     /// `NotYetChecked` 只是还没轮到，不该被算进失败数，也不该触发告警或退避。
     pub fn is_failure(&self) -> bool {
-        !matches!(self, Self::NotYetChecked)
+        !matches!(self, Self::NotYetChecked | Self::PickupNotOpen { .. })
     }
 }
 
