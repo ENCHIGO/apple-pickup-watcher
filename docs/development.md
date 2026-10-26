@@ -43,7 +43,7 @@ cargo test
 | `crates/apw-cli/` | `apw` 命令、JSON/NDJSON 输出、目标输入与进程生命周期 |
 | `src-tauri/` | 桌面装配、IPC、托盘、系统通知与购物袋打开 |
 | `src/`、`tests/` | React 界面、前端状态及交互测试 |
-| `skills/apple-pickup-watcher/` | 配套 agent skill |
+| `skills/apple-pickup-watcher/` | 配套 agent skill 的副本，随 CLI 包分发。正本在 [apple-pickup-skill](https://github.com/ENCHIGO/apple-pickup-skill)，改 CLI 接口时两边一起改 |
 | `site/` | 中英文项目介绍页，见 [站点维护说明](discoverability.md) |
 
 库存判定留在 `apw-core`，失败必须保留为带原因的 `Unknown`。通知失败不得改写库存；配置迁移不得修改旧文件，损坏配置不得被默认值覆盖。完整约定见 [AGENTS.md](../AGENTS.md)。

@@ -24,31 +24,16 @@ cargo install --path crates/apw-cli --locked
 
 ## 安装 skill
 
-配套 skill 可直接从本仓库安装，无需把项目另行发布到 npm。安装 Node.js LTS 后，使用 [Skills CLI](https://github.com/vercel-labs/skills)：
+配套 skill 在独立仓库 [ENCHIGO/apple-pickup-skill](https://github.com/ENCHIGO/apple-pickup-skill) 发布，适用于 WorkBuddy、Claude Code、Codex 及其他支持 `SKILL.md` 的 agent，各 agent 的安装方法见该仓库 README。用 [Skills CLI](https://github.com/vercel-labs/skills)（Node.js 22.20+）安装：
 
 ```bash
-# 先查看仓库中可安装的 skill
-npx skills add ENCHIGO/apple-pickup-watcher --list
-
-# 全局安装到 Codex
-npx skills add ENCHIGO/apple-pickup-watcher --skill apple-pickup-watcher --agent codex --global
-
-# 或全局安装到 Claude Code
-npx skills add ENCHIGO/apple-pickup-watcher --skill apple-pickup-watcher --agent claude-code --global
+npx skills add ENCHIGO/apple-pickup-skill --skill apple-pickup-watcher --agent claude-code --global
+npx skills add ENCHIGO/apple-pickup-skill --skill apple-pickup-watcher --agent codex --global
 ```
 
-去掉 `--global` 即安装到当前项目；省略 `--agent` 由工具检测或选择 agent。需要非交互安装时追加 `--yes`，但已有同名 skill 时应先比较本地定制。Skills CLI 当前要求 Node.js 22.20.0 或更新版本；CLI 程序 `apw` 本身不依赖 Node。
+WorkBuddy 可以在对话里直接发仓库地址让它安装，或导入该仓库 Release 里的 `apple-pickup-watcher.zip`。
 
-安装后可查看和更新这个 skill：
-
-```bash
-npx skills list --agent codex --global
-npx skills update apple-pickup-watcher --global
-```
-
-也可手动将仓库或预编译包中的 `skills/apple-pickup-watcher/` 整个目录复制到 agent 的技能目录。Codex 的默认位置是 `${CODEX_HOME:-$HOME/.codex}/skills/apple-pickup-watcher/`。已有同名 skill 时先比较内容；其他支持 `SKILL.md` 的 agent 可导入同一目录。
-
-上述方式只安装 skill，**不会安装 `apw` 程序**。agent 还需要 Shell 工具以及 PATH 中可访问的 `apw`，可运行 `apw --version` 确认。安装后在新会话中通过 `$apple-pickup-watcher` 使用。
+skill 自带 `apw` 安装脚本（`scripts/install-apw.sh`、`scripts/install-apw.ps1`）：agent 发现没有 `apw` 时，会先告知用户，再从本仓库 Release 下载预编译包并校验 sha256。CLI 预编译包里也附有同一份 skill，可手动把 `skills/apple-pickup-watcher/` 复制到 agent 的技能目录。安装后在新会话中通过 `$apple-pickup-watcher` 使用。
 
 ## 命令
 
