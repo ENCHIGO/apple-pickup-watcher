@@ -791,7 +791,7 @@ impl Notifier for Telegram {
             return Err(NotifyError::Rejected {
                 channel: self.name.clone(),
                 status: status.as_u16(),
-                body: summarize(&body),
+                body: "(响应正文已隐藏)".to_string(),
             });
         }
         Ok(())
