@@ -21,7 +21,7 @@
 [![许可](https://img.shields.io/github/license/ENCHIGO/apple-pickup-watcher?color=6b7280)](LICENSE)
 [![平台](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-111827)](https://github.com/ENCHIGO/apple-pickup-watcher/releases/latest)
 
-[项目主页](https://enchigo.github.io/apple-pickup-watcher/) · [English](README.en.md) · [下载桌面版](https://github.com/ENCHIGO/apple-pickup-watcher/releases/latest) · [CLI 文档](docs/cli.md) · [Agent skill](skills/apple-pickup-watcher/SKILL.md) · [常见问题](#常见问题)
+[项目主页](https://enchigo.github.io/apple-pickup-watcher/) · [English](README.en.md) · [下载桌面版](https://github.com/ENCHIGO/apple-pickup-watcher/releases/latest) · [CLI 文档](docs/cli.md) · [Agent skill](https://github.com/ENCHIGO/apple-pickup-skill) · [常见问题](#常见问题)
 
 </div>
 
@@ -169,7 +169,7 @@ apw watch    --targets targets.json --until-in-stock --timeout 300          # �
 | [CLI 与 agent skill](docs/cli.md) | 构建安装、命令、JSON / NDJSON 格式、批量目标、退出码 |
 | [开发与维护](docs/development.md) | 工具链、检查命令、代码结构、真实接口契约测试、发布流程 |
 | [站点维护](docs/discoverability.md) | 项目主页的构建、部署与搜索收录约定 |
-| [Agent skill](skills/apple-pickup-watcher/SKILL.md) | 给 agent 读的使用说明 |
+| [Agent skill](https://github.com/ENCHIGO/apple-pickup-skill) | 给 agent 读的使用说明 |
 
 ## 来源与许可
 

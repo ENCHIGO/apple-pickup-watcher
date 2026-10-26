@@ -21,7 +21,7 @@ Available as a desktop app, the `apw` command line tool, and an agent skill. Fre
 [![License](https://img.shields.io/github/license/ENCHIGO/apple-pickup-watcher?color=6b7280)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-111827)](https://github.com/ENCHIGO/apple-pickup-watcher/releases/latest)
 
-[Website](https://enchigo.github.io/apple-pickup-watcher/en/) · [简体中文](README.md) · [Download](https://github.com/ENCHIGO/apple-pickup-watcher/releases/latest) · [CLI docs](docs/cli.md) · [Agent skill](skills/apple-pickup-watcher/SKILL.md) · [FAQ](#faq)
+[Website](https://enchigo.github.io/apple-pickup-watcher/en/) · [简体中文](README.md) · [Download](https://github.com/ENCHIGO/apple-pickup-watcher/releases/latest) · [CLI docs](docs/cli.md) · [Agent skill](https://github.com/ENCHIGO/apple-pickup-skill) · [FAQ](#faq)
 
 </div>
 
@@ -169,7 +169,7 @@ More: [desktop guide](docs/desktop.md) · [CLI docs](docs/cli.md) · [developmen
 | [CLI and agent skill](docs/cli.md) | Build and install, commands, JSON / NDJSON format, batch targets, exit codes |
 | [Development and maintenance](docs/development.md) | Toolchain, checks, code layout, live API contract tests, release process |
 | [Website maintenance](docs/discoverability.md) | Building and deploying the project site, search indexing conventions |
-| [Agent skill](skills/apple-pickup-watcher/SKILL.md) | Usage instructions written for agents |
+| [Agent skill](https://github.com/ENCHIGO/apple-pickup-skill) | Usage instructions written for agents |
 
 The detailed guides are currently written in Chinese.
 
