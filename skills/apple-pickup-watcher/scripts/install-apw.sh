@@ -59,7 +59,9 @@ elif command -v shasum >/dev/null 2>&1; then
 else
   fail "需要 sha256sum 或 shasum 来校验下载"
 fi
-[ -n "$expected" ] && [ "$expected" = "$actual" ] || fail "sha256 不匹配（期望 $expected，实际 $actual），已放弃安装"
+if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+  fail "sha256 不匹配（期望 $expected，实际 $actual），已放弃安装"
+fi
 
 tar -xzf "$tmp/$name.tar.gz" -C "$tmp"
 [ -f "$tmp/$name/apw" ] || fail "压缩包里没有 apw"
