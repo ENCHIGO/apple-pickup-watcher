@@ -1,7 +1,7 @@
 //! 到货提醒的发送渠道。
 //!
-//! 这里只做「把一条通知送出去」这一件事：[`Bark`] 远程推送、[`Sound`] 本地
-//! 提示音，以及把若干渠道并发组合起来的 [`Multi`]。
+//! 这里只做「把一条通知送出去」这一件事：[`Bark`]、[`Feishu`]、[`Telegram`]
+//! 远程推送，[`Sound`] 本地提示音，以及把若干渠道并发组合起来的 [`Multi`]。
 //!
 //! 刻意**不**包含系统桌面通知：那需要界面框架的句柄，放进来会让整个 crate
 //! 无法脱离 GUI 单独测试，也会把 UI 依赖传染给调度层。
@@ -31,6 +31,8 @@ use reqwest::Url;
 use rodio::Source;
 use rodio::buffer::SamplesBuffer;
 use rodio::source::UniformSourceIterator;
+
+use crate::config::is_telegram_token_segment;
 
 /// 内嵌的提示音。
 ///
@@ -186,6 +188,22 @@ pub struct Bark {
 
 pub use crate::config::split_bark_urls;
 
+/// 把设置里的原始文本拆成一个个地址（见 [`split_bark_urls`]），配上渠道名：只有
+/// 一个地址时就叫 `label`，多个时依次叫「`label` #1」「`label` #2」……
+/// 各远程渠道的 `from_list` 共用这条命名规则。
+fn numbered(raw: &str, label: &'static str) -> impl Iterator<Item = (String, String)> {
+    let urls = split_bark_urls(raw);
+    let many = urls.len() > 1;
+    urls.into_iter().enumerate().map(move |(i, url)| {
+        let name = if many {
+            format!("{label} #{}", i + 1)
+        } else {
+            label.to_string()
+        };
+        (url, name)
+    })
+}
+
 impl Bark {
     /// `base_url` 是 Bark App 里给出的推送地址，形如
     /// `https://api.day.app/<设备key>`，也可以是自建服务器地址。
@@ -210,16 +228,10 @@ impl Bark {
     /// 「Bark #2」…… 这样某一台手机的推送失败时，提示里能看出是哪一个。
     /// 空文本返回空列表。
     pub fn from_list(raw: &str, http: reqwest::Client) -> Vec<Self> {
-        let urls = split_bark_urls(raw);
-        let many = urls.len() > 1;
-        urls.into_iter()
-            .enumerate()
-            .map(|(i, url)| {
-                let mut bark = Self::new(url, http.clone());
-                if many {
-                    bark.name = format!("{BARK} #{}", i + 1);
-                }
-                bark
+        numbered(raw, BARK)
+            .map(|(url, name)| Self {
+                name,
+                ..Self::new(url, http.clone())
             })
             .collect()
     }
@@ -313,8 +325,8 @@ async fn read_capped(
 /// 把 reqwest 的错误写成给人看的一句话，**不带请求地址**。
 ///
 /// reqwest 的错误文本自带完整 URL（`error sending request for url (…)`），而 Bark
-/// 的设备 key、飞书机器人的密钥都在路径里。这句话会原样进日志，用户排查问题时
-/// 常把日志贴进公开的 issue，等于把推送权限交了出去。
+/// 的设备 key、飞书机器人的密钥、Telegram 机器人的 token 都在路径里。这句话会
+/// 原样进日志，用户排查问题时常把日志贴进公开的 issue，等于把推送权限交了出去。
 ///
 /// 去掉地址之后，把错误链上的原因接在后面。原来那句只说「发请求出错」，连不上、
 /// 超时还是证书问题都看不出来；接上原因，用户才知道该查哪一头。
@@ -337,12 +349,29 @@ fn describe_http_error(err: reqwest::Error) -> String {
 }
 
 /// 出错提示里复述用户填的地址时只留协议和主机，路径换成省略号：Bark 的设备
-/// key、飞书机器人的密钥都在路径里。
+/// key、飞书机器人的密钥、Telegram 机器人的 token 都在路径里。
 fn redacted(u: &Url) -> String {
     match u.host_str().filter(|host| !host.is_empty()) {
         Some(host) => format!("{}://{host}/…", u.scheme()),
         None => format!("{}:…", u.scheme()),
     }
+}
+
+/// 解析用户填的推送地址，只收带主机的 http(s) 地址。各远程渠道共用，出错时
+/// 报成 `channel` 的配置错误。
+fn parse_http_url(raw: &str, channel: &str) -> Result<Url, NotifyError> {
+    let err = |detail: String| NotifyError::Config {
+        channel: channel.to_string(),
+        detail,
+    };
+    let u = Url::parse(raw).map_err(|e| err(format!("地址无法解析：{e}")))?;
+    if !matches!(u.scheme(), "http" | "https") || u.host_str().unwrap_or_default().is_empty() {
+        return Err(err(format!(
+            "地址必须是以 http:// 或 https:// 开头的完整地址，当前为 {}",
+            redacted(&u)
+        )));
+    }
+    Ok(u)
 }
 
 /// 从 Bark 的 JSON 响应里挑出业务错误码。
@@ -383,14 +412,7 @@ fn summarize(body: &[u8]) -> String {
 /// 整条路径的语义就变了（正文被顶到标题位置），末尾的购物袋地址也没转义，
 /// 其中的 `&` 会把后面的参数整段截断。
 fn build_bark_url(base_url: &str, n: &Notification) -> Result<Url, NotifyError> {
-    let mut u = Url::parse(base_url).map_err(|e| config_err(format!("地址无法解析：{e}")))?;
-
-    if !matches!(u.scheme(), "http" | "https") || u.host_str().unwrap_or_default().is_empty() {
-        return Err(config_err(format!(
-            "地址必须是以 http:// 或 https:// 开头的完整地址，当前为 {}",
-            redacted(&u)
-        )));
-    }
+    let mut u = parse_http_url(base_url, BARK)?;
 
     // 已经是转义形态的路径，原样拿来当前缀，不重新编码。
     let base_path = u.path().trim_end_matches('/').to_string();
@@ -548,16 +570,10 @@ impl Feishu {
     /// 按设置里的原始文本构造一组飞书渠道，规则同 [`Bark::from_list`]：
     /// 分号 / 换行分隔，一个地址一个，多个时依次叫「飞书 #1」「飞书 #2」……
     pub fn from_list(raw: &str, http: reqwest::Client) -> Vec<Self> {
-        let urls = split_bark_urls(raw);
-        let many = urls.len() > 1;
-        urls.into_iter()
-            .enumerate()
-            .map(|(i, url)| {
-                let mut feishu = Self::new(url, http.clone());
-                if many {
-                    feishu.name = format!("{FEISHU} #{}", i + 1);
-                }
-                feishu
+        numbered(raw, FEISHU)
+            .map(|(url, name)| Self {
+                name,
+                ..Self::new(url, http.clone())
             })
             .collect()
     }
@@ -586,7 +602,7 @@ impl Notifier for Feishu {
             .timeout(self.timeout)
             .json(&serde_json::json!({
                 "msg_type": "text",
-                "content": { "text": feishu_text(n) },
+                "content": { "text": plain_text(n) },
             }))
             .send()
             .await
@@ -624,13 +640,7 @@ impl Notifier for Feishu {
 /// 合法形态是 `http(s)://<域名>/open-apis/bot/v2/hook/<密钥>`，路径里带着密钥，
 /// 所以除了协议和主机，还要求路径不能是空的。
 fn validate_feishu_webhook(webhook: &str) -> Result<Url, NotifyError> {
-    let u = Url::parse(webhook).map_err(|e| feishu_config_err(format!("地址无法解析：{e}")))?;
-    if !matches!(u.scheme(), "http" | "https") || u.host_str().unwrap_or_default().is_empty() {
-        return Err(feishu_config_err(format!(
-            "地址必须是以 http:// 或 https:// 开头的完整地址，当前为 {}",
-            redacted(&u)
-        )));
-    }
+    let u = parse_http_url(webhook, FEISHU)?;
     if u.path().trim_end_matches('/').is_empty() {
         return Err(feishu_config_err(
             "地址缺少密钥，应形如 https://open.feishu.cn/open-apis/bot/v2/hook/<密钥>".to_string(),
@@ -646,9 +656,9 @@ fn feishu_config_err(detail: String) -> NotifyError {
     }
 }
 
-/// 组装文本消息：标题、正文、链接各占一行；链接单发一行的原因是飞书的
-/// 文本消息没有独立的「点开跳转」参数，附在末尾至少可复制。
-fn feishu_text(n: &Notification) -> String {
+/// 组装飞书和 Telegram 的文本消息：标题、正文、链接各占一行；链接单发一行的
+/// 原因是两者的文本消息都没有独立的「点开跳转」参数，附在末尾至少可点、可复制。
+fn plain_text(n: &Notification) -> String {
     let mut lines = Vec::new();
     for text in [n.title.trim(), n.body.trim()] {
         if !text.is_empty() {
@@ -679,6 +689,192 @@ fn feishu_business_error(body: &[u8]) -> Option<(i64, String)> {
     let payload: Payload = serde_json::from_slice(body).ok()?;
     let code = payload.code.or(payload.status_code)?;
     (code != 0).then(|| (code, payload.msg.unwrap_or_default()))
+}
+
+// ---------------------------------------------------------------------------
+// Telegram 机器人
+// ---------------------------------------------------------------------------
+
+const TELEGRAM: &str = "Telegram";
+
+/// Telegram Bot API 的默认单次请求超时，与 Bark 一致。
+const TELEGRAM_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// 配置出错时给用户看的地址样例。
+const TELEGRAM_EXAMPLE: &str = "https://api.telegram.org/bot<token>/sendMessage?chat_id=<聊天 ID>";
+
+/// 通过 Telegram 机器人向私聊、群组或频道推送通知。
+///
+/// 地址就是 Bot API 的 sendMessage 调用，形如
+/// `https://api.telegram.org/bot<token>/sendMessage?chat_id=<聊天 ID>`：token 在
+/// @BotFather 创建机器人时获得，chat_id 是接收提醒的私聊、群组或频道。主机可以
+/// 换成自建的 Bot API 服务器或反代地址 —— 国内直连不了 api.telegram.org，这是
+/// 最常见的用法。地址里的其他参数（群组话题的 `message_thread_id`、静音推送的
+/// `disable_notification` 等）原样带上。
+#[derive(Debug, Clone)]
+pub struct Telegram {
+    url: String,
+    http: reqwest::Client,
+    timeout: Duration,
+    /// 渠道名。只配一个地址时就是「Telegram」；配了多个时带序号。
+    name: String,
+}
+
+impl Telegram {
+    /// `url` 为空或全是空白表示未配置，[`Notifier::notify`] 直接返回 `Ok(())`，
+    /// 不发任何请求。`http` 传入与其他出站请求共用的客户端以复用连接池。
+    pub fn new(url: String, http: reqwest::Client) -> Self {
+        Self {
+            url: url.trim().to_string(),
+            http,
+            timeout: TELEGRAM_TIMEOUT,
+            name: TELEGRAM.to_string(),
+        }
+    }
+
+    /// 按设置里的原始文本构造一组 Telegram 渠道，规则同 [`Bark::from_list`]：
+    /// 分号 / 换行分隔，一个地址一个，多个时依次叫「Telegram #1」「Telegram #2」……
+    pub fn from_list(raw: &str, http: reqwest::Client) -> Vec<Self> {
+        numbered(raw, TELEGRAM)
+            .map(|(url, name)| Self {
+                name,
+                ..Self::new(url, http.clone())
+            })
+            .collect()
+    }
+
+    /// 用户是否配置了 Telegram 机器人。
+    pub fn is_configured(&self) -> bool {
+        !self.url.is_empty()
+    }
+}
+
+impl Notifier for Telegram {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    async fn notify(&self, n: &Notification) -> Result<(), NotifyError> {
+        if !self.is_configured() {
+            return Ok(());
+        }
+
+        let (url, mut params) = parse_telegram_url(&self.url)?;
+        params.push(("text".to_string(), plain_text(n)));
+
+        let mut resp = self
+            .http
+            .post(url)
+            .timeout(self.timeout)
+            .form(&params)
+            .send()
+            .await
+            .map_err(|e| NotifyError::Transport {
+                channel: self.name.clone(),
+                detail: describe_http_error(e),
+            })?;
+
+        let status = resp.status();
+        let body = read_capped(&mut resp, BARK_MAX_BODY, &self.name).await?;
+
+        // Bot API 出错时 HTTP 状态码与响应体里的 error_code 一致，description 是
+        // 一句能看懂的话（token 写错是 Unauthorized，没先给机器人发过消息是
+        // chat not found），比整段 JSON 好懂，所以先看它。
+        if let Some((code, message)) = telegram_api_error(&body) {
+            return Err(NotifyError::Remote {
+                channel: self.name.clone(),
+                code,
+                message,
+            });
+        }
+        if !status.is_success() {
+            return Err(NotifyError::Rejected {
+                channel: self.name.clone(),
+                status: status.as_u16(),
+                body: summarize(&body),
+            });
+        }
+        Ok(())
+    }
+}
+
+/// 校验 Bot API 地址，拆成要请求的 sendMessage 地址和要放进表单的参数。
+///
+/// 路径里 `bot<token>` 之前的部分是自建服务器或反代的前缀，原样保留；之后写的是
+/// `sendMessage`、`getUpdates` 还是什么都没写，一律换成 `sendMessage` —— 用户的
+/// 地址多半是从查 chat_id 时用的那条改过来的。查询参数整体挪进表单：Bot API
+/// 两处都认，挪过去之后，地址里用户写的 `text` 也不会和通知正文打架。
+fn parse_telegram_url(raw: &str) -> Result<(Url, Vec<(String, String)>), NotifyError> {
+    let mut u = parse_http_url(raw, TELEGRAM)?;
+
+    let segments: Vec<&str> = u.path_segments().map(Iterator::collect).unwrap_or_default();
+    let Some(token_at) = segments.iter().position(|s| is_telegram_token_segment(s)) else {
+        return Err(telegram_config_err(format!(
+            "地址里缺少机器人 token，应形如 {TELEGRAM_EXAMPLE}"
+        )));
+    };
+    let path = format!("/{}/sendMessage", segments[..=token_at].join("/"));
+
+    let mut params: Vec<(String, String)> = u
+        .query_pairs()
+        .filter(|(key, _)| key != "text")
+        .map(|(key, value)| (key.into_owned(), value.into_owned()))
+        .collect();
+    if !params
+        .iter()
+        .any(|(key, value)| key == "chat_id" && !value.trim().is_empty())
+    {
+        return Err(telegram_config_err(format!(
+            "地址里缺少 chat_id，应形如 {TELEGRAM_EXAMPLE}"
+        )));
+    }
+    // 购物袋链接的网页预览是一大张 Apple 的卡片，会把提醒本身挤得不起眼。
+    // 用户自己在地址里设了预览选项就听用户的。
+    if !params
+        .iter()
+        .any(|(key, _)| key == "link_preview_options" || key == "disable_web_page_preview")
+    {
+        params.push((
+            "link_preview_options".to_string(),
+            r#"{"is_disabled":true}"#.to_string(),
+        ));
+    }
+
+    u.set_path(&path);
+    u.set_query(None);
+    u.set_fragment(None);
+    Ok((u, params))
+}
+
+fn telegram_config_err(detail: String) -> NotifyError {
+    NotifyError::Config {
+        channel: TELEGRAM.to_string(),
+        detail,
+    }
+}
+
+/// 从 Bot API 的响应里挑出错误。
+///
+/// 成功是 `{"ok":true,"result":{…}}`，失败是
+/// `{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}`。
+/// 认不出的响应（反代改写过之类）不算失败，交给 HTTP 状态码判断。
+fn telegram_api_error(body: &[u8]) -> Option<(i64, String)> {
+    #[derive(serde::Deserialize)]
+    struct Payload {
+        ok: bool,
+        #[serde(default)]
+        error_code: Option<i64>,
+        #[serde(default)]
+        description: Option<String>,
+    }
+
+    let payload: Payload = serde_json::from_slice(body).ok()?;
+    (!payload.ok).then(|| {
+        (
+            payload.error_code.unwrap_or_default(),
+            payload.description.unwrap_or_default(),
+        )
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -1303,17 +1499,18 @@ mod tests {
     }
 
     #[test]
-    fn 飞书文本消息标题正文链接各占一行() {
+    fn 文本消息标题正文链接各占一行() {
         let notification = n("有货了", "上海-环球港 iPhone 17 512GB")
             .with_url("https://www.apple.com.cn/shop/bag");
         assert_eq!(
-            feishu_text(&notification),
+            plain_text(&notification),
             "有货了\n上海-环球港 iPhone 17 512GB\nhttps://www.apple.com.cn/shop/bag"
         );
         // 空标题跳过、无链接不加行。
-        assert_eq!(feishu_text(&n("  ", "只有正文")), "只有正文");
-        // 标题正文都空的极端情况：拼出空文本，由服务端的关键词校验兜底报错。
-        assert_eq!(feishu_text(&n(" ", "")), "");
+        assert_eq!(plain_text(&n("  ", "只有正文")), "只有正文");
+        // 标题正文都空的极端情况：拼出空文本，由服务端兜底报错（飞书的关键词
+        // 校验、Telegram 的 message text is empty）。
+        assert_eq!(plain_text(&n(" ", "")), "");
     }
 
     #[test]
@@ -1330,6 +1527,92 @@ mod tests {
         assert_eq!(
             feishu_business_error(r#"{"code":19024,"msg":"Key Words Not Found"}"#.as_bytes()),
             Some((19024, "Key Words Not Found".to_string()))
+        );
+    }
+
+    fn tg_params(url: &str) -> (String, Vec<(String, String)>) {
+        let (u, params) = parse_telegram_url(url).expect("正常地址必须能通过");
+        (u.to_string(), params)
+    }
+
+    fn param<'a>(params: &'a [(String, String)], key: &str) -> Option<&'a str> {
+        params
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
+    }
+
+    #[test]
+    fn telegram地址拆成sendmessage和表单参数() {
+        let (url, params) =
+            tg_params("https://api.telegram.org/bot123:AA-b_c/sendMessage?chat_id=-100987");
+        assert_eq!(url, "https://api.telegram.org/bot123:AA-b_c/sendMessage");
+        assert_eq!(param(&params, "chat_id"), Some("-100987"));
+        // 默认关掉链接预览。
+        assert_eq!(
+            param(&params, "link_preview_options"),
+            Some(r#"{"is_disabled":true}"#)
+        );
+
+        // 没写方法、写的是查 chat_id 用的 getUpdates，都换成 sendMessage；
+        // 反代的路径前缀原样保留，用户写的 text 丢掉，其他参数照带。
+        for raw in [
+            "https://tg.example.com/proxy/bot123:AA?chat_id=42&text=x&message_thread_id=7",
+            "https://tg.example.com/proxy/bot123:AA/getUpdates?chat_id=42&message_thread_id=7#frag",
+        ] {
+            let (url, params) = tg_params(raw);
+            assert_eq!(
+                url, "https://tg.example.com/proxy/bot123:AA/sendMessage",
+                "{raw}"
+            );
+            assert_eq!(param(&params, "chat_id"), Some("42"), "{raw}");
+            assert_eq!(param(&params, "message_thread_id"), Some("7"), "{raw}");
+            assert_eq!(param(&params, "text"), None, "{raw}");
+        }
+
+        // 频道用户名里的 @ 不能被弄丢；用户自己设了预览选项就不再追加。
+        let (_, params) = tg_params(
+            "https://api.telegram.org/bot123:AA/sendMessage?chat_id=%40my_channel&disable_web_page_preview=false",
+        );
+        assert_eq!(param(&params, "chat_id"), Some("@my_channel"));
+        assert_eq!(param(&params, "link_preview_options"), None);
+    }
+
+    #[test]
+    fn telegram地址不合法时报配置错误() {
+        for bad in [
+            "",
+            "不是地址",
+            "ftp://api.telegram.org/bot123:AA/sendMessage?chat_id=1",
+            // 没有 token。
+            "https://api.telegram.org/sendMessage?chat_id=1",
+            "https://api.telegram.org/botABC:AA/sendMessage?chat_id=1",
+            // 没有 chat_id，或者是空的。
+            "https://api.telegram.org/bot123:AA/sendMessage",
+            "https://api.telegram.org/bot123:AA/sendMessage?chat_id=%20",
+        ] {
+            let err = parse_telegram_url(bad)
+                .err()
+                .unwrap_or_else(|| panic!("{bad:?} 不该被接受"));
+            assert_eq!(err.channel(), Some("Telegram"), "{bad:?}");
+            assert!(matches!(err, NotifyError::Config { .. }), "{bad:?}");
+            assert!(
+                !err.to_string().contains("123:AA"),
+                "错误里泄露了 token：{err}"
+            );
+        }
+    }
+
+    #[test]
+    fn telegram错误只认明确的ok为false() {
+        assert_eq!(telegram_api_error(br#"{"ok":true,"result":{}}"#), None);
+        assert_eq!(telegram_api_error(br#"{"code":0}"#), None);
+        assert_eq!(telegram_api_error(b"<html>502</html>"), None);
+        assert_eq!(
+            telegram_api_error(
+                br#"{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}"#
+            ),
+            Some((400, "Bad Request: chat not found".to_string()))
         );
     }
 }

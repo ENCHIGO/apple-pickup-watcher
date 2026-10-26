@@ -3,12 +3,12 @@ import type { Settings } from "@/lib/types";
 /**
  * 推送渠道，与 Rust 侧 `config::PushKind` 一一对应。
  *
- * 界面上 Bark 和飞书是同一个「推送地址」列表，用户不用自己选渠道。哪个地址
- * 归哪个渠道由后端按地址长相判断（`Settings::set_push_urls`），这里只按后端
- * 存放的位置读出渠道，不另抄一份判断规则：抄一份，迟早会有一边先认了新渠道、
+ * 界面上 Bark、飞书和 Telegram 是同一个「推送地址」列表，用户不用自己选渠道。
+ * 哪个地址归哪个渠道由后端按地址长相判断（`Settings::set_push_urls`），这里只按
+ * 后端存放的位置读出渠道，不另抄一份判断规则：抄一份，迟早会有一边先认了新渠道、
  * 另一边还按老规矩归类。
  */
-export type PushKind = "bark" | "feishu";
+export type PushKind = "bark" | "feishu" | "telegram";
 
 export interface PushAddress {
   url: string;
@@ -18,7 +18,17 @@ export interface PushAddress {
 export const PUSH_KIND_LABEL: Record<PushKind, string> = {
   bark: "Bark",
   feishu: "飞书",
+  telegram: "Telegram",
 };
+
+/** 每个渠道的地址存在设置的哪个字段里；键的顺序与后端 `push_urls` 一致。 */
+const PUSH_FIELD: Record<PushKind, "barkUrl" | "feishuWebhook" | "telegramUrl"> = {
+  bark: "barkUrl",
+  feishu: "feishuWebhook",
+  telegram: "telegramUrl",
+};
+
+const PUSH_KINDS = Object.keys(PUSH_FIELD) as PushKind[];
 
 /** 文件里每个渠道的地址是分号连起来的规范写法，后端保存时已去空、去重。 */
 function splitStored(raw: string | undefined): string[] {
@@ -29,14 +39,14 @@ function splitStored(raw: string | undefined): string[] {
 }
 
 /**
- * 已保存的推送地址，摊成一张列表：Bark 在前、飞书在后，与后端 `push_urls` 的
- * 顺序一致。旧设置文件没有 feishuWebhook 字段，读上来是 undefined，当作空。
+ * 已保存的推送地址，摊成一张列表：依次是 Bark、飞书、Telegram，与后端 `push_urls`
+ * 的顺序一致。旧设置文件没有 feishuWebhook、telegramUrl 字段，读上来是 undefined，
+ * 当作空。
  */
 export function savedPushAddresses(settings: Settings): PushAddress[] {
-  return [
-    ...splitStored(settings.barkUrl).map((url) => ({ url, kind: "bark" as const })),
-    ...splitStored(settings.feishuWebhook).map((url) => ({ url, kind: "feishu" as const })),
-  ];
+  return PUSH_KINDS.flatMap((kind) =>
+    splitStored(settings[PUSH_FIELD[kind]]).map((url) => ({ url, kind })),
+  );
 }
 
 /**
@@ -62,8 +72,7 @@ export function samePushUrls(a: string[], b: string[]): boolean {
 /** 设置收起时摘要里的那一段，例如「推送：Bark 2 个、飞书 1 个」。 */
 export function pushSummary(addresses: PushAddress[]): string {
   if (addresses.length === 0) return "推送未配置";
-  const kinds: PushKind[] = ["bark", "feishu"];
-  const parts = kinds
+  const parts = PUSH_KINDS
     .map((kind) => [kind, addresses.filter((a) => a.kind === kind).length] as const)
     .filter(([, count]) => count > 0)
     .map(([kind, count]) => `${PUSH_KIND_LABEL[kind]} ${count} 个`);

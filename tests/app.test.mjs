@@ -36,8 +36,14 @@ function renderApp() {
         // 模拟后端分栏存放。真正的归类规则在 Rust 侧，由 crates/apw-core/tests/config.rs 覆盖；
         // 这里只需要让界面拿到「哪个地址存在哪一栏」。
         const feishu = urls.filter((url) => url.includes("/open-apis/bot/v2/hook/"));
-        const bark = urls.filter((url) => !feishu.includes(url));
-        state.settings = { ...state.settings, barkUrl: bark.join(";"), feishuWebhook: feishu.join(";") };
+        const telegram = urls.filter((url) => /\/bot\d+:/.test(url));
+        const bark = urls.filter((url) => !feishu.includes(url) && !telegram.includes(url));
+        state.settings = {
+          ...state.settings,
+          barkUrl: bark.join(";"),
+          feishuWebhook: feishu.join(";"),
+          telegramUrl: telegram.join(";"),
+        };
       },
     };
     if (specifier.startsWith("@/components/") || specifier === "lucide-react") {
@@ -86,6 +92,10 @@ function renderApp() {
     // 渠道标签按行的顺序排列；还没保存的行没有标签。
     pushLabels: () => all((element) => element.type === "Badge" && element.props.children !== "未生效")
       .map((element) => element.props.children),
+    // 输入框下方按渠道给的配置提示。
+    pushHints: () => all((element) => element.type === "p" && typeof element.props.children === "string" &&
+      /^\s*(飞书|Telegram)/.test(element.props.children))
+      .map((element) => element.props.children.trim()),
     removePush: (index) => control((element) => element?.props?.["aria-label"] === `删除推送地址 ${index + 1}`),
     addPush: () => control(isAddPush),
     hasAddPush: () => all(isAddPush).length > 0,
@@ -101,14 +111,20 @@ function renderApp() {
 const K1 = "https://api.day.app/k1";
 const K2 = "https://api.day.app/k2";
 const F1 = "https://open.feishu.cn/open-apis/bot/v2/hook/f1";
+const T1 = "https://api.telegram.org/bot1:t1/sendMessage?chat_id=1";
 
-test("saved push addresses are one list, Bark first then Feishu, labelled by where the backend filed them", () => {
+test("saved push addresses are one list, Bark then Feishu then Telegram, labelled by where the backend filed them", () => {
   const app = renderApp();
   assert.deepEqual(app.pushValues(), ["https://api.day.app/saved-key"]);
+  assert.deepEqual(app.pushHints(), [], "没填飞书或 Telegram 时不显示它们的配置提示");
   // 没动过时跟着后端走。
-  app.state.settings = { ...app.state.settings, barkUrl: `${K1};${K2}`, feishuWebhook: F1 };
-  assert.deepEqual(app.pushValues(), [K1, K2, F1]);
-  assert.deepEqual(app.pushLabels(), ["Bark", "Bark", "飞书"]);
+  app.state.settings = { ...app.state.settings, barkUrl: `${K1};${K2}`, feishuWebhook: F1, telegramUrl: T1 };
+  assert.deepEqual(app.pushValues(), [K1, K2, F1, T1]);
+  assert.deepEqual(app.pushLabels(), ["Bark", "Bark", "飞书", "Telegram"]);
+  const hints = app.pushHints();
+  assert.equal(hints.length, 2);
+  assert.match(hints[0], /自定义关键词/);
+  assert.match(hints[1], /先给机器人发一条消息/);
   // 最后一行有内容才给「添加」，界面上最多只有一个空行。
   assert.equal(app.hasAddPush(), true);
 });
@@ -139,11 +155,18 @@ test("adding a row keeps the typed order, splits a pasted semicolon list, and sk
   assert.deepEqual(app.pushSaves.at(-1), ["https://api.day.app/saved-key", F1, K2]);
   assert.deepEqual(app.pushValues(), ["https://api.day.app/saved-key", F1, K2]);
   assert.deepEqual(app.pushLabels(), ["Bark", "飞书", "Bark"]);
+  // Telegram 地址也进同一个列表，由后端归到自己那一栏。
+  app.addPush().onClick();
+  app.pushRow(3).onChange({ target: { value: T1 } });
+  app.pushRow(3).onBlur();
+  assert.deepEqual(app.pushSaves.at(-1), ["https://api.day.app/saved-key", F1, K2, T1]);
+  assert.equal(app.state.settings.telegramUrl, T1);
+  assert.deepEqual(app.pushLabels(), ["Bark", "飞书", "Bark", "Telegram"]);
   // 新开的空行没填就离开，这一行直接消失，不写盘。
   app.addPush().onClick();
-  app.pushRow(3).onBlur();
-  assert.deepEqual(app.pushValues(), ["https://api.day.app/saved-key", F1, K2]);
-  assert.equal(app.pushSaves.length, 1);
+  app.pushRow(4).onBlur();
+  assert.deepEqual(app.pushValues(), ["https://api.day.app/saved-key", F1, K2, T1]);
+  assert.equal(app.pushSaves.length, 2);
 });
 
 test("deleting a row saves the rest at once, and clearing the last one leaves an empty row", () => {

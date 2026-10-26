@@ -88,6 +88,7 @@ fn 样例设置() -> Settings {
         interval_seconds: 45,
         bark_url: "https://api.day.app/xxxx".into(),
         feishu_webhook: "https://open.feishu.cn/open-apis/bot/v2/hook/yyyy".into(),
+        telegram_url: "https://api.telegram.org/bot1:zz/sendMessage?chat_id=2".into(),
         sound_enabled: false,
         open_bag_on_hit: true,
         proxies: Vec::new(),
@@ -498,6 +499,7 @@ fn 设置的线上格式是小驼峰() {
         "intervalSeconds",
         "barkUrl",
         "feishuWebhook",
+        "telegramUrl",
         "soundEnabled",
         "openBagOnHit",
         "proxies",
@@ -505,7 +507,7 @@ fn 设置的线上格式是小驼峰() {
         assert!(obj.contains_key(key), "缺少字段 {key}：{value}");
     }
     assert!(!obj.contains_key("interval_seconds"), "不该有蛇形字段");
-    assert_eq!(obj.len(), 8);
+    assert_eq!(obj.len(), 9);
 }
 
 #[test]
@@ -594,11 +596,11 @@ fn 代理地址只留合法的并去重() {
 }
 
 // ---------------------------------------------------------------------------
-// 推送地址：界面上是一个列表，文件里按渠道分两栏存
+// 推送地址：界面上是一个列表，文件里按渠道分栏存
 // ---------------------------------------------------------------------------
 
 #[test]
-fn 推送地址按长相归到bark或飞书() {
+fn 推送地址按长相归到bark飞书或telegram() {
     use apw_core::config::{PushKind, push_kind};
 
     for feishu in [
@@ -610,6 +612,15 @@ fn 推送地址按长相归到bark或飞书() {
     ] {
         assert_eq!(push_kind(feishu), PushKind::Feishu, "{feishu:?}");
     }
+    for telegram in [
+        "https://api.telegram.org/bot123456:AAH-x_y/sendMessage?chat_id=42",
+        // 没写方法、反代换了主机、还带路径前缀，都认得出来。
+        "https://api.telegram.org/bot123456:AAH?chat_id=42",
+        "https://tg.example.com/proxy/bot123456:AAH/sendMessage?chat_id=42",
+        "api.telegram.org/bot123456:AAH/sendMessage?chat_id=42",
+    ] {
+        assert_eq!(push_kind(telegram), PushKind::Telegram, "{telegram:?}");
+    }
     for bark in [
         "https://api.day.app/key",
         "https://api.day.app/key?group=库存&sound=alarm",
@@ -617,6 +628,11 @@ fn 推送地址按长相归到bark或飞书() {
         "https://bark.example.com/key",
         // 只看路径：飞书地址出现在查询参数里不算。
         "https://api.day.app/key?url=https://open.feishu.cn/open-apis/bot/v2/hook/x",
+        "https://api.day.app/key?url=https://api.telegram.org/bot1:x/sendMessage",
+        // 像 token 又不是 token 的路径段：冒号前得是数字 ID，冒号后不能为空。
+        "https://bark.example.com/botABC:x",
+        "https://bark.example.com/bot123:",
+        "https://bark.example.com/bot",
         "不是地址",
     ] {
         assert_eq!(push_kind(bark), PushKind::Bark, "{bark:?}");
@@ -628,8 +644,10 @@ fn 推送地址整组替换时各归各的渠道并去重() {
     let b1 = "https://api.day.app/b1";
     let b2 = "https://api.day.app/b2";
     let f1 = "https://open.feishu.cn/open-apis/bot/v2/hook/f1";
+    let t1 = "https://api.telegram.org/bot1:t1/sendMessage?chat_id=1";
     let mut s = Settings::default();
     s.set_push_urls(&[
+        t1.to_string(),
         format!(" {f1} "),
         b1.to_string(),
         String::new(),
@@ -638,11 +656,12 @@ fn 推送地址整组替换时各归各的渠道并去重() {
     ]);
     assert_eq!(s.bark_url, format!("{b1};{b2}"));
     assert_eq!(s.feishu_webhook, f1);
-    // 读回来是 Bark 在前、飞书在后，各自保持填写顺序。
-    assert_eq!(s.push_urls(), vec![b1, b2, f1]);
+    assert_eq!(s.telegram_url, t1);
+    // 读回来依次是 Bark、飞书、Telegram，各自保持填写顺序。
+    assert_eq!(s.push_urls(), vec![b1, b2, f1, t1]);
 
     s.set_push_urls(&[]);
-    assert!(s.bark_url.is_empty() && s.feishu_webhook.is_empty());
+    assert!(s.bark_url.is_empty() && s.feishu_webhook.is_empty() && s.telegram_url.is_empty());
     assert!(s.push_urls().is_empty());
 }
 
@@ -665,4 +684,24 @@ fn 填在bark一栏的飞书地址规范化后挪到飞书() {
     let once = s.clone();
     s.normalize();
     assert_eq!(s, once);
+}
+
+#[test]
+fn 填在bark一栏的telegram地址规范化后挪到telegram() {
+    // 支持 Telegram 之前，这种地址会被当成 Bark 存进 Bark 一栏。
+    let t1 = "https://api.telegram.org/bot1:t1/sendMessage?chat_id=1";
+    let mut s = Settings {
+        bark_url: format!("https://api.day.app/b1;{t1}"),
+        ..Settings::default()
+    };
+    s.normalize();
+    assert_eq!(s.bark_url, "https://api.day.app/b1");
+    assert_eq!(s.telegram_url, t1);
+
+    // 旧配置文件没有 telegramUrl 字段：读上来是空的，不是解析失败。
+    let old: Settings = serde_json::from_str(
+        r#"{"locale":"zh_CN","targets":[],"intervalSeconds":30,"barkUrl":"","feishuWebhook":"","soundEnabled":true,"openBagOnHit":true}"#,
+    )
+    .expect("旧配置应当可读");
+    assert!(old.telegram_url.is_empty());
 }

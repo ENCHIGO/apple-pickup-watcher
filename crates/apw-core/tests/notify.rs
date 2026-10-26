@@ -1,30 +1,31 @@
 //! 通知渠道的测试。
 //!
-//! 不碰真实网络，也不碰音频设备：Bark 打到本进程里起的一个极简 HTTP 服务端，
-//! 断言它收到的**原始**请求行；提示音只测不需要声卡的那几条路径，真的要响一声
+//! 不碰真实网络，也不碰音频设备：Bark、Telegram 打到本进程里起的一个极简 HTTP
+//! 服务端，断言它收到的**原始**请求行和请求体；提示音只测不需要声卡的那几条路径，真的要响一声
 //! 的用例挂了 `#[ignore]`，手动跑。
 
 #![cfg(feature = "notifications")]
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use apw_core::notify::{Bark, Feishu, Multi, Notification, Notifier, NotifyError, Sound};
+use apw_core::notify::{Bark, Feishu, Multi, Notification, Notifier, NotifyError, Sound, Telegram};
 
 // ---------------------------------------------------------------------------
 // 极简 HTTP 测试服务端
 // ---------------------------------------------------------------------------
 
-/// 一个只会应答固定内容、并把收到的请求行原样记下来的 HTTP 服务端。
+/// 一个只会应答固定内容、并把收到的请求行和请求体原样记下来的 HTTP 服务端。
 ///
 /// 必须看**原始**请求行而不是解析后的结果：这一组测试要证明的正是「转义对不对」，
 /// 一旦在断言之前先解码一次，斜杠有没有变成 %2F 就看不出来了。
 struct TestServer {
     addr: SocketAddr,
     requests: Arc<Mutex<Vec<String>>>,
+    bodies: Arc<Mutex<Vec<String>>>,
     join: Option<std::thread::JoinHandle<()>>,
 }
 
@@ -45,9 +46,11 @@ impl TestServer {
         let listener = TcpListener::bind("127.0.0.1:0").expect("绑定本地端口");
         let addr = listener.local_addr().expect("取本地地址");
         let requests = Arc::new(Mutex::new(Vec::new()));
+        let bodies = Arc::new(Mutex::new(Vec::new()));
 
         let join = {
             let requests = Arc::clone(&requests);
+            let bodies = Arc::clone(&bodies);
             std::thread::spawn(move || {
                 // 不应答时也要把连接握住：一旦提前析构，客户端拿到的就是连接被
                 // 重置，测出来的是另一回事。
@@ -68,19 +71,34 @@ impl TestServer {
                         break;
                     }
                     // 把请求头读完，避免客户端还没写完我们就把连接关了。
+                    let mut content_length = 0;
                     loop {
                         let mut header = String::new();
                         match reader.read_line(&mut header) {
                             Ok(0) => break,
                             Ok(_) if header.trim().is_empty() => break,
-                            Ok(_) => {}
+                            Ok(_) => {
+                                if let Some((name, value)) = header.split_once(':')
+                                    && name.eq_ignore_ascii_case("content-length")
+                                {
+                                    content_length = value.trim().parse().unwrap_or(0);
+                                }
+                            }
                             Err(_) => break,
                         }
+                    }
+                    let mut body = vec![0; content_length];
+                    if reader.read_exact(&mut body).is_err() {
+                        body.clear();
                     }
                     requests
                         .lock()
                         .expect("记录请求")
                         .push(request_line.trim_end().to_string());
+                    bodies
+                        .lock()
+                        .expect("记录请求体")
+                        .push(String::from_utf8_lossy(&body).into_owned());
 
                     let Some((status_line, body)) = respond else {
                         held.push(stream);
@@ -101,6 +119,7 @@ impl TestServer {
         Self {
             addr,
             requests,
+            bodies,
             join: Some(join),
         }
     }
@@ -118,14 +137,35 @@ impl TestServer {
         self.requests.lock().expect("读请求").len()
     }
 
+    /// 第一条请求的请求行，如 `POST /bot…/sendMessage HTTP/1.1`。
+    fn request_line(&self) -> String {
+        let requests = self.requests.lock().expect("读请求");
+        requests.first().cloned().unwrap_or_default()
+    }
+
     /// 第一条请求的原始请求目标，即 `GET` 与 `HTTP/1.1` 之间那一段。
     fn target(&self) -> String {
-        let requests = self.requests.lock().expect("读请求");
-        let line = requests.first().cloned().unwrap_or_default();
-        line.split_whitespace()
+        self.request_line()
+            .split_whitespace()
             .nth(1)
             .unwrap_or_default()
             .to_string()
+    }
+
+    /// 第一条请求的请求体，表单按 `&` 拆开并解码成键值对。
+    fn form(&self) -> Vec<(String, String)> {
+        let bodies = self.bodies.lock().expect("读请求体");
+        let body = bodies.first().cloned().unwrap_or_default();
+        body.split('&')
+            .filter(|pair| !pair.is_empty())
+            .map(|pair| {
+                let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
+                (
+                    percent_decode(&key.replace('+', " ")),
+                    percent_decode(&value.replace('+', " ")),
+                )
+            })
+            .collect()
     }
 }
 
@@ -352,6 +392,133 @@ async fn bark地址不合法时报错且不发请求() {
         assert!(matches!(err, NotifyError::Config { .. }), "{bad:?}：{err}");
     }
     assert_eq!(server.count(), 0);
+}
+
+// ---------------------------------------------------------------------------
+// Telegram
+// ---------------------------------------------------------------------------
+
+const TG_OK: &str = r#"{"ok":true,"result":{"message_id":1}}"#;
+
+fn telegram_url(server: &TestServer, query: &str) -> String {
+    format!(
+        "http://{}/bot123456:SECRET-BOT-TOKEN/sendMessage?{query}",
+        server.addr
+    )
+}
+
+fn form_value<'a>(form: &'a [(String, String)], key: &str) -> Option<&'a str> {
+    form.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+}
+
+#[tokio::test]
+async fn telegram地址为空时直接成功且一个请求都不发() {
+    let server = TestServer::start("200 OK", TG_OK);
+    for blank in ["", "   ", "\t\n"] {
+        let telegram = Telegram::new(blank.to_string(), client());
+        assert!(!telegram.is_configured());
+        telegram
+            .notify(&到货通知())
+            .await
+            .expect("未配置不是错误，必须返回 Ok");
+    }
+    assert_eq!(server.count(), 0, "未配置时不该发出任何请求");
+}
+
+#[tokio::test]
+async fn telegram把chat_id和正文用表单post到sendmessage() {
+    let server = TestServer::start("200 OK", TG_OK);
+    Telegram::new(
+        telegram_url(&server, "chat_id=-100123&message_thread_id=7"),
+        client(),
+    )
+    .notify(&到货通知())
+    .await
+    .expect("正常推送应当成功");
+
+    assert_eq!(server.count(), 1);
+    assert_eq!(
+        server.request_line(),
+        "POST /bot123456:SECRET-BOT-TOKEN/sendMessage HTTP/1.1",
+        "参数挪进表单，地址里只留 token"
+    );
+    let form = server.form();
+    assert_eq!(form_value(&form, "chat_id"), Some("-100123"));
+    assert_eq!(form_value(&form, "message_thread_id"), Some("7"));
+    // 标题里的斜杠、链接里的 & 都必须原样到达，不能把表单截断。
+    assert_eq!(
+        form_value(&form, "text"),
+        Some(
+            "到货/提醒\n上海-环球港 iPhone 17 有货\nhttps://www.apple.com.cn/shop/bag?step=1&next=2"
+        ),
+        "{form:?}"
+    );
+}
+
+#[tokio::test]
+async fn telegram拒绝时报出bot_api的错误说明() {
+    let server = TestServer::start(
+        "400 Bad Request",
+        r#"{"ok":false,"error_code":400,"description":"Bad Request: chat not found"}"#,
+    );
+    let err = Telegram::new(telegram_url(&server, "chat_id=1"), client())
+        .notify(&到货通知())
+        .await
+        .expect_err("chat_id 不对，推送必须失败");
+    match &err {
+        NotifyError::Remote {
+            channel,
+            code,
+            message,
+        } => {
+            assert_eq!(channel, "Telegram");
+            assert_eq!(*code, 400);
+            assert_eq!(message, "Bad Request: chat not found");
+        }
+        other => panic!("应当报 Bot API 的错误说明，实际为 {other:?}"),
+    }
+    assert_no_secret(&err, "SECRET-BOT-TOKEN");
+
+    // 反代挂了、回的不是 Bot API 的 JSON：退回按状态码报错。
+    let server = TestServer::start("502 Bad Gateway", "<html>bad gateway</html>");
+    let err = Telegram::new(telegram_url(&server, "chat_id=1"), client())
+        .notify(&到货通知())
+        .await
+        .expect_err("502 必须报错");
+    assert!(
+        matches!(err, NotifyError::Rejected { status: 502, .. }),
+        "{err}"
+    );
+}
+
+#[tokio::test]
+async fn telegram多个地址渠道名带序号且只点名失败的那个() {
+    let good = TestServer::start("200 OK", TG_OK);
+    let bad = TestServer::start(
+        "401 Unauthorized",
+        r#"{"ok":false,"error_code":401,"description":"Unauthorized"}"#,
+    );
+    let raw = format!(
+        "{};{}",
+        telegram_url(&good, "chat_id=1"),
+        telegram_url(&bad, "chat_id=2")
+    );
+    let telegrams = Telegram::from_list(&raw, client());
+    assert_eq!(telegrams.len(), 2);
+    assert_eq!(telegrams[0].name(), "Telegram #1");
+    assert_eq!(telegrams[1].name(), "Telegram #2");
+
+    let mut all = Multi::new();
+    for telegram in telegrams {
+        all.push(telegram);
+    }
+    let err = all
+        .notify(&到货通知())
+        .await
+        .expect_err("第二个地址返回 401");
+    assert_eq!(err.failed_channels(), vec!["Telegram #2"]);
+    assert_eq!(good.count(), 1);
+    assert_eq!(bad.count(), 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -649,8 +816,9 @@ fn closed_port() -> SocketAddr {
     // listener 在这里析构，端口随即关闭。
 }
 
-/// Bark 的设备 key、飞书机器人的密钥都在地址的路径里。错误信息会原样进日志，
-/// 用户排查问题时常把日志贴进公开的 issue，所以错误文本里只能有协议和主机。
+/// Bark 的设备 key、飞书机器人的密钥、Telegram 机器人的 token 都在地址的路径里。
+/// 错误信息会原样进日志，用户排查问题时常把日志贴进公开的 issue，所以错误文本里
+/// 只能有协议和主机。
 fn assert_no_secret(err: &NotifyError, secret: &str) {
     let text = err.to_string();
     assert!(!text.contains(secret), "错误信息泄露了密钥：{text}");
@@ -681,6 +849,21 @@ async fn 飞书连不上时错误信息里没有机器人密钥() {
     .expect_err("端口没人监听，推送必须失败");
     assert!(matches!(err, NotifyError::Transport { .. }), "{err}");
     assert_no_secret(&err, "SECRET-HOOK-TOKEN");
+    assert!(err.to_string().contains("error sending request："), "{err}");
+}
+
+#[tokio::test]
+async fn telegram连不上时错误信息里没有机器人token() {
+    let addr = closed_port();
+    let err = Telegram::new(
+        format!("http://{addr}/bot123456:SECRET-BOT-TOKEN/sendMessage?chat_id=1"),
+        client(),
+    )
+    .notify(&到货通知())
+    .await
+    .expect_err("端口没人监听，推送必须失败");
+    assert!(matches!(err, NotifyError::Transport { .. }), "{err}");
+    assert_no_secret(&err, "SECRET-BOT-TOKEN");
     assert!(err.to_string().contains("error sending request："), "{err}");
 }
 

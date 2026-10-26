@@ -71,6 +71,7 @@ const DEFAULT_SETTINGS: Settings = {
   intervalSeconds: 30,
   barkUrl: "",
   feishuWebhook: "",
+  telegramUrl: "",
   soundEnabled: true,
   openBagOnHit: true,
   proxies: [],
@@ -266,7 +267,7 @@ export async function saveSettings(next: Settings): Promise<void> {
 /**
  * 用界面上的推送地址列表整体替换现有的。
  *
- * 每个地址是 Bark 还是飞书由后端按地址长相判断并分栏存好，这里原样交过去，
+ * 每个地址是 Bark、飞书还是 Telegram 由后端按地址长相判断并分栏存好，这里原样交过去，
  * 拿回存好的设置；界面上的渠道标签就按存回来的位置显示。
  */
 export async function setPushUrls(urls: string[]): Promise<void> {

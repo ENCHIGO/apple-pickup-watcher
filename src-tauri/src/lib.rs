@@ -15,7 +15,7 @@ use apw_core::apple::{AppleClient, ClientConfig};
 use apw_core::catalog::Catalog;
 use apw_core::config::{MIN_INTERVAL_SECONDS, Settings, SettingsStore};
 use apw_core::model::{Category, Product, REGIONS, Store, Target, region_by_locale};
-use apw_core::notify::{Bark, Feishu, Multi, Notification, Notifier, Sound};
+use apw_core::notify::{Bark, Feishu, Multi, Notification, Notifier, Sound, Telegram};
 use apw_core::watcher::{Event, TargetState, Watcher, WatcherConfig};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
@@ -176,7 +176,7 @@ async fn save_settings(
 
 /// 用界面上的推送地址列表整体替换现有的。
 ///
-/// 每个地址是 Bark 还是飞书由 [`Settings::set_push_urls`] 按长相判断，界面不自己猜。
+/// 每个地址是 Bark、飞书还是 Telegram 由 [`Settings::set_push_urls`] 按长相判断，界面不自己猜。
 /// 只动推送地址：不经过 [`save_settings`]，免得顺带把引擎的目标、间隔和代理
 /// 也重新下发一遍。
 #[tauri::command]
@@ -308,15 +308,16 @@ async fn test_notify(app: AppHandle) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
-/// 发出一条提醒：系统通知 + 提示音 + Bark，按用户设置取舍。
+/// 发出一条提醒：系统通知 + 提示音 + Bark / 飞书 / Telegram，按用户设置取舍。
 async fn dispatch_notification(
     app: &AppHandle,
     notification: Notification,
 ) -> Result<(), apw_core::notify::NotifyError> {
-    let settings = match app.try_state::<AppState>() {
-        Some(state) => state.settings_snapshot(),
-        None => return Ok(()),
+    let Some(state) = app.try_state::<AppState>() else {
+        return Ok(());
     };
+    let settings = state.settings_snapshot();
+    let http = state.http.clone();
 
     // 系统通知总是发。它是最轻量也最可靠的一条，没有理由让用户关掉它之后
     // 就完全收不到东西。
@@ -326,28 +327,18 @@ async fn dispatch_notification(
     if settings.sound_enabled {
         channels.push(Sound::embedded());
     }
-    if !settings.bark_url.trim().is_empty() {
-        let http = app
-            .try_state::<AppState>()
-            .map(|s| s.http.clone())
-            .unwrap_or_default();
-        // Bark 每次现构造：地址是用户随时可改的设置项，缓存实例会在改完地址后
-        // 继续往旧地址推。共享的 http 客户端一并传进去，连接池仍然复用。
-        // 用户可以填多个地址（分号分隔），每个地址一条渠道，并发推送、各自报错。
-        for bark in Bark::from_list(&settings.bark_url, http) {
-            channels.push(bark);
-        }
+    // 远程渠道每次现构造：地址是用户随时可改的设置项，缓存实例会在改完地址后
+    // 继续往旧地址推。共享的 http 客户端一并传进去，连接池仍然复用。
+    // 每个渠道都可以填多个地址（分号分隔），每个地址一条渠道，并发推送、各自
+    // 报错；没填的渠道 from_list 返回空列表。
+    for bark in Bark::from_list(&settings.bark_url, http.clone()) {
+        channels.push(bark);
     }
-    if !settings.feishu_webhook.trim().is_empty() {
-        let http = app
-            .try_state::<AppState>()
-            .map(|s| s.http.clone())
-            .unwrap_or_default();
-        // 飞书与 Bark 同样的构造规则：地址随时可改、支持分号分隔多个、
-        // 共享连接池，渠道各自报错。
-        for feishu in Feishu::from_list(&settings.feishu_webhook, http) {
-            channels.push(feishu);
-        }
+    for feishu in Feishu::from_list(&settings.feishu_webhook, http.clone()) {
+        channels.push(feishu);
+    }
+    for telegram in Telegram::from_list(&settings.telegram_url, http) {
+        channels.push(telegram);
     }
     if channels.is_empty() {
         return Ok(());
