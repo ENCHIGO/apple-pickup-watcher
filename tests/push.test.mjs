@@ -7,12 +7,14 @@ const push = loadSource("src/lib/push.ts");
 const K1 = "https://api.day.app/k1";
 const K2 = "https://api.day.app/k2";
 const F1 = "https://open.feishu.cn/open-apis/bot/v2/hook/f1";
+const T1 = "https://api.telegram.org/bot1:t1/sendMessage?chat_id=1";
 
-test("saved addresses are read back Bark first, and a missing Feishu field reads as empty", () => {
-  assert.deepEqual(push.savedPushAddresses({ barkUrl: `${K1};${K2}`, feishuWebhook: F1 }), [
+test("saved addresses are read back Bark, Feishu, Telegram, and missing newer fields read as empty", () => {
+  assert.deepEqual(push.savedPushAddresses({ barkUrl: `${K1};${K2}`, feishuWebhook: F1, telegramUrl: T1 }), [
     { url: K1, kind: "bark" },
     { url: K2, kind: "bark" },
     { url: F1, kind: "feishu" },
+    { url: T1, kind: "telegram" },
   ]);
   assert.deepEqual(push.savedPushAddresses({ barkUrl: "" }), []);
 });
@@ -35,4 +37,8 @@ test("the collapsed summary counts addresses per channel", () => {
     "推送：Bark 2 个、飞书 1 个",
   );
   assert.equal(push.pushSummary(push.savedPushAddresses({ barkUrl: "", feishuWebhook: F1 })), "推送：飞书 1 个");
+  assert.equal(
+    push.pushSummary(push.savedPushAddresses({ barkUrl: K1, feishuWebhook: "", telegramUrl: T1 })),
+    "推送：Bark 1 个、Telegram 1 个",
+  );
 });
