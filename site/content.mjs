@@ -36,7 +36,7 @@ export const locales = [
         "独立命令行 apw 输出 JSON，watch 逐行输出 NDJSON，无需桌面环境；配套 skill 让 Codex 等 agent 直接查询库存或等待到货。CLI 本身不弹窗、不推送、不下单。"
       ]
     ],
-    "screenshotAlt": "Apple Pickup Watcher 桌面版截图：监控列表逐行显示门店、型号、有货 / 无货 / 未知状态与最后检查时间",
+    "screenshotAlt": "Apple Pickup Watcher 桌面版截图：监控列表按型号分组，每组列出各家门店，有货的门店标成绿色、整组排在最前，无货的门店是灰字",
     "keywords": "苹果直营店库存监控, Apple Store 到店取货, iPhone 到货提醒, iPhone 库存查询, Apple Store 库存提醒, apple-store-helper 替代, Bark 推送",
     "coverageHeading": "支持范围",
     "categoriesLabel": "产品",
@@ -150,7 +150,7 @@ export const locales = [
         "The standalone apw command prints JSON and its watch mode streams NDJSON, with no desktop environment required. A bundled skill lets Codex-style agents query stock or wait for a restock. The CLI itself shows no popups, sends no pushes and places no orders."
       ]
     ],
-    "screenshotAlt": "Screenshot of the Apple Pickup Watcher desktop app: a watch list showing store, model, in-stock / out-of-stock / unknown state and last-checked time per row",
+    "screenshotAlt": "Screenshot of the Apple Pickup Watcher desktop app: the watch list grouped by model, each with its stores; stores with stock are green and their model sits at the top, out-of-stock stores are grey text",
     "keywords": "Apple Store stock checker, Apple Store pickup availability, iPhone restock alert, iPhone in-store stock monitor, Apple Store stock notifier, apple-store-helper alternative, Bark push",
     "coverageHeading": "Supported products and regions",
     "categoriesLabel": "Products",

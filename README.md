@@ -28,7 +28,7 @@
 <br>
 
 <p align="center">
-  <img src="assets/screenshot.png" alt="Apple Pickup Watcher 桌面版截图：监控列表逐行显示门店、型号、有货 / 无货 / 未知状态与最后检查时间" width="900">
+  <img src="assets/screenshot.png" alt="Apple Pickup Watcher 桌面版截图：监控列表按型号分组，每组列出各家门店，有货的门店标成绿色、整组排在最前，无货的门店是灰字" width="900">
 </p>
 
 ## 它做什么

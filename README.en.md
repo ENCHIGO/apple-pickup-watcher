@@ -28,7 +28,7 @@ Available as a desktop app, the `apw` command line tool, and an agent skill. Fre
 <br>
 
 <p align="center">
-  <img src="assets/screenshot.png" alt="Apple Pickup Watcher desktop app: the watch list shows each store and model with its in stock / out of stock / unknown status and the time of the last check" width="900">
+  <img src="assets/screenshot.png" alt="Apple Pickup Watcher desktop app: the watch list is grouped by model and lists each model's stores; stores with stock are green and their model sits at the top, out-of-stock stores are grey text" width="900">
 </p>
 
 ## What it does
