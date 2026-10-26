@@ -1,6 +1,6 @@
 ---
 name: apple-pickup-watcher
-description: Query Apple Retail pickup availability and monitor specified stores and SKUs with the apw CLI. Use when the user asks about Apple in-store stock, available pickup stores, or a bounded stock watch.
+description: Query Apple Retail in-store pickup availability and monitor chosen Apple Stores and models (iPhone, iPad, Mac, Apple Watch) in 25 regions with the apw CLI. Use when the user asks whether an Apple product can be picked up at an Apple Store, which stores have stock, or wants to watch stock until it arrives (苹果到店取货、Apple Store 库存、门店有没有货、蹲货/监控到货).
 ---
 
 # Apple Pickup Watcher
@@ -9,7 +9,16 @@ Use `apw` for inventory queries. It runs without the desktop application and emi
 
 ## Locate and discover
 
-Use `apw --version` and `apw schema` to identify the installed interface. If `apw` is absent, use an explicitly supplied executable path; in a source checkout the build is `cargo build --release --locked -p apw-cli` and the executable is `target/release/apw` (`apw.exe` on Windows). If neither binary nor source checkout is available, explain that the CLI must be installed; do not invent a download URL.
+Use `apw --version` and `apw schema` to identify the installed interface. If `apw` is not on PATH, check the default install locations (`~/.local/bin/apw`, or `%LOCALAPPDATA%\apw\bin\apw.exe` on Windows) and any path the user supplied.
+
+If it is still missing, install it with the script bundled in this skill, after telling the user it downloads the official prebuilt CLI from `github.com/ENCHIGO/apple-pickup-watcher/releases` and verifies its sha256:
+
+```bash
+sh <this skill's directory>/scripts/install-apw.sh          # macOS, x86_64 Linux → ~/.local/bin/apw
+powershell -ExecutionPolicy Bypass -File <this skill's directory>\scripts\install-apw.ps1   # Windows → %LOCALAPPDATA%\apw\bin\apw.exe
+```
+
+The script prints the installed path on its last stdout line; use that full path if its directory is not on PATH. `APW_VERSION=v0.7.0` pins a release. Prebuilt packages exist only for macOS (Apple Silicon, Intel), x86_64 Linux and x64 Windows; elsewhere, or if the download fails (GitHub may be unreachable on some networks), report the script's error instead of fetching binaries from any other source. From a source checkout of that repository the build is `cargo build --release --locked -p apw-cli` and the executable is `target/release/apw`.
 
 `apw schema` returns the supported flags, exit codes, limits and JSON Schema definitions. This skill covers `schemaVersion: 1`; inspect a different version's contract before relying on field names.
 
