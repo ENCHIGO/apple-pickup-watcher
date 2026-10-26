@@ -4,8 +4,21 @@ import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
-function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+function Sheet({ onOpenChange, ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
+  return (
+    <SheetPrimitive.Root
+      data-slot="sheet"
+      onOpenChange={(open) => {
+        // 收起前先让焦点离开面板里的输入框。设置项靠失焦保存，可按 Esc 收起时焦点
+        // 还在框里，框随面板卸载，React 收不到这次失焦，刚填的地址就没存上。
+        if (!open && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur()
+        }
+        onOpenChange?.(open)
+      }}
+      {...props}
+    />
+  )
 }
 
 // 从右侧滑出的面板。遮罩压得很淡：添加目标时要能看到左边的列表跟着变。
