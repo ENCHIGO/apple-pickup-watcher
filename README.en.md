@@ -36,7 +36,7 @@ Available as a desktop app, the `apw` command line tool, and an agent skill. Fre
 | Feature | What it means |
 | --- | --- |
 | **Three stock states, and failures are never disguised as “out of stock”** | Every target is exactly one of *in stock / out of stock / unknown*. When a query is blocked, rate-limited, fails on the network, or the response shape changes, you see **“unknown” with the reason** and a “monitoring is currently unreliable” warning, never a silent “out of stock”. |
-| **Watch many stores and models at once** | Mix targets from different product categories and different stores in one list. iPhone is picked in three steps (model → capacity → colour), each accepting several choices, and every combination the catalogue has is added at once; other categories pick the full model directly, and every dropdown is searchable. |
+| **Watch many stores and models at once** | Mix targets from different product categories and different stores in one list, grouped by model; stores with stock turn green and their model moves to the top. iPhone is picked in three steps (model → capacity → colour), each accepting several choices, and every combination the catalogue has is added at once; other categories pick the full model directly, and every dropdown is searchable. |
 | **Closing the window doesn’t quit** | The app moves to the system tray and the Rust backend keeps querying and alerting, so it can sit there for hours before a launch without an open window. |
 | **Alerts on every channel you need** | Desktop notifications, an alert sound, optional [Bark](https://github.com/Finb/Bark) push to your iPhone, and an optional Feishu (Lark) group bot that reaches Android, iPhone and desktop. Continuous availability is not re-announced every cycle; the app can open your shopping bag automatically if enabled. |
 | **Model catalog refreshes from Apple** | An offline snapshot is built in, and one click refreshes the current category from Apple’s buy pages, so new models on already supported pages can be watched on launch day. |
@@ -89,7 +89,7 @@ For Claude Code replace `codex` with `claude-code`; drop `--global` to install i
 
 ### Desktop in three steps
 
-1. **Add targets**: choose region → category → store → model and click “Add”. You can tick several stores at once and get one target per store. For iPhone, pick the model, capacity and colour step by step; each step accepts several choices, and every combination the catalogue has is added at once. Add as many as you like, mixing categories and stores freely.
+1. **Add targets**: click “Add” at the top right, choose region, store, category and model in the panel that slides in, and click “Add” at the bottom of the panel. You can tick several stores at once and get one target per store. For iPhone, pick the model, capacity and colour step by step; each step accepts several choices, and every combination the catalogue has is added at once. Add as many as you like, mixing categories and stores freely.
 2. **Start watching**: click “Start”. Keep the app running and your computer online and awake; closing the window moves it to the tray and keeps it going. It polls every 30 seconds by default, with a minimum of 5 seconds.
 3. **Get the alert, then buy on Apple’s website**: when stock is confirmed you get a desktop notification, the alert sound, and a Bark or Feishu push, and the shopping bag can open if enabled. Adding the item, choosing the pickup store, checkout, and payment are done by you on Apple’s website.
 
@@ -157,7 +157,7 @@ Install [Bark](https://github.com/Finb/Bark) on your iPhone, paste the push URL 
 
 ### Why is the default polling interval 30 seconds?
 
-Store stock does not flip back and forth within seconds, and 30 seconds is plenty for launch-day buying. The minimum is 5 seconds; anything lower falls back to 30. It is a floor, not a promise: Apple limits pickup queries per egress IP, so the app stretches the real interval to fit its request budget (one request per city per cycle, roughly one per minute at steady state) and shows the next check time in the footer. Please don’t use it for bulk buying for resale, which only gets this route shut down for everyone.
+Store stock does not flip back and forth within seconds, and 30 seconds is plenty for launch-day buying. The minimum is 5 seconds; anything lower falls back to 30. It is a floor, not a promise: Apple limits pickup queries per egress IP, so the app stretches the real interval to fit its request budget (one request per city per cycle, roughly one per minute at steady state) and shows the next check time in the status line at the top of the window. Please don’t use it for bulk buying for resale, which only gets this route shut down for everyone.
 
 More: [desktop guide](docs/desktop.md) · [CLI docs](docs/cli.md) · [development and maintenance](docs/development.md)
 

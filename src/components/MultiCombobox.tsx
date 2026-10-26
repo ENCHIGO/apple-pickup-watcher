@@ -60,7 +60,8 @@ export function MultiCombobox({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    // 模态的理由见 Combobox：在模态面板里，非模态弹层的列表滚不动。
+    <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"

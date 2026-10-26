@@ -2,25 +2,42 @@ import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } fr
 import {
   AlertTriangle,
   BellRing,
-  ChevronDown,
-  ChevronUp,
   Download,
   Pause,
   Play,
   Plus,
   RefreshCw,
+  Settings2,
   Trash2,
   X,
 } from "lucide-react";
 
 import { Combobox } from "@/components/Combobox";
+import { LogFooter } from "@/components/LogFooter";
 import { MultiCombobox } from "@/components/MultiCombobox";
+import { WatchList } from "@/components/WatchList";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { groupByProduct, inAddedOrder, latestCheck } from "@/lib/groups";
 import {
   capacityOptions,
   colorOptions,
@@ -32,25 +49,9 @@ import {
   cleanPushRows,
   PUSH_KIND_LABEL,
   type PushKind,
-  pushSummary,
   samePushUrls,
   savedPushAddresses,
 } from "@/lib/push";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-
 import {
   changeLocale,
   connect,
@@ -68,130 +69,20 @@ import {
   watcherStore,
 } from "@/lib/store";
 import {
-  type Availability,
   type Category,
   describeAdvice,
-  describeAvailability,
   formatTime,
   isUntrusted,
   type Product,
-  type Settings,
-  type StatusTone,
   type Target,
   targetKey,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-/** 四种展示状态各自的样式。 */
-const TONE_CLASS: Record<StatusTone, string> = {
-  inStock: "bg-in-stock/15 text-in-stock border-in-stock/30 font-medium",
-  outOfStock: "bg-muted text-muted-foreground border-transparent",
-  // 「未知」必须和「无货」长得完全不一样。这是整个项目的意义所在：上游把查询
-  // 失败显示成「无货」，用户对着一个早已失效的程序空等了大半年。
-  unknown: "bg-unknown/15 text-unknown border-unknown/40 font-medium",
-  pending: "bg-transparent text-muted-foreground/60 border-dashed",
-};
-
-function StatusBadge({ availability }: { availability: Availability }) {
-  const { label, tone, detail } = describeAvailability(availability);
-  const badge = (
-    <Badge variant="outline" className={`min-w-18 justify-center ${TONE_CLASS[tone]}`}>
-      {label}
-    </Badge>
-  );
-  if (!detail) return badge;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="cursor-help">{badge}</span>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-90">{detail}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-/**
- * 一块带标题的分区。「在哪儿加什么」和「怎么跑」分开放，控件不再挤成一排。
- *
- * 传 `onToggle` 就可以折叠：标题行整行可点，折叠后只剩标题和一行摘要。
- */
-function Panel({
-  title,
-  hint,
-  open = true,
-  onToggle,
-  children,
-}: {
-  title: string;
-  hint?: string;
-  open?: boolean;
-  onToggle?: () => void;
-  children: ReactNode;
-}) {
-  const heading = (
-    <>
-      <h2 className="shrink-0 text-sm font-medium">{title}</h2>
-      {hint !== undefined && (
-        <p className="text-muted-foreground min-w-0 flex-1 truncate text-xs" title={hint}>
-          {hint}
-        </p>
-      )}
-      {onToggle !== undefined &&
-        (open ? (
-          <ChevronUp className="text-muted-foreground size-4 shrink-0" />
-        ) : (
-          <ChevronDown className="text-muted-foreground size-4 shrink-0" />
-        ))}
-    </>
-  );
-  return (
-    <section className="bg-card text-card-foreground rounded-xl border shadow-xs">
-      {onToggle !== undefined ? (
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={onToggle}
-          className={cn(
-            "hover:bg-muted/40 flex w-full items-center gap-3 px-4 py-2 text-left",
-            open ? "rounded-t-xl" : "rounded-xl",
-          )}
-        >
-          {heading}
-        </button>
-      ) : (
-        <div className="flex items-center gap-3 px-4 py-2">{heading}</div>
-      )}
-      {open && <div className="grid gap-2.5 border-t px-4 pt-3 pb-4">{children}</div>}
-    </section>
-  );
-}
-
-const SETTINGS_OPEN_KEY = "apw.settingsOpen";
-
-/** 上次是展开还是收起。读不到（首次启动、无 localStorage）按展开。 */
-function readSettingsOpen(): boolean {
-  try {
-    return localStorage.getItem(SETTINGS_OPEN_KEY) !== "0";
-  } catch {
-    return true;
-  }
-}
-
-/** 收起时的一行摘要：设置折起来了，但它们是什么一眼还在。 */
-function settingsSummary(s: Settings): string {
-  return [
-    `每 ${s.intervalSeconds} 秒查一轮`,
-    pushSummary(savedPushAddresses(s)),
-    (s.proxies ?? []).length > 0 ? `代理 ${s.proxies.length} 条` : "无代理",
-    s.soundEnabled ? "提示音开" : "提示音关",
-    s.openBagOnHit ? "有货时开购物袋" : "有货时不开购物袋",
-  ].join(" · ");
-}
-
 /** 运行状态。一个会呼吸的点比一行灰字更像「它还活着」。 */
 function RunState({ running }: { running: boolean }) {
   return (
-    <span className="text-muted-foreground flex items-center gap-2 text-sm">
+    <span className="flex shrink-0 items-center gap-2 text-sm font-medium">
       <span className="relative flex size-2">
         {running && (
           <span className="bg-in-stock/60 absolute inline-flex size-full animate-ping rounded-full [animation-duration:2.4s]" />
@@ -208,45 +99,33 @@ function RunState({ running }: { running: boolean }) {
   );
 }
 
-/** 一个统计数字。数字等宽：每轮查询都会变，几个并排时不该来回抖。 */
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone?: "inStock" | "unknown";
-}) {
+/** 添加面板里的一行：左边标签，右边控件。 */
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <span className="bg-card inline-flex items-baseline gap-1.5 rounded-md border px-2.5 py-1 text-sm shadow-xs">
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span
-        className={cn(
-          "font-semibold tabular-nums",
-          value > 0 && tone === "inStock" && "text-in-stock",
-          value > 0 && tone === "unknown" && "text-unknown",
-        )}
-      >
-        {value}
-      </span>
-    </span>
+    <div className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-3">
+      <Label className="text-muted-foreground font-normal">{label}</Label>
+      {children}
+    </div>
   );
 }
 
-/** 日志行。时间戳弱化，到货那几行用有货色标出来，一屏灰字里一眼能找到。 */
-function LogLine({ line }: { line: string }) {
-  const match = /^\[(\d{2}:\d{2}:\d{2})\] ?(.*)$/s.exec(line);
-  if (!match) return <div className="whitespace-pre-wrap">{line}</div>;
-  const [, stamp, text = ""] = match;
+/** 设置面板里的一节。 */
+function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="whitespace-pre-wrap">
-      <span className="text-muted-foreground/60">{stamp}</span>{" "}
-      <span className={text.startsWith("有货") ? "text-in-stock font-medium" : "text-muted-foreground"}>
-        {text}
-      </span>
-    </div>
+    <section className="grid gap-3">
+      <h3 className="text-muted-foreground text-xs font-medium">{title}</h3>
+      {children}
+    </section>
   );
+}
+
+/**
+ * 面板打开时焦点落在面板本身，不自动进第一个输入框：设置面板一打开就亮着
+ * 「查询间隔」的焦点框，像是在催人改它。按 Tab 照常进入第一个控件。
+ */
+function focusPanel(event: Event) {
+  event.preventDefault();
+  (event.currentTarget as HTMLElement | null)?.focus();
 }
 
 export default function App() {
@@ -258,6 +137,9 @@ export default function App() {
     // StrictMode 的重复调用由 connect 内部去重。
   }, []);
 
+  // 主窗口只放监控结果。添加和设置是从右侧滑出的面板，用完就收：它们一直摆在
+  // 上面的时候，默认窗口里的监控列表只剩三分之一的高度。
+  const [sheet, setSheet] = useState<"add" | "settings" | null>(null);
   // 门店可以一次选好几家：同城门店合并成一次请求之后，多选不增加请求量。
   const [storeNumbers, setStoreNumbers] = useState<string[]>([]);
   // 非 iPhone 品类直接选一个完整型号。
@@ -268,22 +150,19 @@ export default function App() {
   const [families, setFamilies] = useState<string[]>([]);
   const [capacities, setCapacities] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
+  // 刚加进去几个。新的一组排在列表后面，可能被面板挡着或者要滚动才看得到，
+  // 面板底部说一声。
+  const [justAdded, setJustAdded] = useState(0);
   // 推送地址：Bark 和飞书是同一个列表，一行一个。null 表示还没动过，跟着后端走；
   // 动过之后以这份为准，保持用户填写的顺序，渠道标签按后端的归类显示。
   const [pushDraft, setPushDraft] = useState<string[] | null>(null);
   // 代理地址和推送地址一样一行一个，草稿的规矩也相同，见 pushDraft。
   const [proxyDraft, setProxyDraft] = useState<string[] | null>(null);
   const [intervalDraft, setIntervalDraft] = useState<number | null>(null);
-  // 设置改一次就放着不动，折起来把纵向空间还给表格；记住上次的选择。
-  const [settingsOpen, setSettingsOpen] = useState(readSettingsOpen());
-  function toggleSettings() {
-    const next = !settingsOpen;
-    setSettingsOpen(next);
-    try {
-      localStorage.setItem(SETTINGS_OPEN_KEY, next ? "1" : "0");
-    } catch {
-      // 存不下就每次都展开，不值得报错。
-    }
+
+  function openAdd() {
+    setJustAdded(0);
+    setSheet("add");
   }
 
   const savedPush = useMemo(() => savedPushAddresses(ui.settings), [ui.settings]);
@@ -332,6 +211,7 @@ export default function App() {
     () => ui.stores.map((s) => ({ value: s.number, label: s.title })),
     [ui.stores],
   );
+  const storeIndex = useMemo(() => new Map(ui.stores.map((s) => [s.number, s])), [ui.stores]);
   // 只列当前品类。四个品类的型号加起来好几百条，全堆进一个下拉框，
   // 想找一台 Mac 得先划过所有 iPhone。
   const productOptions = useMemo(
@@ -361,6 +241,7 @@ export default function App() {
     const product = ui.products.find((p) => p.partNumber === partNumber);
     return product ? [product] : [];
   }, [ui.products, ui.category, families, capacities, colors, partNumber]);
+  const selectedStores = ui.stores.filter((s) => storeNumbers.includes(s.number));
 
   function resetProductSelection() {
     setPartNumber("");
@@ -387,27 +268,34 @@ export default function App() {
     setColors(keepAvailable(colors, colorOptions(ui.products, ui.category, families, next)));
   }
 
-  const targets = useMemo(() => ui.rows.map((r) => r.target), [ui.rows]);
+  // 添加、删除都在这份上改，再整份交给后端：按加入的先后排，列表里各组的位置才不会变。
+  const targets = useMemo(
+    () => inAddedOrder(ui.rows, ui.settings.targets),
+    [ui.rows, ui.settings.targets],
+  );
+  const groups = useMemo(
+    () => groupByProduct(ui.rows, ui.settings.targets),
+    [ui.rows, ui.settings.targets],
+  );
+  // 列表里不止一个地区时，组标题旁标出地区：同一个型号名可能在两个地区各有一组。
+  const regionTitle = useMemo(() => {
+    const locales = new Set(ui.rows.map((r) => r.target.locale));
+    if (locales.size < 2) return null;
+    return (locale: string) => ui.regions.find((r) => r.locale === locale)?.title ?? locale;
+  }, [ui.rows, ui.regions]);
 
   const summary = useMemo(() => {
     let inStock = 0;
-    let outOfStock = 0;
     let untrusted = 0;
     for (const r of ui.rows) {
       if (r.availability.kind === "in_stock") inStock += 1;
-      else if (r.availability.kind === "out_of_stock") outOfStock += 1;
       if (isUntrusted(r.availability)) untrusted += 1;
     }
-    return { inStock, outOfStock, untrusted };
+    return { inStock, untrusted, lastChecked: latestCheck(ui.rows) };
   }, [ui.rows]);
 
-  const canAdd = storeNumbers.length > 0 && selectedProducts.length > 0;
-
-  async function onAdd() {
-    if (!canAdd) return;
-
-    // 门店 × 型号，每个组合一条目标；已经在列表里的跳过，不重复。
-    // 按门店分组排，表格里同一家店的几台机器挨在一起。
+  // 门店 × 型号，每个组合一条目标；已经在列表里的跳过，不重复。
+  const newTargets = useMemo(() => {
     const existing = new Set(targets.map(targetKey));
     const added: Target[] = [];
     for (const number of storeNumbers) {
@@ -428,95 +316,167 @@ export default function App() {
         added.push(next);
       }
     }
-    if (added.length === 0) return;
+    return added;
+  }, [targets, storeNumbers, selectedProducts, ui.stores, ui.settings.locale]);
+  const combos = storeNumbers.length * selectedProducts.length;
+
+  async function onAdd() {
+    if (newTargets.length === 0) return;
+    const added = newTargets;
     await setTargets([...targets, ...added]);
-    // 只清型号，门店留着：接着给同一批门店加下一个型号是最常见的操作。
+    // 只清型号，门店留着，面板也不关：接着给同一批门店加下一个型号是最常见的操作。
     resetProductSelection();
+    setJustAdded(added.length);
   }
 
-  async function onRemove(t: Target) {
-    await setTargets(targets.filter((x) => targetKey(x) !== targetKey(t)));
+  async function onRemove(remove: Target[]) {
+    const keys = new Set(remove.map(targetKey));
+    await setTargets(targets.filter((t) => !keys.has(targetKey(t))));
+  }
+
+  // 顶栏的一行状态：怎么在查、上一轮什么时候、查出了什么。
+  const status: { text: string; className?: string }[] = [];
+  if (ui.running) {
+    status.push({
+      // 请求预算在拉长间隔时明说，否则用户会以为设的 30 秒没生效。
+      text:
+        ui.pacing !== null && ui.pacing.paced
+          ? `受 Apple 频率限制，下一轮 ${ui.pacing.nextCheckInSecs} 秒后`
+          : `每 ${ui.settings.intervalSeconds} 秒查一轮`,
+    });
+  }
+  if (summary.lastChecked !== null) {
+    status.push({ text: `上次 ${formatTime(summary.lastChecked)}` });
+  }
+  if (ui.rows.length > 0) status.push({ text: `${ui.rows.length} 个目标` });
+  if (summary.inStock > 0) {
+    status.push({ text: `${summary.inStock} 个有货`, className: "text-in-stock font-medium" });
+  }
+  if (summary.untrusted > 0) {
+    // 「其中多少项查不到」一直点出来：这个数字大于 0 时，
+    // 列表里那些「无货」也未必反映真实情况。
+    status.push({ text: `${summary.untrusted} 个查不到`, className: "text-unknown font-medium" });
   }
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="mx-auto flex h-screen max-w-6xl flex-col gap-3 p-5">
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Apple Pickup Watcher</h1>
-            <p className="text-muted-foreground text-sm">
-              盯 Apple 直营店的到店取货库存，有货立刻提醒
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <RunState running={ui.running} />
-            {ui.running ? (
-              <Button variant="secondary" onClick={() => void stopWatching()}>
-                <Pause /> 暂停
-              </Button>
-            ) : (
-              <Button onClick={() => void startWatching()} disabled={ui.rows.length === 0}>
-                <Play /> 开始
-              </Button>
-            )}
-          </div>
+      <div className="mx-auto flex h-screen max-w-6xl flex-col">
+        <header className="flex items-center gap-3 px-6 pt-4 pb-3">
+          <RunState running={ui.running} />
+          <p
+            className="text-muted-foreground min-w-0 flex-1 truncate text-sm"
+            title={status.map((s) => s.text).join(" · ")}
+          >
+            {status.map((s, i) => (
+              <span key={s.text}>
+                {i > 0 && " · "}
+                <span className={s.className}>{s.text}</span>
+              </span>
+            ))}
+          </p>
+          <Button variant="ghost" onClick={openAdd}>
+            <Plus /> 添加
+          </Button>
+          <Button variant="ghost" onClick={() => setSheet("settings")}>
+            <Settings2 /> 设置
+          </Button>
+          {ui.running ? (
+            <Button variant="secondary" onClick={() => void stopWatching()}>
+              <Pause /> 暂停
+            </Button>
+          ) : (
+            <Button onClick={() => void startWatching()} disabled={ui.rows.length === 0}>
+              <Play /> 开始
+            </Button>
+          )}
         </header>
 
-        {ui.trouble !== null && (
-          // 只有标题是红的。原因和建议各占一行、用正常的字色：三段红字堆在一起，
-          // 用户反而分不清哪句是原因、哪句是该做的事。
-          <div
-            role="alert"
-            className="border-destructive/30 bg-destructive/5 border-l-destructive grid gap-1.5 rounded-lg border border-l-4 px-4 py-3 text-sm"
-          >
-            <p className="text-destructive flex flex-wrap items-center gap-x-2 font-medium">
-              <AlertTriangle className="size-4" />
-              监控当前不可信
-              <span className="text-muted-foreground font-normal">
-                恢复之前，表格里的状态不代表门店的真实库存
-              </span>
-            </p>
-            <p className="pl-6">{ui.trouble.reason}</p>
-            {ui.trouble.advice !== null && (
-              // 用户自己能做的那件事单独拎出来，而且要短：issue #3 里那位对着反复
-              // 告警的窗口干等了三个小时，缺的不是解释，是一句「换条网络」。
-              <p className="text-muted-foreground pl-6">
-                <span className="text-foreground font-medium">建议</span>{" "}
-                {describeAdvice(ui.trouble.advice)}
-              </p>
+        {(ui.trouble !== null || ui.update !== null) && (
+          <div className="grid gap-2 px-6 pb-3">
+            {ui.trouble !== null && (
+              // 只有标题是红的。原因和建议各占一行、用正常的字色：三段红字堆在一起，
+              // 用户反而分不清哪句是原因、哪句是该做的事。
+              <div
+                role="alert"
+                className="border-destructive/30 bg-destructive/5 border-l-destructive grid gap-1.5 rounded-lg border border-l-4 px-4 py-3 text-sm"
+              >
+                <p className="text-destructive flex flex-wrap items-center gap-x-2 font-medium">
+                  <AlertTriangle className="size-4" />
+                  监控当前不可信
+                  <span className="text-muted-foreground font-normal">
+                    恢复之前，列表里的状态不代表门店的真实库存
+                  </span>
+                </p>
+                <p className="pl-6">{ui.trouble.reason}</p>
+                {ui.trouble.advice !== null && (
+                  // 用户自己能做的那件事单独拎出来，而且要短：issue #3 里那位对着反复
+                  // 告警的窗口干等了三个小时，缺的不是解释，是一句「换条网络」。
+                  <p className="text-muted-foreground pl-6">
+                    <span className="text-foreground font-medium">建议</span>{" "}
+                    {describeAdvice(ui.trouble.advice)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {ui.update !== null && (
+              // 只提示，不自作主张安装。用户可能正等着抢购，被强制重启是灾难。
+              <div className="bg-card flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border px-4 py-2.5 text-sm shadow-xs">
+                <p className="flex items-center gap-2 font-medium">
+                  <Download className="size-4" /> 有新版本 {ui.update.version}
+                </p>
+                <p className="text-muted-foreground">
+                  当前 {ui.update.currentVersion}，安装后需重启应用生效。
+                </p>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button size="sm" disabled={ui.installing} onClick={() => void installUpdate()}>
+                    {ui.installing ? "正在下载…" : "下载并安装"}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={dismissUpdate}>
+                    <X /> 稍后
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         )}
 
-        {ui.update !== null && (
-          // 只提示，不自作主张安装。用户可能正等着抢购，被强制重启是灾难。
-          <div className="bg-card flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border px-4 py-2.5 text-sm shadow-xs">
-            <p className="flex items-center gap-2 font-medium">
-              <Download className="size-4" /> 有新版本 {ui.update.version}
-            </p>
-            <p className="text-muted-foreground">
-              当前 {ui.update.currentVersion}，安装后需重启应用生效。
-            </p>
-            <div className="ml-auto flex items-center gap-2">
-              <Button size="sm" disabled={ui.installing} onClick={() => void installUpdate()}>
-                {ui.installing ? "正在下载…" : "下载并安装"}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={dismissUpdate}>
-                <X /> 稍后
-              </Button>
-            </div>
+        {ui.rows.length === 0 ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 pb-16">
+            {ui.ready ? (
+              <>
+                <p className="text-muted-foreground text-sm">还没有监控目标</p>
+                <Button onClick={openAdd}>
+                  <Plus /> 添加监控目标
+                </Button>
+              </>
+            ) : (
+              <p className="text-muted-foreground text-sm">正在载入…</p>
+            )}
           </div>
+        ) : (
+          <ScrollArea className="min-h-0 flex-1">
+            <WatchList
+              groups={groups}
+              stores={storeIndex}
+              regionTitle={regionTitle}
+              onRemove={(remove) => void onRemove(remove)}
+            />
+          </ScrollArea>
         )}
 
-        <Panel
-          title="添加监控目标"
-          hint="不同品类、不同门店可以混着加；门店和 iPhone 的机型、容量、颜色都可多选，组合一次全部加入"
-        >
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="grid gap-1.5">
-              <Label>地区</Label>
+        <LogFooter logs={ui.logs} />
+      </div>
+
+      <Sheet open={sheet === "add"} onOpenChange={(open) => setSheet(open ? "add" : null)}>
+        <SheetContent aria-describedby={undefined} onOpenAutoFocus={focusPanel}>
+          <SheetHeader>
+            <SheetTitle>添加监控目标</SheetTitle>
+          </SheetHeader>
+          <SheetBody className="grid content-start gap-3">
+            <Field label="地区">
               <Combobox
-                className="w-36"
+                className="w-full"
                 options={ui.regions.map((r) => ({ value: r.locale, label: r.title }))}
                 value={ui.settings.locale}
                 onChange={(locale) => {
@@ -529,12 +489,36 @@ export default function App() {
                 searchPlaceholder="搜索地区…"
                 emptyText="没有匹配的地区"
               />
-            </div>
+            </Field>
+            <Field label="门店">
+              <MultiCombobox
+                className="w-full"
+                options={storeOptions}
+                values={storeNumbers}
+                onChange={setStoreNumbers}
+                placeholder="选择自提门店"
+                searchPlaceholder="搜索门店…"
+                emptyText="没有匹配的门店"
+                countLabel={(n) => `已选 ${n} 家门店`}
+                disabled={storeOptions.length === 0}
+              />
+            </Field>
+            {selectedStores.length > 1 && (
+              // 门店在面板收起后仍然保留，下次打开要能直接看到是哪几家；
+              // 触发器上只放得下一个数字。
+              <p
+                className="text-muted-foreground -mt-1 line-clamp-2 pl-15 text-xs"
+                title={selectedStores.map((s) => s.title).join("、")}
+              >
+                {selectedStores.map((s) => s.title).join("、")}
+              </p>
+            )}
 
-            <div className="grid gap-1.5">
-              <Label>品类</Label>
+            <div className="my-1 border-t" />
+
+            <Field label="品类">
               <Combobox
-                className="w-36"
+                className="w-full"
                 options={ui.categories.map((c) => ({ value: c.value, label: c.title }))}
                 value={ui.category}
                 onChange={(value) => {
@@ -548,31 +532,12 @@ export default function App() {
                 emptyText="没有匹配的品类"
                 disabled={ui.categories.length === 0}
               />
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label>门店（可多选）</Label>
-              <MultiCombobox
-                className="w-64"
-                options={storeOptions}
-                values={storeNumbers}
-                onChange={setStoreNumbers}
-                placeholder="选择自提门店"
-                searchPlaceholder="搜索门店…"
-                emptyText="没有匹配的门店"
-                countLabel={(n) => `已选 ${n} 家门店`}
-                disabled={storeOptions.length === 0}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-end gap-3">
+            </Field>
             {ui.category === "iphone" ? (
               <>
-                <div className="grid gap-1.5">
-                  <Label>机型（可多选）</Label>
+                <Field label="机型">
                   <MultiCombobox
-                    className="w-48"
+                    className="w-full"
                     options={iphoneFamilyOptions}
                     values={families}
                     onChange={onFamiliesChange}
@@ -582,12 +547,10 @@ export default function App() {
                     countLabel={(n) => `已选 ${n} 款机型`}
                     disabled={iphoneFamilyOptions.length === 0}
                   />
-                </div>
-
-                <div className="grid gap-1.5">
-                  <Label>容量（可多选）</Label>
+                </Field>
+                <Field label="容量">
                   <MultiCombobox
-                    className="w-36"
+                    className="w-full"
                     options={iphoneCapacityOptions}
                     values={capacities}
                     onChange={onCapacitiesChange}
@@ -597,12 +560,10 @@ export default function App() {
                     countLabel={(n) => `已选 ${n} 种容量`}
                     disabled={families.length === 0 || iphoneCapacityOptions.length === 0}
                   />
-                </div>
-
-                <div className="grid gap-1.5">
-                  <Label>颜色（可多选）</Label>
+                </Field>
+                <Field label="颜色">
                   <MultiCombobox
-                    className="w-40"
+                    className="w-full"
                     options={iphoneColorOptions}
                     values={colors}
                     onChange={setColors}
@@ -612,13 +573,12 @@ export default function App() {
                     countLabel={(n) => `已选 ${n} 种颜色`}
                     disabled={capacities.length === 0 || iphoneColorOptions.length === 0}
                   />
-                </div>
+                </Field>
               </>
             ) : (
-              <div className="grid gap-1.5">
-                <Label>型号</Label>
+              <Field label="型号">
                 <Combobox
-                  className="w-96"
+                  className="w-full"
                   options={productOptions}
                   value={partNumber}
                   onChange={setPartNumber}
@@ -627,65 +587,186 @@ export default function App() {
                   emptyText="没有匹配的型号"
                   disabled={productOptions.length === 0}
                 />
-              </div>
+              </Field>
             )}
-
-            <Button variant="secondary" onClick={() => void onAdd()} disabled={!canAdd}>
-              <Plus /> 添加
-            </Button>
-            {selectedProducts.length > 1 && (
-              // 多选时把要加的规模点明：三级各勾几项之后，组合数并不直观。
-              <span
-                className="text-muted-foreground pb-2 text-sm"
-                title={selectedProducts.map((p) => p.title).join("、")}
-              >
-                {selectedProducts.length} 个型号 × {storeNumbers.length} 家门店
-              </span>
-            )}
-
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="从 Apple 官网更新当前品类的型号列表"
+                  variant="link"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground ml-15 h-auto justify-self-start p-0 text-xs font-normal has-[>svg]:px-0 [&_svg]:size-3"
                   disabled={ui.refreshing}
                   onClick={() => void refreshProducts()}
                 >
                   <RefreshCw className={ui.refreshing ? "animate-spin" : undefined} />
+                  更新型号列表
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
                 从 Apple 官网更新当前品类的型号列表。新机发布后用这个，不必等程序更新。
               </TooltipContent>
             </Tooltip>
-          </div>
-        </Panel>
+          </SheetBody>
+          <SheetFooter>
+            <p className="text-muted-foreground min-w-0 flex-1 text-sm">
+              {combos > 0 ? (
+                // 多选时把要加的规模点明：三级各勾几项之后，组合数并不直观。
+                <span title={selectedProducts.map((p) => p.title).join("、")}>
+                  {selectedProducts.length} 个型号 × {storeNumbers.length} 家门店
+                  {combos > newTargets.length
+                    ? newTargets.length === 0
+                      ? "，都已在监控列表里"
+                      : `，其中 ${combos - newTargets.length} 个已在监控列表里`
+                    : null}
+                </span>
+              ) : justAdded > 0 ? (
+                `已添加 ${justAdded} 个`
+              ) : null}
+            </p>
+            <Button onClick={() => void onAdd()} disabled={newTargets.length === 0}>
+              <Plus /> 添加
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
-        <Panel
-          title="运行设置"
-          hint={settingsOpen ? "改动即时保存" : settingsSummary(ui.settings)}
-          open={settingsOpen}
-          onToggle={toggleSettings}
-        >
-          {/* 两栏：左边是查询与本机提醒，右边是推送地址。推送地址一行一个会占好几行，
-              和别的设置叠成一列的话，默认窗口高度下监控列表会被挤得看不见。 */}
-          <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
-            <div className="grid min-w-80 grow-[2] basis-80 gap-3">
-              <div className="grid gap-1.5">
-                {/* 标题行和右栏「推送地址」一样高，两栏的输入框才能对齐。 */}
-                <div className="flex h-3.5 items-center gap-x-2">
-                  <Label htmlFor="proxy-0" className="shrink-0 whitespace-nowrap">
-                    代理地址（可选）
+      <Sheet
+        open={sheet === "settings"}
+        onOpenChange={(open) => setSheet(open ? "settings" : null)}
+      >
+        <SheetContent onOpenAutoFocus={focusPanel}>
+          <SheetHeader>
+            <SheetTitle>设置</SheetTitle>
+            <SheetDescription>改动即时保存</SheetDescription>
+          </SheetHeader>
+          <SheetBody className="grid content-start gap-7">
+            <SettingsSection title="查询">
+              <div className="flex items-center justify-between gap-4">
+                <Label htmlFor="interval">查询间隔</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="interval"
+                    type="number"
+                    min={5}
+                    className="h-8 w-20 select-text"
+                    value={intervalValue}
+                    onChange={(e) => setIntervalDraft(e.target.valueAsNumber)}
+                    onBlur={() => {
+                      const s = Number.isFinite(intervalValue) ? Math.round(intervalValue) : 30;
+                      setIntervalDraft(null);
+                      void setIntervalSeconds(s);
+                    }}
+                  />
+                  <span className="text-muted-foreground text-sm">秒</span>
+                </div>
+              </div>
+            </SettingsSection>
+
+            <SettingsSection title="提醒">
+              <div className="flex items-center justify-between gap-4">
+                <Label htmlFor="sound">提示音</Label>
+                <Switch
+                  id="sound"
+                  checked={ui.settings.soundEnabled}
+                  onCheckedChange={(v) => void saveSettings({ ...ui.settings, soundEnabled: v })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <Label htmlFor="openbag">有货时打开购物袋</Label>
+                <Switch
+                  id="openbag"
+                  checked={ui.settings.openBagOnHit}
+                  onCheckedChange={(v) => void saveSettings({ ...ui.settings, openBagOnHit: v })}
+                />
+              </div>
+              <div className="grid gap-1.5 pt-1">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="push-0" className="shrink-0">
+                    推送地址
                   </Label>
-                  <span className="text-muted-foreground min-w-0 truncate text-xs leading-none">
+                  <span className="text-muted-foreground min-w-0 truncate text-xs">
+                    Bark 或飞书群机器人，一行一个
+                  </span>
+                  {lastPushRow.trim() !== "" && (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="text-muted-foreground hover:text-foreground ml-auto h-auto shrink-0 gap-1 p-0 text-xs has-[>svg]:px-0 [&_svg]:size-3"
+                      onClick={() => setPushDraft([...cleanPushRows(visiblePushRows), ""])}
+                    >
+                      <Plus /> 添加推送地址
+                    </Button>
+                  )}
+                </div>
+                {visiblePushRows.map((row, index) => {
+                  const kind = savedPushKind.get(row.trim());
+                  return (
+                    <div key={index} className="flex items-center gap-2">
+                      {/* 渠道标签占固定宽度：还没保存的行留空，输入框照样对齐。 */}
+                      <span className="flex w-12 shrink-0 justify-center">
+                        {kind !== undefined && (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            {PUSH_KIND_LABEL[kind]}
+                          </Badge>
+                        )}
+                      </span>
+                      <Input
+                        id={`push-${index}`}
+                        aria-label={`推送地址 ${index + 1}`}
+                        className="select-text"
+                        placeholder="Bark 地址，或飞书群机器人的 webhook"
+                        value={row}
+                        // 只有点「添加」新开的那一行自动聚焦；打开面板时的空行不抢焦点。
+                        autoFocus={pushDraft !== null && row === "" && index > 0}
+                        onChange={(e) => editPushRow(index, e.target.value)}
+                        onBlur={() => commitPushRows(visiblePushRows)}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`删除推送地址 ${index + 1}`}
+                        disabled={visiblePushRows.length === 1 && row === ""}
+                        onClick={() =>
+                          commitPushRows(visiblePushRows.filter((_, i) => i !== index))
+                        }
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
+                  );
+                })}
+                {savedPush.some((p) => p.kind === "feishu") && (
+                  // 飞书机器人最常见的配置错误是安全设置，只在真填了飞书地址时提醒。
+                  <p className="text-muted-foreground pl-14 text-xs">
+                    飞书机器人的安全设置请选「自定义关键词」，填「有货」。
+                  </p>
+                )}
+              </div>
+              {/* 测的就是上面这些：提示音、系统通知和推送一起发一遍。 */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="justify-self-start"
+                onClick={() => void testNotify()}
+              >
+                <BellRing /> 测试提醒
+              </Button>
+            </SettingsSection>
+
+            <SettingsSection title="网络">
+              <div className="grid gap-1.5">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="proxy-0" className="shrink-0">
+                    代理地址
+                  </Label>
+                  <span className="text-muted-foreground min-w-0 truncate text-xs">
                     http / https / socks5，一行一个
                   </span>
                   {lastProxyRow.trim() !== "" && (
                     <Button
                       variant="link"
                       size="sm"
-                      className="text-muted-foreground hover:text-foreground ml-auto h-3.5 shrink-0 gap-1 p-0 text-xs leading-none has-[>svg]:px-0 [&_svg]:size-3"
+                      className="text-muted-foreground hover:text-foreground ml-auto h-auto shrink-0 gap-1 p-0 text-xs has-[>svg]:px-0 [&_svg]:size-3"
                       onClick={() => setProxyDraft([...cleanPushRows(visibleProxyRows), ""])}
                     >
                       <Plus /> 添加代理
@@ -703,7 +784,7 @@ export default function App() {
                         aria-label={`代理地址 ${index + 1}`}
                         aria-invalid={rejected || undefined}
                         className="select-text"
-                        placeholder="socks5://127.0.0.1:1080 或 http://user:pass@host:port"
+                        placeholder="socks5://127.0.0.1:1080 或 http://host:port"
                         value={row}
                         autoFocus={proxyDraft !== null && row === "" && index > 0}
                         onChange={(e) => editProxyRow(index, e.target.value)}
@@ -733,214 +814,10 @@ export default function App() {
                   );
                 })}
               </div>
-
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="interval" className="whitespace-nowrap">
-                    查询间隔
-                  </Label>
-                  <Input
-                    id="interval"
-                    type="number"
-                    min={5}
-                    className="h-8 w-20 select-text"
-                    value={intervalValue}
-                    onChange={(e) => setIntervalDraft(e.target.valueAsNumber)}
-                    onBlur={() => {
-                      const s = Number.isFinite(intervalValue) ? Math.round(intervalValue) : 30;
-                      setIntervalDraft(null);
-                      void setIntervalSeconds(s);
-                    }}
-                  />
-                  <span className="text-muted-foreground text-sm">秒</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="sound"
-                    checked={ui.settings.soundEnabled}
-                    onCheckedChange={(v) =>
-                      void saveSettings({ ...ui.settings, soundEnabled: v })
-                    }
-                  />
-                  <Label htmlFor="sound">提示音</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="openbag"
-                    checked={ui.settings.openBagOnHit}
-                    onCheckedChange={(v) =>
-                      void saveSettings({ ...ui.settings, openBagOnHit: v })
-                    }
-                  />
-                  <Label htmlFor="openbag">有货时打开购物袋</Label>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid min-w-96 grow-[3] basis-96 gap-1.5">
-              {/* 标题行和左栏的标签一样高，两栏的第一行输入框才能对齐。 */}
-              <div className="flex h-3.5 items-center gap-x-2">
-                <Label htmlFor="push-0" className="shrink-0 whitespace-nowrap">
-                  推送地址（可选）
-                </Label>
-                <span className="text-muted-foreground min-w-0 truncate text-xs leading-none">
-                  Bark 或飞书群机器人，一行一个，自动识别
-                </span>
-                {lastPushRow.trim() !== "" && (
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="text-muted-foreground hover:text-foreground ml-auto h-3.5 shrink-0 gap-1 p-0 text-xs leading-none has-[>svg]:px-0 [&_svg]:size-3"
-                    onClick={() => setPushDraft([...cleanPushRows(visiblePushRows), ""])}
-                  >
-                    <Plus /> 添加推送地址
-                  </Button>
-                )}
-                {/* 测试的就是这些推送（连同系统通知和提示音），放在它们的标题旁边。 */}
-                <Button
-                  variant="link"
-                  size="sm"
-                  className={`text-muted-foreground hover:text-foreground h-3.5 shrink-0 gap-1 p-0 text-xs leading-none has-[>svg]:px-0 [&_svg]:size-3 ${lastPushRow.trim() !== "" ? "" : "ml-auto"}`}
-                  onClick={() => void testNotify()}
-                >
-                  <BellRing /> 测试提醒
-                </Button>
-              </div>
-              {visiblePushRows.map((row, index) => {
-                const kind = savedPushKind.get(row.trim());
-                return (
-                  <div key={index} className="flex items-center gap-2">
-                    {/* 渠道标签占固定宽度：还没保存的行留空，输入框照样对齐。 */}
-                    <span className="flex w-12 shrink-0 justify-center">
-                      {kind !== undefined && (
-                        <Badge variant="outline" className="text-muted-foreground">
-                          {PUSH_KIND_LABEL[kind]}
-                        </Badge>
-                      )}
-                    </span>
-                    <Input
-                      id={`push-${index}`}
-                      aria-label={`推送地址 ${index + 1}`}
-                      className="select-text"
-                      placeholder="粘贴 Bark 地址，或飞书群机器人的 webhook 地址"
-                      value={row}
-                      // 只有点「添加」新开的那一行自动聚焦；启动时的空行不抢焦点。
-                      autoFocus={pushDraft !== null && row === "" && index > 0}
-                      onChange={(e) => editPushRow(index, e.target.value)}
-                      onBlur={() => commitPushRows(visiblePushRows)}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`删除推送地址 ${index + 1}`}
-                      disabled={visiblePushRows.length === 1 && row === ""}
-                      onClick={() =>
-                        commitPushRows(visiblePushRows.filter((_, i) => i !== index))
-                      }
-                    >
-                      <Trash2 />
-                    </Button>
-                  </div>
-                );
-              })}
-              {savedPush.some((p) => p.kind === "feishu") && (
-                // 飞书机器人最常见的配置错误是安全设置，只在真填了飞书地址时提醒。
-                <p className="text-muted-foreground pl-14 text-xs">
-                  飞书机器人的安全设置请选「自定义关键词」，填「有货」。
-                </p>
-              )}
-            </div>
-          </div>
-        </Panel>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Stat label="监控" value={ui.rows.length} />
-          <Stat label="有货" value={summary.inStock} tone="inStock" />
-          <Stat label="无货" value={summary.outOfStock} />
-          {summary.untrusted > 0 && (
-            // 「其中多少项查不到」单独点出来：这个数字大于 0 时，
-            // 表格里那些「无货」也未必反映真实情况。
-            <Stat label="查不到" value={summary.untrusted} tone="unknown" />
-          )}
-          {ui.running && ui.pacing !== null && ui.pacing.paced && (
-            // 请求预算在拉长间隔时明说，否则用户会以为设的 30 秒没生效。
-            <span className="text-muted-foreground ml-auto text-sm">
-              受 Apple 频率限制，下一轮 {ui.pacing.nextCheckInSecs} 秒后
-            </span>
-          )}
-        </div>
-
-        <section className="bg-card min-h-0 flex-1 overflow-hidden rounded-xl border shadow-xs">
-          <ScrollArea className="h-full">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-muted-foreground w-24 pl-4 text-xs">状态</TableHead>
-                  <TableHead className="text-muted-foreground text-xs">门店</TableHead>
-                  <TableHead className="text-muted-foreground text-xs">型号</TableHead>
-                  <TableHead className="text-muted-foreground w-24 text-xs">最后检查</TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ui.rows.length === 0 ? (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={5} className="text-muted-foreground h-28 text-center">
-                      {ui.ready ? "还没有监控目标。在上面选好门店和型号，点「添加」。" : "正在载入…"}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  ui.rows.map((row) => (
-                    <TableRow
-                      key={targetKey(row.target)}
-                      // 有货的行整行铺一层有货色。这一刻是这个程序存在的全部理由，
-                      // 不该只靠一枚小徽标。
-                      className={cn(
-                        "odd:bg-muted/30",
-                        row.availability.kind === "in_stock" &&
-                          "bg-in-stock/10 odd:bg-in-stock/10 hover:bg-in-stock/15",
-                      )}
-                    >
-                      <TableCell className="pl-4">
-                        <StatusBadge availability={row.availability} />
-                      </TableCell>
-                      <TableCell className="font-medium">{row.target.storeTitle}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {row.target.productName}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground tabular-nums">
-                        {formatTime(row.lastCheckedMs)}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label="删除这条监控"
-                          onClick={() => void onRemove(row.target)}
-                        >
-                          <Trash2 />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </section>
-
-        <section className="bg-card h-28 shrink-0 overflow-hidden rounded-xl border shadow-xs">
-          <ScrollArea className="h-full">
-            <div className="p-3 font-mono text-xs leading-5 select-text">
-              {ui.logs.length === 0 ? (
-                <p className="text-muted-foreground">日志会显示在这里。</p>
-              ) : (
-                ui.logs.map((line, i) => <LogLine key={i} line={line} />)
-              )}
-            </div>
-          </ScrollArea>
-        </section>
-      </div>
+            </SettingsSection>
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
     </TooltipProvider>
   );
 }
