@@ -27,12 +27,3 @@ test("the same addresses in another order are not a change", () => {
   assert.equal(push.samePushUrls([K1], [K1, F1]), false);
   assert.equal(push.samePushUrls([K1, K2], [K1, F1]), false);
 });
-
-test("the collapsed summary counts addresses per channel", () => {
-  assert.equal(push.pushSummary([]), "推送未配置");
-  assert.equal(
-    push.pushSummary(push.savedPushAddresses({ barkUrl: `${K1};${K2}`, feishuWebhook: F1 })),
-    "推送：Bark 2 个、飞书 1 个",
-  );
-  assert.equal(push.pushSummary(push.savedPushAddresses({ barkUrl: "", feishuWebhook: F1 })), "推送：飞书 1 个");
-});

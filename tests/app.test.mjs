@@ -7,7 +7,7 @@ function renderApp() {
   const addedTargets = [];
   const pushSaves = [];
   const state = {
-    settings: { locale: "zh_CN", barkUrl: "https://api.day.app/saved-key", intervalSeconds: 30 },
+    settings: { locale: "zh_CN", barkUrl: "https://api.day.app/saved-key", intervalSeconds: 30, targets: [] },
     stores: [], products: [], rows: [], regions: [], categories: [], logs: [],
     category: "iphone", trouble: null, update: null,
   };
@@ -71,6 +71,11 @@ function renderApp() {
     walk(App());
     return found;
   }
+  function last(predicate) {
+    const found = all(predicate);
+    assert.ok(found.length > 0, "expected UI control to be rendered");
+    return found.at(-1).props;
+  }
   const isPushInput = (element) => /^push-\d+$/.test(element?.props?.id ?? "");
   const isAddPush = (element) => element.type === "Button" &&
     Array.isArray(element.props.children) && element.props.children.includes(" 添加推送地址");
@@ -90,10 +95,15 @@ function renderApp() {
     addPush: () => control(isAddPush),
     hasAddPush: () => all(isAddPush).length > 0,
     choice: (placeholder) => control((element) => element?.props?.placeholder === placeholder),
-    addButton: () => control((element) => element.type === "Button" &&
+    // 顶栏也有一个「添加」，只负责打开面板；要的是面板底部真正加入目标的那个。
+    addButton: () => last((element) => element.type === "Button" &&
       Array.isArray(element.props.children) && element.props.children.includes(" 添加")),
     scaleHint: () => control((element) => element.type === "span" &&
       Array.isArray(element.props.children) && element.props.children.includes(" 个型号 × ")),
+    // 顶栏那一行状态，取悬停提示里的整句。
+    status: () => control((element) => element.type === "p" &&
+      typeof element.props.title === "string" && element.props.title.includes("个目标")).title,
+    watchList: () => control((element) => element.type === "WatchList"),
     state, saved, addedTargets, pushSaves,
   };
 }
@@ -115,7 +125,7 @@ test("saved push addresses are one list, Bark first then Feishu, labelled by whe
 
 test("old settings without push addresses show one empty row that saves on blur", () => {
   const app = renderApp();
-  app.state.settings = { locale: "zh_CN", barkUrl: "", intervalSeconds: 30 };
+  app.state.settings = { locale: "zh_CN", barkUrl: "", intervalSeconds: 30, targets: [] };
   assert.deepEqual(app.pushValues(), [""], "老设置没有 feishuWebhook 字段，也应当是一个空行而不是报错");
   assert.equal(app.hasAddPush(), false);
   assert.equal(app.removePush(0).disabled, true, "只剩一个空行时删除没有意义");
@@ -323,4 +333,73 @@ test("proxy addresses are one per row, saved as a list, and a row the backend dr
   assert.deepEqual(app.proxyValues(), ["socks5://127.0.0.1:1081", "http://a:8080"]);
   assert.equal(app.rejectedProxies(), 0);
   assert.equal(app.saved.length, saves);
+});
+
+function row(target, availability) {
+  return { target, availability, lastCheckedMs: null, consecutiveFailures: 0 };
+}
+
+test("the status line counts stock and untrusted rows and says when Apple's budget stretches the wait", () => {
+  const app = renderApp();
+  const target = (store) => ({ locale: "zh_CN", storeNumber: store, storeTitle: store, partNumber: "A", productName: "iPhone 18 Pro 256GB 黑色" });
+  app.state.rows = [
+    row(target("R1"), { kind: "in_stock" }),
+    row(target("R2"), { kind: "out_of_stock" }),
+    row(target("R3"), { kind: "unknown", reason: "blocked", detail: "HTTP 541" }),
+    // 还没轮到、Apple 还没开放取货：都不算「查不到」。
+    row(target("R4"), { kind: "unknown", reason: "not_yet_checked" }),
+    row(target("R5"), { kind: "unknown", reason: "pickup_not_open", raw: "default" }),
+  ];
+  app.state.running = true;
+  app.state.pacing = { nextCheckInSecs: 30, paced: false };
+  assert.equal(app.status(), "每 30 秒查一轮 · 5 个目标 · 1 个有货 · 1 个查不到");
+  app.state.pacing = { nextCheckInSecs: 85, paced: true };
+  assert.equal(app.status(), "受 Apple 频率限制，下一轮 85 秒后 · 5 个目标 · 1 个有货 · 1 个查不到");
+  app.state.running = false;
+  assert.equal(app.status(), "5 个目标 · 1 个有货 · 1 个查不到");
+});
+
+test("the list groups targets by model with in-stock models first, and removing drops exactly those targets", async () => {
+  const app = renderApp();
+  const target = (store, part) => ({ locale: "zh_CN", storeNumber: store, storeTitle: `上海-${store}`, partNumber: part, productName: `型号 ${part}` });
+  const a1 = target("R1", "A");
+  const a2 = target("R2", "A");
+  const b1 = target("R1", "B");
+  // 先加的 A，后加的 B；快照和后端一样按「地区|门店|零件号」排。
+  app.state.settings = { ...app.state.settings, targets: [a1, a2, b1] };
+  app.state.rows = [row(a1, { kind: "out_of_stock" }), row(b1, { kind: "out_of_stock" }), row(a2, { kind: "out_of_stock" })];
+  assert.deepEqual(app.watchList().groups.map((g) => g.key), ["zh_CN|A", "zh_CN|B"]);
+  app.state.rows = [row(a1, { kind: "out_of_stock" }), row(b1, { kind: "in_stock" }), row(a2, { kind: "out_of_stock" })];
+  assert.deepEqual(app.watchList().groups.map((g) => g.key), ["zh_CN|B", "zh_CN|A"]);
+  // 删掉整组 A，B 原样留下。
+  app.watchList().onRemove([a1, a2]);
+  await new Promise(setImmediate);
+  assert.deepEqual(app.addedTargets.at(-1), [b1]);
+});
+
+test("adding keeps the targets in the order they were added, not the snapshot's store order", async () => {
+  const app = phoneSelectionApp();
+  const watched = (store, part, name) => ({ locale: "zh_CN", storeNumber: store, storeTitle: store, partNumber: part, productName: name });
+  const later = watched("R100", "A", "iPhone 18 Pro 256GB 黑色");
+  const earlier = watched("R900", "C", "iPhone 18 Pro Max 512GB 银色");
+  app.state.settings = { ...app.state.settings, targets: [earlier, later] };
+  app.state.rows = [row(later, { kind: "out_of_stock" }), row(earlier, { kind: "out_of_stock" })];
+  app.addButton().onClick();
+  await new Promise(setImmediate);
+  assert.deepEqual(app.addedTargets.at(-1).map((t) => `${t.storeNumber}|${t.partNumber}`), ["R900|C", "R100|A", "R532|B"]);
+});
+
+test("the add panel says how many of the picked combinations are already being watched", () => {
+  const app = phoneSelectionApp();
+  app.state.stores = [
+    { number: "R532", title: "杭州万象城" },
+    { number: "R471", title: "杭州西湖" },
+  ];
+  app.state.rows = [row({ locale: "zh_CN", storeNumber: "R532", storeTitle: "杭州万象城", partNumber: "B", productName: "iPhone 18 Pro 512GB 银色" }, { kind: "out_of_stock" })];
+  app.choice("选择自提门店").onChange(["R532", "R471"]);
+  assert.equal(app.scaleHint().children.join(""), "1 个型号 × 2 家门店，其中 1 个已在监控列表里");
+  assert.equal(app.addButton().disabled, false);
+  app.choice("选择自提门店").onChange(["R532"]);
+  assert.equal(app.scaleHint().children.join(""), "1 个型号 × 1 家门店，都已在监控列表里");
+  assert.equal(app.addButton().disabled, true, "全都在列表里时没有可加的，按钮不该亮着");
 });

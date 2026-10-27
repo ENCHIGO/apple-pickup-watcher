@@ -58,14 +58,3 @@ export function cleanPushRows(rows: string[]): string[] {
 export function samePushUrls(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((url) => b.includes(url));
 }
-
-/** 设置收起时摘要里的那一段，例如「推送：Bark 2 个、飞书 1 个」。 */
-export function pushSummary(addresses: PushAddress[]): string {
-  if (addresses.length === 0) return "推送未配置";
-  const kinds: PushKind[] = ["bark", "feishu"];
-  const parts = kinds
-    .map((kind) => [kind, addresses.filter((a) => a.kind === kind).length] as const)
-    .filter(([, count]) => count > 0)
-    .map(([kind, count]) => `${PUSH_KIND_LABEL[kind]} ${count} 个`);
-  return `推送：${parts.join("、")}`;
-}

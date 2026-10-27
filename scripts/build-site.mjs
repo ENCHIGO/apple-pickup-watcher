@@ -93,7 +93,7 @@ function render(c) {
         <a class="download-button" href="${releases}">${c.download}</a>
         <a href="${repo}">${c.source}</a>
       </div>
-      <img class="screenshot" src="${asset("assets/screenshot.png")}" alt="${escape(c.screenshotAlt)}" width="1080" height="820">
+      <img class="screenshot" src="${asset("assets/screenshot.png")}" alt="${escape(c.screenshotAlt)}" width="1280" height="820">
     </section>
     <section id="download" class="section">
       <h2>${c.downloadHeading}</h2>

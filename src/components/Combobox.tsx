@@ -47,7 +47,10 @@ export function Combobox({
   const selected = options.find((o) => o.value === value);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    // 模态弹层：下拉都在「添加」侧边面板里打开，面板是模态的，会锁住它以外的
+    // 滚动；弹层渲染在面板外面，非模态时滚轮在列表上被吞掉，几十家门店滚不动。
+    // 模态弹层自己接管滚动锁，列表照常滚。
+    <Popover modal open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
